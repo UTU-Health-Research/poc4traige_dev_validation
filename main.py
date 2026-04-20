@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
 import struct
-from utils import read_binary_samples_hex, convert_binary_data, extract_signals
-from utils import parse_arguments
+from utils import ( 
+    parse_arguments, read_binary_samples_hex, convert_binary_data, 
+    extract_signals, remove_dc_offset, preprocess_signals
+    )
 
 def main():
 
@@ -19,7 +21,8 @@ def main():
 
     print(f"\nDev. Data shape:       {dev_data_raw.shape}")
     signals = extract_signals(dev_data_raw, cut_samples=500)
-
+    signals_clean = remove_dc_offset(signals, exclude=['body_temperature'])
+    preprocessed_signals = preprocess_signals(signals_clean)
 
 
     

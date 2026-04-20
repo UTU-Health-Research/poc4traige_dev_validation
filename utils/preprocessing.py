@@ -1,0 +1,366 @@
+import pandas as pd
+import numpy as np
+from vitalwave.basic_algos import butter_filter
+
+SIGNAL_MAP = {
+    # ECG channels
+    "impedance_pneumography": "ecg_ch1",
+    "lead1":                  "ecg_ch2",
+    "lead2":                  "ecg_ch3",
+    "c1":                     "ecg_ch4",
+    "c2":                     "ecg_ch5",
+    "c3":                     "ecg_ch6",
+    "c4":                     "ecg_ch7",
+    "c5":                     "ecg_ch8",
+
+    # IMU 1 — Ribs
+    "accx_ribs_imu":          "imu1_acc_x",
+    "accy_ribs_imu":          "imu1_acc_y",
+    "accz_ribs_imu":          "imu1_acc_z",
+    "gyrx_ribs_imu":          "imu1_gyr_x",
+    "gyry_ribs_imu":          "imu1_gyr_y",
+    "gyrz_ribs_imu":          "imu1_gyr_z",
+
+    # IMU 2 — Chest
+    "accx_chest_imu":         "imu2_acc_x",
+    "accy_chest_imu":         "imu2_acc_y",
+    "accz_chest_imu":         "imu2_acc_z",
+    "gyrx_chest_imu":         "imu2_gyr_x",
+    "gyry_chest_imu":         "imu2_gyr_y",
+    "gyrz_chest_imu":         "imu2_gyr_z",
+
+    # Temperature
+    "body_temperature":       "temperature",
+}
+
+
+def extract_signals(df, cut_samples=500):
+    """
+    Extracts and trims all signals from the input DataFrame.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Raw DataFrame with 22 columns including timestamps.
+    cut_samples : int, optional
+        Number of initial samples to discard (default: 500).
+
+    Returns
+    -------
+    dict
+        Dictionary with signal names as keys and trimmed
+        pd.Series (reset index) as values.
+
+    Raises
+    ------
+    ValueError
+        If cut_samples exceeds DataFrame length.
+    KeyError
+        If expected columns are missing from the DataFrame.
+    """
+
+    # --- Validation ---
+    if cut_samples >= len(df):
+        raise ValueError(
+            f"cut_samples ({cut_samples}) >= DataFrame length ({len(df)}). "
+            f"Nothing left to extract."
+        )
+
+    # Check for missing columns
+    expected_cols = set(SIGNAL_MAP.values())
+    actual_cols   = set(df.columns)
+    missing       = expected_cols - actual_cols
+
+    if missing:
+        raise KeyError(
+            f"Missing columns in DataFrame: {missing}\n"
+            f"Available columns: {sorted(actual_cols)}"
+        )
+
+    # --- Extraction ---
+    signals = {}
+
+    for signal_name, col_name in SIGNAL_MAP.items():
+        signals[signal_name] = df[col_name][cut_samples:].reset_index(drop=True)
+
+    print(f"[OK] Extracted {len(signals)} signals")
+    print(f"[OK] Discarded first {cut_samples} samples")
+    print(f"[OK] Samples per signal: {len(df) - cut_samples}")
+
+    return signals
+
+
+def remove_dc_offset(signals, exclude=None):
+    """
+    Removes DC offset (mean subtraction) from all signals in the dictionary.
+
+    Parameters
+    ----------
+    signals : dict
+        Dictionary with signal names as keys and pd.Series/np.ndarray as values.
+        (Output of extract_signals)
+    exclude : list of str, optional
+        Signal names to skip from DC removal.
+        e.g., ['body_temperature'] if you want to preserve absolute temperature.
+
+    Returns
+    -------
+    dict
+        New dictionary with DC-offset-removed signals.
+        Excluded signals are returned as unchanged copies.
+
+    Example
+    -------
+    >>> dc_removed = remove_dc_offset(signals)
+    >>> dc_removed = remove_dc_offset(signals, exclude=['body_temperature'])
+    """
+
+    if exclude is None:
+        exclude = []
+
+    # Validate exclusion list
+    invalid_keys = set(exclude) - set(signals.keys())
+    if invalid_keys:
+        print(f"[WARNING] These exclude keys not found in signals: {invalid_keys}")
+
+    dc_removed = {}
+    removed_count = 0
+    skipped_count = 0
+
+    for name, signal in signals.items():
+
+        if name in exclude:
+            dc_removed[name] = signal.copy()
+            skipped_count += 1
+        else:
+            dc_offset = np.mean(signal)
+            dc_removed[name] = signal.copy() - dc_offset
+            removed_count += 1
+
+    print(f"[OK] DC offset removed from {removed_count} signals")
+    if skipped_count > 0:
+        print(f"[OK] Skipped {skipped_count} signals: {exclude}")
+
+    return dc_removed
+
+
+def preprocess_respiration(signal, fs=250):
+    """
+    Respiration Signal Preprocessing using vitalwave:
+        Step 1 → High-pass filter at 0.05 Hz (remove baseline drift)
+        Step 2 → Low-pass filter  at 1.0  Hz (remove high-freq noise)
+
+    Preserves breathing band: 0.1 – 0.5 Hz
+
+    Parameters
+    ----------
+    signal : array-like
+        Raw respiration signal (impedance pneumography).
+    fs : int
+        Sampling frequency in Hz (default: 250).
+
+    Returns
+    -------
+    np.ndarray
+        Cleaned respiration signal.
+    """
+
+    sig = np.array(signal, dtype=np.float64).flatten()
+
+    # Step 1: High-pass at 0.05 Hz → remove slow baseline drift
+    sig_hp = butter_filter(
+        arr=sig,
+        n=2,
+        wn=np.array([0.05]),
+        filter_type='high',
+        fs=fs
+    )
+
+    # Step 2: Low-pass at 1.0 Hz → remove noise above breathing band
+    sig_lp = butter_filter(
+        arr=sig_hp,
+        n=2,
+        wn=np.array([1.0]),
+        filter_type='low',
+        fs=fs
+    )
+
+    return sig_lp
+
+
+def preprocess_ecg(signal, fs=250):
+    """
+    ECG Preprocessing using vitalwave:
+        Step 1 → High-pass filter at 0.5 Hz  (remove baseline wander)
+        Step 2 → Low-pass filter  at 20.0 Hz  (remove high-freq noise)
+
+    Parameters
+    ----------
+    signal : array-like
+        Raw ECG signal.
+    fs : int
+        Sampling frequency in Hz (default: 250).
+
+    Returns
+    -------
+    np.ndarray
+        Cleaned ECG signal.
+    """
+
+    sig = np.array(signal, dtype=np.float64).flatten()
+
+    # Step 1: High-pass at 0.5 Hz → remove baseline wander
+    sig_hp = butter_filter(
+        arr=sig,
+        n=2,
+        wn=np.array([0.5]),
+        filter_type='high',
+        fs=fs
+    )
+
+    # Step 2: Low-pass at 20.0 Hz → remove high-frequency noise
+    sig_lp = butter_filter(
+        arr=sig_hp,
+        n=2,
+        wn=np.array([20.0]),
+        filter_type='low',
+        fs=fs
+    )
+
+    return sig_lp
+
+
+def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0):
+    """
+    IMU Preprocessing using vitalwave:
+        Step 1 → Spike detection (z-score based)
+        Step 2 → Interpolation over spikes
+        Step 3 → Low-pass filter at 2.0 Hz (remove high-freq noise)
+
+    Parameters
+    ----------
+    signal : array-like
+        Raw IMU signal (accelerometer or gyroscope).
+    fs : int
+        Sampling frequency in Hz (default: 250).
+    spike_threshold : float
+        Z-score threshold for spike detection (default: 3.0).
+    highcut : float
+        Low-pass cutoff frequency in Hz (default: 2.0).
+
+    Returns
+    -------
+    sig_lp : np.ndarray
+        Cleaned IMU signal.
+    spike_mask : np.ndarray of bool
+        Boolean mask indicating detected spike locations.
+    """
+
+    sig = np.array(signal, dtype=np.float64).flatten()
+
+    # Step 1: Detect spikes via z-score
+    mean = np.mean(sig)
+    std  = np.std(sig)
+
+    spike_mask = np.abs(sig - mean) > spike_threshold * std
+    n_spikes   = np.sum(spike_mask)
+    print(f"  Spikes detected: {n_spikes} samples "
+          f"({100 * n_spikes / len(sig):.2f}% of signal)")
+
+    # Step 2: Interpolate over spike locations
+    indices      = np.arange(len(sig), dtype=np.float64)
+    good_indices = indices[~spike_mask]
+    good_values  = sig[~spike_mask]
+    sig_clean    = np.interp(indices, good_indices, good_values)
+
+    # Step 3: Low-pass filter at highcut Hz
+    sig_lp = butter_filter(
+        arr=sig_clean,
+        n=4,
+        wn=np.array([highcut]),
+        filter_type='low',
+        fs=fs
+    )
+
+    return sig_lp, spike_mask
+
+
+ECG_SIGNALS = [
+    "lead1", "lead2", "c1", "c2", "c3", "c4", "c5"
+]
+
+RESPIRATION_SIGNALS = [
+    "impedance_pneumography"
+]
+
+IMU_SIGNALS = [
+    "accx_ribs_imu", "accy_ribs_imu", "accz_ribs_imu",
+    "gyrx_ribs_imu", "gyry_ribs_imu", "gyrz_ribs_imu",
+    "accx_chest_imu", "accy_chest_imu", "accz_chest_imu",
+    "gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu",
+]
+
+TEMPERATURE_SIGNALS = [
+    "body_temperature"
+]
+
+
+def preprocess_signals(signals, fs=250):
+    """
+    Applies appropriate preprocessing to each signal based on its type.
+
+    Parameters
+    ----------
+    signals : dict
+        Dictionary from extract_signals (after DC offset removal).
+    fs : int
+        Sampling frequency in Hz (default: 250).
+
+    Returns
+    -------
+    preprocessed : dict
+        Dictionary of preprocessed signals.
+    spike_masks : dict
+        Dictionary of spike masks for IMU signals only.
+    """
+
+    preprocessed = {}
+    spike_masks  = {}
+
+    # ─── ECG Channels ──────────────────────────────────────
+    print("\n[PREPROCESSING] ECG Signals")
+    print("-" * 40)
+    for name in ECG_SIGNALS:
+        if name in signals:
+            preprocessed[name] = preprocess_ecg(signals[name], fs=fs)
+            print(f"  ✓ {name}")
+
+    # ─── Respiration ───────────────────────────────────────
+    print("\n[PREPROCESSING] Respiration Signals")
+    print("-" * 40)
+    for name in RESPIRATION_SIGNALS:
+        if name in signals:
+            preprocessed[name] = preprocess_respiration(signals[name], fs=fs)
+            print(f"  ✓ {name}")
+
+    # ─── IMU Channels ──────────────────────────────────────
+    print("\n[PREPROCESSING] IMU Signals")
+    print("-" * 40)
+    for name in IMU_SIGNALS:
+        if name in signals:
+            print(f"  Processing {name}:")
+            sig_clean, mask = preprocess_imu(signals[name], fs=fs)
+            preprocessed[name] = sig_clean
+            spike_masks[name]  = mask
+
+    # ─── Temperature (pass through — no filtering) ────────
+    print("\n[PREPROCESSING] Temperature")
+    print("-" * 40)
+    for name in TEMPERATURE_SIGNALS:
+        if name in signals:
+            preprocessed[name] = np.array(signals[name], dtype=np.float64).copy()
+            print(f"  ✓ {name} (no filtering applied)")
+
+    print(f"\n[OK] Preprocessed {len(preprocessed)}/{len(signals)} signals")
+
+    return preprocessed, spike_masks
