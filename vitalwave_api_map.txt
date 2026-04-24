@@ -1,0 +1,102 @@
+============================================================
+SUBMODULES
+============================================================
+[MOD] vitalwave.activity
+[MOD] vitalwave.basic_algos
+[MOD] vitalwave.example_data
+[MOD] vitalwave.experimental
+[MOD] vitalwave.features
+[MOD] vitalwave.peak_detectors
+[MOD] vitalwave.signal_quality
+
+============================================================
+TOP-LEVEL ATTRIBUTES
+============================================================
+__builtins__ -> ModuleSpec
+__cached__ -> ModuleSpec
+__doc__ -> ModuleSpec
+__file__ -> ModuleSpec
+__loader__ -> ModuleSpec
+__name__ -> ModuleSpec
+__package__ -> ModuleSpec
+__path__ -> ModuleSpec
+__spec__ -> ModuleSpec
+activity -> module
+basic_algos -> module
+example_data -> module
+experimental -> module
+features -> module
+peak_detectors -> module
+
+============================================================
+MODULE: vitalwave.activity
+============================================================
+  [function] axes_corr(data: numpy.ndarray, size: int = 2)
+  [function] calculate_gravity_and_movement_xyz(arr_ac_x: numpy.ndarray, arr_ac_y: numpy.ndarray, arr_ac_z: numpy.ndarray, fs: float)
+  [function] calculate_gravity_statistics(gravity_data: numpy.ndarray)
+  [function] calculate_polynomial_fit(data: numpy.ndarray)
+  [function] clean_accelerometer_signal(arr: numpy.ndarray, dwt_transform: str = 'bior4.4', dlevels: int = 9, cutoff_low: int = 1, cutoff_high: int = 9) -> numpy.ndarray
+  [function] extract_frequency_domain_features(movement: numpy.ndarray)
+  [function] get_activity_features(arr_ac_x: numpy.ndarray, arr_ac_y: numpy.ndarray, arr_ac_z: numpy.ndarray, fs: float, size: int = 6)
+
+============================================================
+MODULE: vitalwave.basic_algos
+============================================================
+  [function] butter(N, Wn, btype='low', analog=False, output='ba', fs=None)
+  [function] butter_filter(arr: numpy.ndarray, n: int, wn: numpy.ndarray, filter_type: str, fs: int) -> numpy.ndarray
+  [function] calculate_time_delay(arr_ecg: numpy.ndarray, arr_ppg: numpy.ndarray, peaks_ecg, fs: int) -> numpy.ndarray
+  [function] derivative_filter(arr: numpy.ndarray, fs: int) -> numpy.ndarray
+  [function] extract_waveforms(arr: numpy.ndarray, fid_points: numpy.ndarray, mode: str, window: int = None) -> tuple[numpy.ndarray, numpy.ndarray]
+  [function] filter_hr(heart_rates: numpy.ndarray, kernel_size: int = 7, hr_max_diff: int = 16, hr_min: int = 40, hr_max: int = 180) -> numpy.ndarray
+  [function] filter_hr_peaks(peaks, fs: int, hr_min=40, hr_max=200, kernel_size=7, sdsd_max=0.35)
+  [function] filtfilt(b, a, x, axis=-1, padtype='odd', padlen=None, method='pad', irlen=None)
+  [function] hilbert(x, N=None, axis=-1)
+  [function] homomorphic_hilbert_envelope(arr: numpy.ndarray, fs: int, order: int = 1, cutoff_fz: int = 8) -> numpy.ndarray
+  [type] interp1d(x, y, kind='linear', axis=-1, copy=True, bounds_error=None, fill_value=nan, assume_sorted=False)
+  [function] medfilt(volume, kernel_size=None)
+  [function] min_max_normalize(arr: numpy.ndarray, min_val: float = 0.0, max_val: float = 1.0) -> numpy.ndarray
+  [function] moving_average_filter(arr: numpy.ndarray, window: int, type='triang') -> numpy.ndarray
+  [function] resample(timestamps: numpy.ndarray, arr: numpy.ndarray, timestamps_new: numpy.ndarray = None, dt: float = None) -> tuple[numpy.ndarray, numpy.ndarray]
+  [function] segmenting(arr: numpy.ndarray, window_size: int, overlap: int)
+  [function] sosfiltfilt(sos, x, axis=-1, padtype='odd', padlen=None)
+  [function] wavedec(data, wavelet, mode='symmetric', level=None, axis=-1)
+  [function] wavelet_transform_signal(arr: numpy.ndarray, dwt_transform, dlevels, cutoff_low, cutoff_high)
+  [function] waverec(coeffs, wavelet, mode='symmetric', axis=-1)
+
+============================================================
+MODULE: vitalwave.example_data
+============================================================
+  [function] load_biosignal(l_columns: list = None, type: str = 'ECG', clean: bool = True) -> tuple
+
+============================================================
+MODULE: vitalwave.experimental
+============================================================
+  [function] ampd(arr: numpy.ndarray, fs: int) -> numpy.ndarray
+  [function] argrelextrema(data, comparator, axis=0, order=1, mode='clip')
+  [function] derive_ppg_signal_peaks(arr: numpy.ndarray, ppg_peaks: numpy.ndarray, ppg_feets: numpy.ndarray, window_length: int = 9, polyorder: int = 5) -> tuple
+  [function] do_ppg_from_raw_signal(arr: numpy.ndarray, fs: float, signal_integration_window: float = 0, segment: int = 2, threshold: float = 2, return_as_segment=False)
+  [function] find_peaks(x, height=None, threshold=None, distance=None, prominence=None, width=None, wlen=None, rel_height=0.5, plateau_size=None)
+  [function] get_ecg_signal_peaks(arr: numpy.ndarray, r_peaks: numpy.ndarray, fs: int) -> tuple
+  [function] savgol_filter(x, window_length, polyorder, deriv=0, delta=1.0, axis=-1, mode='interp', cval=0.0)
+
+============================================================
+MODULE: vitalwave.features
+============================================================
+  [function] compute_meandist(diff_rri)
+  [function] get_egc_interval_p_t(arr, p_points: numpy.ndarray, t_points: numpy.ndarray, fs: int = 200, max_len: int = 50, threshold: float = 0.0001)
+  [function] get_egc_interval_q_s(arr: numpy.ndarray, q_points: numpy.ndarray, s_points: numpy.ndarray, fs: int = 200, max_len=50, threshold=0.0001)
+  [function] get_egc_interval_q_t(arr, q_points, t_points, fs=200, max_len: int = 50, threshold: float = 0.0001)
+  [function] get_global_egc_features(r_peaks: numpy.ndarray, fs: int = 100, min_rr_interval: int = 50)
+  [function] get_ppg_peak_amplitude_ratio(arr: numpy.ndarray, feets: numpy.ndarray, systolic_peaks: numpy.ndarray, diastolic_peaks: numpy.ndarray) -> list
+  [function] get_ppg_peak_integral_ratio(arr: numpy.ndarray, feets: numpy.ndarray, dicrotic_valley: numpy.ndarray, problems: numpy.ndarray) -> list
+
+============================================================
+MODULE: vitalwave.peak_detectors
+============================================================
+  [function] ampd(arr: numpy.ndarray, fs: int) -> numpy.ndarray
+  [function] detrend(data: 'np.ndarray', axis: 'int' = -1, type: "Literal['linear', 'constant']" = 'linear', bp: 'ArrayLike | int' = 0, overwrite_data: 'bool' = False) -> 'np.ndarray'
+  [function] ecg_modified_pan_tompkins(arr: numpy.ndarray, fs: int) -> numpy.ndarray
+  [function] find_peaks(x, height=None, threshold=None, distance=None, prominence=None, width=None, wlen=None, rel_height=0.5, plateau_size=None)
+  [function] get_peaks_from_ppg_using_segments(arr: numpy.ndarray, fs: float, set_overlap: float, signal_window_triangular: float = 0, segment: int = 3, get_peaks_only: bool = False)
+  [function] msptd(arr: numpy.ndarray, fs: int) -> tuple[numpy.ndarray, numpy.ndarray]
+  Could not inspect vitalwave.signal_quality: cannot import name 'skew' from 'scipy.signal' (C:\Users\usazma\AppData\Local\anaconda3\envs\nnLayers\lib\site-packages\scipy\signal\__init__.py)

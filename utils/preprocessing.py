@@ -264,8 +264,8 @@ def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0):
 
     spike_mask = np.abs(sig - mean) > spike_threshold * std
     n_spikes   = np.sum(spike_mask)
-    print(f"  Spikes detected: {n_spikes} samples "
-          f"({100 * n_spikes / len(sig):.2f}% of signal)")
+    # print(f"  Spikes detected: {n_spikes} samples "
+    #       f"({100 * n_spikes / len(sig):.2f}% of signal)")
 
     # Step 2: Interpolate over spike locations
     indices      = np.arange(len(sig), dtype=np.float64)
