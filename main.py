@@ -1,10 +1,13 @@
+from pyexpat import features
+
 import pandas as pd
 import numpy as np
 import struct
 from utils import ( 
     parse_arguments, read_binary_samples_hex, convert_binary_data, 
-    extract_signals, remove_dc_offset, preprocess_signals, 
-    extract_all_features, export_all, visualize_all
+    extract_signals, remove_dc_offset, preprocess_signals, preprocess_ecg, preprocess_respiration,
+    extract_ecg_features, extract_respiration_features, extract_all_features, export_all, visualize_all,
+    read_all_references, inspect_edf, inspect_acq
     )
 
 def main():
@@ -25,34 +28,91 @@ def main():
     signals_clean = remove_dc_offset(signals, exclude=['body_temperature'])
     preprocessed_signals, spike_masks = preprocess_signals(signals_clean)
 
-    features, fiducials = extract_all_features(preprocessed_signals, fs=250)
+    dev_features, dev_fiducials = extract_all_features(preprocessed_signals, fs=250)
 
-    # Inspect results
-    print(f"\nSample features:")
-    for i, (key, val) in enumerate(features.items()):
-        print(f"  {key}: {val}")
-        if i > 20:
-            print(f"  ... and {len(features) - 21} more")
-            break
 
-    # Export everything
-    saved_files = export_all(
-        features, fiducials,
-        output_dir="outputs/features"
+    # ─── REFERENCE SIGNALS ───────────────────────────────────
+    print("\n" + "=" * 60)
+    print("[PIPELINE] Processing Reference Signals")
+    print("=" * 60)
+
+    ref_signals, ref_metadata = read_all_references(
+        bitt_path=args['bitt_path'],
+        bpc_path=args['bpc_path'],
+        target_fs=250,
+        cut_samples=500
     )
 
-    # Generate all visualizations
+    # DC offset removal for reference signals
+    ref_signals_dc = remove_dc_offset(ref_signals)
+
+    ref_preprocessed = {}
+    for name, sig in ref_signals_dc.items():
+        if name.startswith('ref_lead'):
+            ref_preprocessed[name] = preprocess_ecg(sig, fs=250)
+            print(f"  [OK] Preprocessed {name} (ECG pipeline)")
+        elif name.startswith('ref_resp'):
+            ref_preprocessed[name] = preprocess_respiration(sig, fs=250)
+            print(f"  [OK] Preprocessed {name} (Respiration pipeline)")
+        elif name.startswith('ref_acc'):
+            from utils.preprocessing import preprocess_imu
+            ref_preprocessed[name], _ = preprocess_imu(sig, fs=250)
+            print(f"  [OK] Preprocessed {name} (IMU pipeline)")
+        else:
+            ref_preprocessed[name] = sig
+
+    ref_features = {}
+    ref_fiducials = {}
+
+    # Reference ECG features
+    for name in ['ref_lead1', 'ref_lead2', 'ref_lead3']:
+        if name in ref_preprocessed:
+            feats, fids = extract_ecg_features(
+                ref_preprocessed[name], fs=250, signal_name=name
+            )
+            ref_features.update(feats)
+            ref_fiducials.update(fids)
+
+    # Reference respiration features
+    if 'ref_respiration' in ref_preprocessed:
+        feats, fids = extract_respiration_features(
+            ref_preprocessed['ref_respiration'], fs=250,
+            signal_name='ref_respiration'
+        )
+        ref_features.update(feats)
+        ref_fiducials.update(fids)
+
+    # ─── EXPORT ───────────────────────────────────────────────
+    print("\n" + "=" * 60)
+    print("[PIPELINE] Exporting Results")
+    print("=" * 60)
+
+    # Device features
+    export_all(
+        dev_features, dev_fiducials,
+        output_dir="outputs/device_features"
+    )
+
+    # Reference features
+    export_all(
+        ref_features, ref_fiducials,
+        output_dir="outputs/reference_features"
+    )
+
+    # ─── VISUALIZE DEV ────────────────────────────────────────────
     visualize_all(
         raw_signals=signals_clean,
         preprocessed=preprocessed_signals,
-        fiducials=fiducials,
-        features=features,
+        fiducials=dev_fiducials,
+        features=dev_features,
         spike_masks=spike_masks,
         fs=250,
-        output_dir="outputs/plots",
-        show=False,    # set True for interactive viewing
-        save=True
+        output_dir="outputs/plots/device",
+        show=False, save=True
     )
+
+    print(f"\n[DONE] Device features:    {len(dev_features)}")
+    print(f"[DONE] Reference features: {len(ref_features)}")
 
 
 if __name__ == "__main__":
