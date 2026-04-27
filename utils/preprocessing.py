@@ -87,7 +87,7 @@ def extract_signals(df, cut_starting_samples=0, cut_ending_samples=0):
 
     print(f"[OK] Extracted {len(signals)} signals")
     print(f"[OK] Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
-    print(f"[OK] Samples per signal: {len(df) - cut_starting_samples - cut_ending_samples}")
+    print(f"[OK] Samples per signal: {len(df) - cut_starting_samples - cut_ending_samples}, {((len(df) - cut_starting_samples - cut_ending_samples) / 250):.2f}s")
 
     return signals
 

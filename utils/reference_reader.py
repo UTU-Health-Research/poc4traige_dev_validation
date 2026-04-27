@@ -180,7 +180,7 @@ def read_bittium_edf(filepath, channel_map=None, cut_starting_samples=0, cut_end
 
     print(f"\n  Fs:        {fs} Hz")
     print(f"  Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
-    print(f"  Duration:  {metadata['duration_sec']:.2f} s")
+    # print(f"  Duration:  {metadata['duration_sec']:.2f} s")
     print(f"  Extracted: {len(signals)} channels")
 
     return signals, metadata

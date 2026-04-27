@@ -90,7 +90,7 @@ def extract_ecg_features(signal, fs=250, signal_name="ecg"):
             kernel_size=7,
             sdsd_max=0.35
         )
-        r_peaks_clean = np.array(r_peaks_filtered, dtype=int)
+        r_peaks_clean = np.array(r_peaks_filtered[0], dtype=int)
         features[f"{signal_name}_n_r_peaks_raw"]      = len(r_peaks)
         features[f"{signal_name}_n_r_peaks_filtered"]  = len(r_peaks_clean)
         features[f"{signal_name}_peaks_rejected_pct"]  = round(

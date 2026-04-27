@@ -5,7 +5,7 @@ import numpy as np
 import struct
 from utils import ( 
     parse_arguments, read_binary_samples_hex, convert_binary_data, 
-    extract_signals, remove_dc_offset, preprocess_signals, preprocess_ecg, preprocess_respiration,
+    extract_signals, remove_dc_offset, preprocess_signals, preprocess_ecg, preprocess_respiration, align_signals,
     extract_ecg_features, extract_respiration_features, extract_all_features, export_all, visualize_all,
     read_all_references, compare_features, plot_all_signal_overlays, assess_all_quality, 
     export_quality_report, plot_quality_dashboard
@@ -18,10 +18,10 @@ def main():
     args = parse_arguments()
 
     # ═════════════════════════════════════════════════════════
-    #  DEVICE PIPELINE
+    #  DEVICE + REF SIGNAL READING AND AlIGNMENT
     # ═════════════════════════════════════════════════════════
     print("\n" + "=" * 60)
-    print("[PIPELINE] Processing Device Signals")
+    print("DEVICE + REF SIGNAL READING AND AlIGNMENT")
     print("=" * 60)
 
     dev_path = args['dev_path']  # device data (ECG + IMU + Temperature)
@@ -35,6 +35,74 @@ def main():
     signals_clean = remove_dc_offset(signals, exclude=['body_temperature'])
     preprocessed_signals, spike_masks = preprocess_signals(signals_clean)
 
+    print(f'\n  Device signals after preprocessing: {list(preprocessed_signals.keys())}')
+
+    # Reading refence signals (ECG + Respiration)
+    ref_signals, ref_metadata = read_all_references(
+        bitt_path=args['bitt_path'], # reference data (ECG)
+        bpc_path=args['bpc_path'], # reference data (Respiration)
+        target_fs=250,
+        cut_starting_samples=5000,
+        cut_ending_samples=11000
+    )
+
+    # DC offset removal for reference signals
+    ref_signals_dc = remove_dc_offset(ref_signals)
+    print(f'\n  Reference signals after DC offset removal: {list(ref_signals_dc.keys())}')
+
+    ref_preprocessed = {}
+    for name, sig in ref_signals_dc.items():
+        if name.startswith('ref_lead'):
+            ref_preprocessed[name] = preprocess_ecg(sig, fs=250)
+            print(f"  [OK] Preprocessed {name} (ECG pipeline)")
+        elif name.startswith('ref_resp'):
+            ref_preprocessed[name] = preprocess_respiration(sig, fs=250)
+            print(f"  [OK] Preprocessed {name} (Respiration pipeline)")
+        # elif name.startswith('ref_acc'):
+        #     from utils.preprocessing import preprocess_imu
+        #     ref_preprocessed[name], _ = preprocess_imu(sig, fs=250)
+        #     print(f"  [OK] Preprocessed {name} (IMU pipeline)")
+        else:
+            ref_preprocessed[name] = sig
+
+    print(f'\n  Preprocessed reference signals: {list(ref_preprocessed.keys())}')
+
+    aligned_signals = {}
+    signals_to_align = {
+    "lead1"  : {"device": "lead1", "ref": "ref_lead1"},
+    "lead2" : {"device": "lead2", "ref": "ref_lead2"},
+    "respiration" : {"device": "impedance_pneumography", "ref": "ref_respiration"}
+    }
+
+    for lead_name, pair in signals_to_align.items():
+        dev_al, bit_al, lag = align_signals(
+            preprocessed_signals[pair["device"]],
+            ref_preprocessed[pair["ref"]],
+            fs=250
+        )
+        aligned_signals[lead_name] = {
+            "device"  : dev_al,
+            "ref" : bit_al
+        }
+        print(f"{lead_name}:")
+        print(f"  Best lag         : {lag} samples ({lag/250:.3f}s)")
+        print(f"  Samples aligned  : {len(dev_al)}")
+        print(f"  Duration aligned : {len(dev_al)/250:.2f}s")
+        print(f" Aligned signals keys: {list(aligned_signals.keys())}\n")
+
+
+    # replace preprocessed signals with aligned versions for ECG and respiration
+    preprocessed_signals['lead1'] = aligned_signals.get('lead1', {}).get('device')
+    preprocessed_signals['lead2'] = aligned_signals.get('lead2', {}).get('device')
+    preprocessed_signals['impedance_pneumography'] = aligned_signals.get('respiration', {}).get('device')
+
+    # also update the reference preprocessed signals with the aligned versions
+    ref_preprocessed['ref_lead1'] = aligned_signals.get('lead1', {}).get('ref')
+    ref_preprocessed['ref_lead2'] = aligned_signals.get('lead2', {}).get('ref')
+    ref_preprocessed['ref_respiration'] = aligned_signals.get('respiration', {}).get('ref')
+
+
+    # extract features and fiducials from device signals (for comparison later)
     dev_features, dev_fiducials = extract_all_features(preprocessed_signals, fs=250)
 
     # ═════════════════════════════════════════════════════════
@@ -58,38 +126,12 @@ def main():
     print("[PIPELINE] Processing Reference Signals")
     print("=" * 60)
 
-    ref_signals, ref_metadata = read_all_references(
-        bitt_path=args['bitt_path'], # reference data (ECG)
-        bpc_path=args['bpc_path'], # reference data (Respiration)
-        target_fs=250,
-        cut_starting_samples=5000,
-        cut_ending_samples=11000
-    )
-
-    # DC offset removal for reference signals
-    ref_signals_dc = remove_dc_offset(ref_signals)
-    print(f'\n  Signals after DC offset removal: {list(ref_signals_dc.keys())}')
-
-    ref_preprocessed = {}
-    for name, sig in ref_signals_dc.items():
-        if name.startswith('ref_lead'):
-            ref_preprocessed[name] = preprocess_ecg(sig, fs=250)
-            print(f"  [OK] Preprocessed {name} (ECG pipeline)")
-        elif name.startswith('ref_resp'):
-            ref_preprocessed[name] = preprocess_respiration(sig, fs=250)
-            print(f"  [OK] Preprocessed {name} (Respiration pipeline)")
-        elif name.startswith('ref_acc'):
-            from utils.preprocessing import preprocess_imu
-            ref_preprocessed[name], _ = preprocess_imu(sig, fs=250)
-            print(f"  [OK] Preprocessed {name} (IMU pipeline)")
-        else:
-            ref_preprocessed[name] = sig
-
     ref_features = {}
     ref_fiducials = {}
 
     # Reference ECG features
-    for name in ['ref_lead1', 'ref_lead2', 'ref_lead3']:
+    # for name in ['ref_lead1', 'ref_lead2', 'ref_lead3']:
+    for name in ['ref_lead1', 'ref_lead2']:
         if name in ref_preprocessed:
             feats, fids = extract_ecg_features(
                 ref_preprocessed[name], fs=250, signal_name=name

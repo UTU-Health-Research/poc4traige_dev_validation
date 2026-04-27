@@ -380,7 +380,7 @@ def assess_ecg_quality(signal, fs=250, signal_name="ecg"):
             hr_min=40, hr_max=200,
             kernel_size=7, sdsd_max=0.35
         )
-        r_peaks_filtered = np.array(r_peaks_filtered, dtype=int)
+        r_peaks_filtered = np.array(r_peaks_filtered[0], dtype=int)
 
         rejection_rate = 1 - len(r_peaks_filtered) / max(len(r_peaks), 1)
         quality['n_r_peaks_raw'] = len(r_peaks)
