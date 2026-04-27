@@ -5,3 +5,5 @@ from .feature_extraction import extract_all_features, extract_ecg_features, extr
 from .feature_export import export_all
 from .visualization import visualize_all
 from .reference_reader import read_all_references, inspect_edf, inspect_acq
+from .comparison import compare_features, plot_all_signal_overlays
+from .signal_quality import assess_all_quality, export_quality_report, plot_quality_dashboard

@@ -7,44 +7,68 @@ from utils import (
     parse_arguments, read_binary_samples_hex, convert_binary_data, 
     extract_signals, remove_dc_offset, preprocess_signals, preprocess_ecg, preprocess_respiration,
     extract_ecg_features, extract_respiration_features, extract_all_features, export_all, visualize_all,
-    read_all_references, inspect_edf, inspect_acq
+    read_all_references, compare_features, plot_all_signal_overlays, assess_all_quality, 
+    export_quality_report, plot_quality_dashboard
     )
+
 
 def main():
 
-    # Step 1: Get file path from terminal
+    # Get file path from terminal
     args = parse_arguments()
 
-    dev_path = args['dev_path']  # device data (ECG + IMU + Temperature)
-    bitt_path = args['bitt_path']  # reference data (ECG)
-    bpc_path = args['bpc_path']  # reference data (Respiration)
+    # ═════════════════════════════════════════════════════════
+    #  DEVICE PIPELINE
+    # ═════════════════════════════════════════════════════════
+    print("\n" + "=" * 60)
+    print("[PIPELINE] Processing Device Signals")
+    print("=" * 60)
 
-    # Step 2: Read binary data from device file
+    dev_path = args['dev_path']  # device data (ECG + IMU + Temperature)
+
+    # Read binary data from device file
     _, raw = read_binary_samples_hex(dev_path,88)
     dev_data_raw = convert_binary_data(raw)
 
     print(f"\nDev. Data shape:       {dev_data_raw.shape}")
-    signals = extract_signals(dev_data_raw, cut_samples=500)
+    signals = extract_signals(dev_data_raw, cut_starting_samples=5000, cut_ending_samples=11000)
     signals_clean = remove_dc_offset(signals, exclude=['body_temperature'])
     preprocessed_signals, spike_masks = preprocess_signals(signals_clean)
 
     dev_features, dev_fiducials = extract_all_features(preprocessed_signals, fs=250)
 
+    # ═════════════════════════════════════════════════════════
+    #  DEVICE SIGNAL QUALITY
+    # ═════════════════════════════════════════════════════════
+    print("\n" + "=" * 60)
+    print("[PIPELINE] Device Signal Quality Assessment")
+    print("=" * 60)
 
-    # ─── REFERENCE SIGNALS ───────────────────────────────────
+    dev_quality = assess_all_quality(
+        preprocessed_signals, fs=250, spike_masks=spike_masks
+    )
+    export_quality_report(dev_quality, output_dir="outputs/quality/device/reports")
+    plot_quality_dashboard(dev_quality, output_dir="outputs/quality/device/plots")
+
+
+    # ═════════════════════════════════════════════════════════
+    #  REFERENCE PIPELINE
+    # ═════════════════════════════════════════════════════════
     print("\n" + "=" * 60)
     print("[PIPELINE] Processing Reference Signals")
     print("=" * 60)
 
     ref_signals, ref_metadata = read_all_references(
-        bitt_path=args['bitt_path'],
-        bpc_path=args['bpc_path'],
+        bitt_path=args['bitt_path'], # reference data (ECG)
+        bpc_path=args['bpc_path'], # reference data (Respiration)
         target_fs=250,
-        cut_samples=500
+        cut_starting_samples=5000,
+        cut_ending_samples=11000
     )
 
     # DC offset removal for reference signals
     ref_signals_dc = remove_dc_offset(ref_signals)
+    print(f'\n  Signals after DC offset removal: {list(ref_signals_dc.keys())}')
 
     ref_preprocessed = {}
     for name, sig in ref_signals_dc.items():
@@ -82,7 +106,20 @@ def main():
         ref_features.update(feats)
         ref_fiducials.update(fids)
 
-    # ─── EXPORT ───────────────────────────────────────────────
+    # ═════════════════════════════════════════════════════════
+    #  REFERENCE SIGNAL QUALITY
+    # ═════════════════════════════════════════════════════════
+    print("\n" + "=" * 60)
+    print("[PIPELINE] Reference Signal Quality Assessment")
+    print("=" * 60)
+
+    ref_quality = assess_all_quality(ref_preprocessed, fs=250)
+    export_quality_report(ref_quality, output_dir="outputs/quality/reference/reports")
+    plot_quality_dashboard(ref_quality, output_dir="outputs/quality/reference/plots")
+
+    # ═════════════════════════════════════════════════════════
+    #  EXPORT FEATURES
+    # ═════════════════════════════════════════════════════════
     print("\n" + "=" * 60)
     print("[PIPELINE] Exporting Results")
     print("=" * 60)
@@ -99,7 +136,30 @@ def main():
         output_dir="outputs/reference_features"
     )
 
-    # ─── VISUALIZE DEV ────────────────────────────────────────────
+    # ═════════════════════════════════════════════════════════
+    #  COMPARISON
+    # ═════════════════════════════════════════════════════════
+    print("\n" + "=" * 60)
+    print("[PIPELINE] Device vs Reference Comparison")
+    print("=" * 60)
+
+    comparison_results = compare_features(
+        dev_features=dev_features,
+        ref_features=ref_features,
+        output_dir="outputs/comparison"
+    )
+
+    plot_all_signal_overlays(
+        dev_preprocessed=preprocessed_signals,
+        ref_preprocessed=ref_preprocessed,
+        fs=250,
+        output_dir="outputs/comparison/plots",
+        show=False, save=True
+    )
+
+    # ═════════════════════════════════════════════════════════
+    #  VISUALIZE
+    # ═════════════════════════════════════════════════════════
     visualize_all(
         raw_signals=signals_clean,
         preprocessed=preprocessed_signals,
@@ -111,8 +171,15 @@ def main():
         show=False, save=True
     )
 
-    print(f"\n[DONE] Device features:    {len(dev_features)}")
-    print(f"[DONE] Reference features: {len(ref_features)}")
+    # ═════════════════════════════════════════════════════════
+    #  FINAL SUMMARY
+    # ═════════════════════════════════════════════════════════
+    print("\n" + "=" * 60)
+    print("[DONE] Pipeline Complete")
+    print("=" * 60)
+    print(f"  Device features:    {len(dev_features)}")
+    print(f"  Reference features: {len(ref_features)}")
+    print(f"  Comparison pairs:   {len(comparison_results)}")
 
 
 if __name__ == "__main__":

@@ -109,13 +109,13 @@ BITTIUM_CHANNEL_MAP = {
     "ref_lead1": "ECG_1",
     "ref_lead2": "ECG_2",
     "ref_lead3": "ECG_3",
-    "ref_acc_x": "Accelerometer_X",
-    "ref_acc_y": "Accelerometer_Y",
-    "ref_acc_z": "Accelerometer_Z",
+    # "ref_acc_x": "Accelerometer_X",
+    # "ref_acc_y": "Accelerometer_Y",
+    # "ref_acc_z": "Accelerometer_Z",
 }
 
 
-def read_bittium_edf(filepath, channel_map=None, cut_samples=0):
+def read_bittium_edf(filepath, channel_map=None, cut_starting_samples=0, cut_ending_samples=0):
     """
     Read Bittium Faros .EDF file and extract signals.
 
@@ -126,8 +126,10 @@ def read_bittium_edf(filepath, channel_map=None, cut_samples=0):
     channel_map : dict, optional
         Custom mapping {friendly_name: edf_channel_name}.
         If None, uses default BITTIUM_CHANNEL_MAP.
-    cut_samples : int
+    cut_starting_samples : int
         Number of initial samples to discard (default: 0).
+    cut_ending_samples : int
+        Number of ending samples to discard (default: 0).
 
     Returns
     -------
@@ -157,8 +159,8 @@ def read_bittium_edf(filepath, channel_map=None, cut_samples=0):
             sig = data.flatten()
 
             # Apply cut
-            if cut_samples > 0 and cut_samples < len(sig):
-                sig = sig[cut_samples:]
+            if cut_starting_samples > 0 and cut_starting_samples < len(sig):
+                sig = sig[cut_starting_samples:-1*cut_ending_samples if cut_ending_samples > 0 else None]
 
             signals[friendly_name] = sig
             print(f"  [OK] {friendly_name:<20} <- {edf_name:<25} "
@@ -172,10 +174,12 @@ def read_bittium_edf(filepath, channel_map=None, cut_samples=0):
         'fs': fs,
         'duration_sec': edf_file.times[-1],
         'n_channels_extracted': len(signals),
-        'cut_samples': cut_samples,
+        'cut_starting_samples': cut_starting_samples,
+        'cut_ending_samples': cut_ending_samples,
     }
 
     print(f"\n  Fs:        {fs} Hz")
+    print(f"  Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
     print(f"  Duration:  {metadata['duration_sec']:.2f} s")
     print(f"  Extracted: {len(signals)} channels")
 
@@ -193,7 +197,7 @@ BIOPAC_CHANNEL_MAP = {
 }
 
 
-def read_biopac_acq(filepath, channel_map=None, cut_samples=0):
+def read_biopac_acq(filepath, channel_map=None, cut_starting_samples=0, cut_ending_samples=0):
     """
     Read Biopac .acq file and extract signals.
 
@@ -236,8 +240,8 @@ def read_biopac_acq(filepath, channel_map=None, cut_samples=0):
             ch_fs = ch.samples_per_second
 
             # Apply cut
-            if cut_samples > 0 and cut_samples < len(sig):
-                sig = sig[cut_samples:]
+            if cut_starting_samples > 0 and cut_starting_samples < len(sig):
+                sig = sig[cut_starting_samples:-1*cut_ending_samples if cut_ending_samples > 0 else None]
 
             signals[friendly_name] = sig
             fs_map[friendly_name] = ch_fs
@@ -252,10 +256,12 @@ def read_biopac_acq(filepath, channel_map=None, cut_samples=0):
         'filepath': filepath,
         'fs_map': fs_map,
         'n_channels_extracted': len(signals),
-        'cut_samples': cut_samples,
+        'cut_starting_samples': cut_starting_samples,
+        'cut_ending_samples': cut_ending_samples,
     }
 
     print(f"\n  Extracted: {len(signals)} channels")
+    print(f"  Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
 
     return signals, metadata
 
@@ -264,7 +270,7 @@ def read_biopac_acq(filepath, channel_map=None, cut_samples=0):
 #  MASTER REFERENCE READER
 # ═══════════════════════════════════════════════════════════════
 
-def read_all_references(bitt_path, bpc_path, target_fs=250, cut_samples=0):
+def read_all_references(bitt_path, bpc_path, target_fs=250, cut_starting_samples=0, cut_ending_samples=0):
     """
     Master function: reads both reference files and resamples to target_fs.
 
@@ -276,8 +282,10 @@ def read_all_references(bitt_path, bpc_path, target_fs=250, cut_samples=0):
         Path to Biopac .acq file.
     target_fs : int
         Target sampling frequency for all signals (default: 250 Hz).
-    cut_samples : int
+    cut_starting_samples : int
         Number of initial samples to discard (default: 0).
+    cut_ending_samples : int
+        Number of ending samples to discard (default: 0).
 
     Returns
     -------
@@ -296,7 +304,7 @@ def read_all_references(bitt_path, bpc_path, target_fs=250, cut_samples=0):
 
     # ─── Bittium Faros (ECG) ──────────────────────────────
     bitt_signals, bitt_meta = read_bittium_edf(
-        bitt_path, cut_samples=cut_samples
+        bitt_path, cut_starting_samples=cut_starting_samples, cut_ending_samples=cut_ending_samples
     )
     ref_metadata['bittium'] = bitt_meta
     bitt_fs = bitt_meta['fs']
@@ -312,7 +320,7 @@ def read_all_references(bitt_path, bpc_path, target_fs=250, cut_samples=0):
 
     # ─── Biopac (Respiration) ─────────────────────────────
     bpc_signals, bpc_meta = read_biopac_acq(
-        bpc_path, cut_samples=cut_samples
+        bpc_path, cut_starting_samples=cut_starting_samples, cut_ending_samples=cut_ending_samples
     )
     ref_metadata['biopac'] = bpc_meta
 

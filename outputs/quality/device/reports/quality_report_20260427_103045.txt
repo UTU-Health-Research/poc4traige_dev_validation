@@ -1,0 +1,395 @@
+======================================================================
+SIGNAL QUALITY ASSESSMENT REPORT
+Generated: 2026-04-27 10:30:45
+======================================================================
+
+Signal                            Score    Quality
+--------------------------------------------------
+lead1                             73.0       good
+lead2                             64.0   moderate
+c1                                62.0   moderate
+c2                                60.0   moderate
+c3                                73.0       good
+c4                                64.0   moderate
+c5                                60.0   moderate
+impedance_pneumography            79.0       good
+imu_ribs                          63.0   moderate
+imu_chest                         63.0   moderate
+body_temperature                  70.0       good
+
+==================================================
+  lead1
+==================================================
+  signal_name                        : lead1
+  snr_db                             : 13.7090
+  snr_quality                        : good
+  peak_detection_error               : setting an array element with a sequence. The requested array has an inhomogeneous shape after 1 dimensions. The detected shape was (2,) + inhomogeneous part.
+  skewness                           : 1.8054
+  skewness_quality                   : moderate
+  kurtosis                           : 2.3586
+  kurtosis_quality                   : good
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 0.6836
+  rms_amplitude                      : 0.1432
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.0837
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0029
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 66.2815
+  seg_quality_std                    : 5.8685
+  seg_quality_min                    : 57.0918
+  seg_quality_max                    : 77.3576
+  seg_n_good                         : 4
+  seg_n_moderate                     : 10
+  seg_n_poor                         : 0
+  seg_total                          : 14
+  overall_score                      : 73.0000
+  overall_quality                    : good
+
+==================================================
+  lead2
+==================================================
+  signal_name                        : lead2
+  snr_db                             : 13.5164
+  snr_quality                        : good
+  peak_detection_error               : setting an array element with a sequence. The requested array has an inhomogeneous shape after 1 dimensions. The detected shape was (2,) + inhomogeneous part.
+  skewness                           : 2.3345
+  skewness_quality                   : poor
+  kurtosis                           : 5.7631
+  kurtosis_quality                   : moderate
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 0.9714
+  rms_amplitude                      : 0.1555
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.3144
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0021
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 52.5371
+  seg_quality_std                    : 4.5580
+  seg_quality_min                    : 40.7875
+  seg_quality_max                    : 62.9599
+  seg_n_good                         : 0
+  seg_n_moderate                     : 14
+  seg_n_poor                         : 0
+  seg_total                          : 14
+  overall_score                      : 64.0000
+  overall_quality                    : moderate
+
+==================================================
+  c1
+==================================================
+  signal_name                        : c1
+  snr_db                             : 19.6944
+  snr_quality                        : good
+  peak_detection_error               : setting an array element with a sequence. The requested array has an inhomogeneous shape after 1 dimensions. The detected shape was (2,) + inhomogeneous part.
+  skewness                           : -4.3634
+  skewness_quality                   : poor
+  kurtosis                           : 20.5240
+  kurtosis_quality                   : poor
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 1.0136
+  rms_amplitude                      : 0.1339
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.5099
+  qrs_band_quality                   : moderate
+  baseline_wander_ratio              : 0.0005
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 46.0485
+  seg_quality_std                    : 3.9004
+  seg_quality_min                    : 36.6956
+  seg_quality_max                    : 50.0000
+  seg_n_good                         : 0
+  seg_n_moderate                     : 13
+  seg_n_poor                         : 1
+  seg_total                          : 14
+  overall_score                      : 62.0000
+  overall_quality                    : moderate
+
+==================================================
+  c2
+==================================================
+  signal_name                        : c2
+  snr_db                             : 16.5857
+  snr_quality                        : good
+  peak_detection_error               : setting an array element with a sequence. The requested array has an inhomogeneous shape after 1 dimensions. The detected shape was (2,) + inhomogeneous part.
+  skewness                           : -2.1002
+  skewness_quality                   : poor
+  kurtosis                           : 9.6826
+  kurtosis_quality                   : poor
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 1.3429
+  rms_amplitude                      : 0.1798
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.3360
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0013
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 52.3407
+  seg_quality_std                    : 7.3344
+  seg_quality_min                    : 38.8828
+  seg_quality_max                    : 61.3406
+  seg_n_good                         : 0
+  seg_n_moderate                     : 13
+  seg_n_poor                         : 1
+  seg_total                          : 14
+  overall_score                      : 60.0000
+  overall_quality                    : moderate
+
+==================================================
+  c3
+==================================================
+  signal_name                        : c3
+  snr_db                             : 13.6411
+  snr_quality                        : good
+  peak_detection_error               : setting an array element with a sequence. The requested array has an inhomogeneous shape after 1 dimensions. The detected shape was (2,) + inhomogeneous part.
+  skewness                           : 1.6298
+  skewness_quality                   : moderate
+  kurtosis                           : 2.1162
+  kurtosis_quality                   : good
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 1.2260
+  rms_amplitude                      : 0.2279
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.0915
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0028
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 67.8452
+  seg_quality_std                    : 6.2479
+  seg_quality_min                    : 59.8902
+  seg_quality_max                    : 80.3255
+  seg_n_good                         : 6
+  seg_n_moderate                     : 8
+  seg_n_poor                         : 0
+  seg_total                          : 14
+  overall_score                      : 73.0000
+  overall_quality                    : good
+
+==================================================
+  c4
+==================================================
+  signal_name                        : c4
+  snr_db                             : 15.3696
+  snr_quality                        : good
+  peak_detection_error               : setting an array element with a sequence. The requested array has an inhomogeneous shape after 1 dimensions. The detected shape was (2,) + inhomogeneous part.
+  skewness                           : 2.1949
+  skewness_quality                   : poor
+  kurtosis                           : 4.4825
+  kurtosis_quality                   : moderate
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 1.1902
+  rms_amplitude                      : 0.2069
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.2913
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0019
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 60.7977
+  seg_quality_std                    : 5.4101
+  seg_quality_min                    : 51.9220
+  seg_quality_max                    : 71.5964
+  seg_n_good                         : 1
+  seg_n_moderate                     : 13
+  seg_n_poor                         : 0
+  seg_total                          : 14
+  overall_score                      : 64.0000
+  overall_quality                    : moderate
+
+==================================================
+  c5
+==================================================
+  signal_name                        : c5
+  snr_db                             : 15.8279
+  snr_quality                        : good
+  peak_detection_error               : setting an array element with a sequence. The requested array has an inhomogeneous shape after 1 dimensions. The detected shape was (2,) + inhomogeneous part.
+  skewness                           : 2.5644
+  skewness_quality                   : poor
+  kurtosis                           : 7.0047
+  kurtosis_quality                   : poor
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 1.1153
+  rms_amplitude                      : 0.1785
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.3371
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0017
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 53.4833
+  seg_quality_std                    : 6.2888
+  seg_quality_min                    : 43.8466
+  seg_quality_max                    : 65.4144
+  seg_n_good                         : 0
+  seg_n_moderate                     : 14
+  seg_n_poor                         : 0
+  seg_total                          : 14
+  overall_score                      : 60.0000
+  overall_quality                    : moderate
+
+==================================================
+  impedance_pneumography
+==================================================
+  signal_name                        : impedance_pneumography
+  snr_db                             : 12.1857
+  snr_quality                        : good
+  n_peaks_ampd                       : 15
+  n_peaks_msptd                      : 29
+  peak_method_agreement              : 0.5172
+  peak_agreement_quality             : poor
+  bbi_cv                             : 0.2760
+  resp_rate_mean                     : 25.4623
+  bbi_regularity                     : moderate
+  n_impossible_breaths               : 0
+  impossible_breath_pct              : 0.0000
+  breathing_band_ratio               : 0.7402
+  breathing_band_quality             : good
+  skewness                           : 0.5051
+  skewness_quality                   : good
+  kurtosis                           : -0.9696
+  kurtosis_quality                   : good
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 0.0095
+  rms_amplitude                      : 0.0024
+  overall_score                      : 79.0000
+  overall_quality                    : good
+
+==================================================
+  imu_ribs
+==================================================
+  imu_name                           : ribs
+  ribs_acc_x_skewness                : 0.1963
+  ribs_acc_x_kurtosis                : -0.7276
+  ribs_acc_x_flatline_pct            : 0.0000
+  ribs_acc_x_peak_to_peak            : 0.6558
+  ribs_acc_x_rms                     : 0.1174
+  ribs_acc_x_spike_pct               : 0.4630
+  ribs_acc_x_spike_quality           : good
+  ribs_acc_y_skewness                : -1.1895
+  ribs_acc_y_kurtosis                : 2.3414
+  ribs_acc_y_flatline_pct            : 0.0000
+  ribs_acc_y_peak_to_peak            : 1.2493
+  ribs_acc_y_rms                     : 0.1809
+  ribs_acc_y_spike_pct               : 3.1539
+  ribs_acc_y_spike_quality           : moderate
+  ribs_acc_z_skewness                : -0.1395
+  ribs_acc_z_kurtosis                : -1.1695
+  ribs_acc_z_flatline_pct            : 0.0000
+  ribs_acc_z_peak_to_peak            : 1.1926
+  ribs_acc_z_rms                     : 0.2712
+  ribs_acc_z_spike_pct               : 0.1100
+  ribs_acc_z_spike_quality           : good
+  ribs_gyr_x_skewness                : -0.0504
+  ribs_gyr_x_kurtosis                : 0.0128
+  ribs_gyr_x_flatline_pct            : 0.0000
+  ribs_gyr_x_peak_to_peak            : 0.0028
+  ribs_gyr_x_rms                     : 0.0005
+  ribs_gyr_x_spike_pct               : 1.5046
+  ribs_gyr_x_spike_quality           : moderate
+  ribs_gyr_y_skewness                : 0.3734
+  ribs_gyr_y_kurtosis                : -1.0610
+  ribs_gyr_y_flatline_pct            : 0.0000
+  ribs_gyr_y_peak_to_peak            : 0.0129
+  ribs_gyr_y_rms                     : 0.0031
+  ribs_gyr_y_spike_pct               : 0.7060
+  ribs_gyr_y_spike_quality           : good
+  ribs_gyr_z_skewness                : -0.2197
+  ribs_gyr_z_kurtosis                : -0.0619
+  ribs_gyr_z_flatline_pct            : 0.0000
+  ribs_gyr_z_peak_to_peak            : 0.0053
+  ribs_gyr_z_rms                     : 0.0010
+  ribs_gyr_z_spike_pct               : 1.0880
+  ribs_gyr_z_spike_quality           : moderate
+  ribs_acc_mag_mean                  : 0.3110
+  ribs_acc_mag_std                   : 0.1527
+  ribs_gravity_deviation             : 9.4990
+  ribs_acc_calibration               : poor
+  overall_score                      : 63.0000
+  overall_quality                    : moderate
+
+==================================================
+  imu_chest
+==================================================
+  imu_name                           : chest
+  chest_acc_x_skewness               : 0.3978
+  chest_acc_x_kurtosis               : 0.2221
+  chest_acc_x_flatline_pct           : 0.0000
+  chest_acc_x_peak_to_peak           : 0.8343
+  chest_acc_x_rms                    : 0.1302
+  chest_acc_x_spike_pct              : 1.5914
+  chest_acc_x_spike_quality          : moderate
+  chest_acc_y_skewness               : 0.0006
+  chest_acc_y_kurtosis               : -0.4633
+  chest_acc_y_flatline_pct           : 0.0000
+  chest_acc_y_peak_to_peak           : 1.4683
+  chest_acc_y_rms                    : 0.2523
+  chest_acc_y_spike_pct              : 0.3530
+  chest_acc_y_spike_quality          : good
+  chest_acc_z_skewness               : -0.0813
+  chest_acc_z_kurtosis               : -0.3914
+  chest_acc_z_flatline_pct           : 0.0000
+  chest_acc_z_peak_to_peak           : 0.4889
+  chest_acc_z_rms                    : 0.0934
+  chest_acc_z_spike_pct              : 0.6192
+  chest_acc_z_spike_quality          : good
+  chest_gyr_x_skewness               : 0.3293
+  chest_gyr_x_kurtosis               : -0.8790
+  chest_gyr_x_flatline_pct           : 0.0000
+  chest_gyr_x_peak_to_peak           : 0.0114
+  chest_gyr_x_rms                    : 0.0026
+  chest_gyr_x_spike_pct              : 0.3067
+  chest_gyr_x_spike_quality          : good
+  chest_gyr_y_skewness               : 0.2109
+  chest_gyr_y_kurtosis               : -0.4944
+  chest_gyr_y_flatline_pct           : 0.0000
+  chest_gyr_y_peak_to_peak           : 0.0070
+  chest_gyr_y_rms                    : 0.0013
+  chest_gyr_y_spike_pct              : 1.0590
+  chest_gyr_y_spike_quality          : moderate
+  chest_gyr_z_skewness               : 0.3135
+  chest_gyr_z_kurtosis               : 0.2086
+  chest_gyr_z_flatline_pct           : 0.0000
+  chest_gyr_z_peak_to_peak           : 0.0029
+  chest_gyr_z_rms                    : 0.0004
+  chest_gyr_z_spike_pct              : 1.3368
+  chest_gyr_z_spike_quality          : moderate
+  chest_acc_mag_mean                 : 0.2637
+  chest_acc_mag_std                  : 0.1407
+  chest_gravity_deviation            : 9.5463
+  chest_acc_calibration              : poor
+  overall_score                      : 63.0000
+  overall_quality                    : moderate
+
+==================================================
+  body_temperature
+==================================================
+  signal_name                        : body_temperature
+  mean_temperature                   : 34.6642
+  std_temperature                    : 0.0575
+  min_temperature                    : 34.5430
+  max_temperature                    : 34.7695
+  physiological_range                : good
+  range                              : 0.2266
+  stability                          : stable
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  n_sudden_jumps                     : 0
+  jump_pct                           : 0.0000
+  overall_score                      : 70.0000
+  overall_quality                    : good

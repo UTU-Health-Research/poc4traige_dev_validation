@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from vitalwave.basic_algos import butter_filter
+from scipy.signal import correlate
 
 SIGNAL_MAP = {
     # ECG channels
@@ -34,7 +35,7 @@ SIGNAL_MAP = {
 }
 
 
-def extract_signals(df, cut_samples=500):
+def extract_signals(df, cut_starting_samples=0, cut_ending_samples=0):
     """
     Extracts and trims all signals from the input DataFrame.
 
@@ -42,8 +43,10 @@ def extract_signals(df, cut_samples=500):
     ----------
     df : pd.DataFrame
         Raw DataFrame with 22 columns including timestamps.
-    cut_samples : int, optional
-        Number of initial samples to discard (default: 500).
+    cut_starting_samples : int, optional
+        Number of initial samples to discard (default: 0).
+    cut_ending_samples : int, optional
+        Number of ending samples to discard (default: 0).
 
     Returns
     -------
@@ -53,17 +56,16 @@ def extract_signals(df, cut_samples=500):
 
     Raises
     ------
-    ValueError
-        If cut_samples exceeds DataFrame length.
+        If cut_starting_samples or cut_ending_samples exceeds DataFrame length.
     KeyError
         If expected columns are missing from the DataFrame.
     """
 
     # --- Validation ---
-    if cut_samples >= len(df):
+    if cut_starting_samples >= len(df) or cut_ending_samples >= len(df):
         raise ValueError(
-            f"cut_samples ({cut_samples}) >= DataFrame length ({len(df)}). "
-            f"Nothing left to extract."
+            f"cut_starting_samples ({cut_starting_samples}) or cut_ending_samples ({cut_ending_samples}) "
+            f"exceeds DataFrame length ({len(df)}). Nothing left to extract."
         )
 
     # Check for missing columns
@@ -81,11 +83,11 @@ def extract_signals(df, cut_samples=500):
     signals = {}
 
     for signal_name, col_name in SIGNAL_MAP.items():
-        signals[signal_name] = df[col_name][cut_samples:].reset_index(drop=True)
+        signals[signal_name] = df[col_name][cut_starting_samples:-1*cut_ending_samples if cut_ending_samples > 0 else None].reset_index(drop=True)
 
     print(f"[OK] Extracted {len(signals)} signals")
-    print(f"[OK] Discarded first {cut_samples} samples")
-    print(f"[OK] Samples per signal: {len(df) - cut_samples}")
+    print(f"[OK] Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
+    print(f"[OK] Samples per signal: {len(df) - cut_starting_samples - cut_ending_samples}")
 
     return signals
 
@@ -364,3 +366,52 @@ def preprocess_signals(signals, fs=250):
     print(f"\n[OK] Preprocessed {len(preprocessed)}/{len(signals)} signals")
 
     return preprocessed, spike_masks
+
+
+# ECG feature mapping: device_signal → reference_signal
+ECG_SIGNAL_PAIRS = {
+    "lead1": "ref_lead1",
+    "lead2": "ref_lead2",
+}
+
+# Respiration mapping
+RESP_SIGNAL_PAIRS = {
+    "impedance_pneumography": "ref_respiration",
+}
+
+def normalize_signal(sig):
+    return sig / np.max(np.abs(sig))
+
+def align_signals(dev_sig, bit_sig, fs):
+    """
+    Normalize and align two signals using cross-correlation
+    Returns aligned signals of equal length
+    """
+    dev_norm = normalize_signal(
+                   np.array(dev_sig, dtype=np.float64).flatten())
+    bit_norm = normalize_signal(
+                   np.array(bit_sig, dtype=np.float64).flatten())
+
+    # ─── Trim to same length ──────────────────────────────────
+    min_samples = min(len(dev_norm), len(bit_norm))
+    dev_norm    = dev_norm[:min_samples]
+    bit_norm    = bit_norm[:min_samples]
+
+    # ─── Cross-correlate ──────────────────────────────────────
+    correlation = correlate(dev_norm, bit_norm, mode='full')
+    lags        = np.arange(-len(dev_norm)+1, len(dev_norm))
+    best_lag    = lags[np.argmax(correlation)]
+
+    # ─── Align ────────────────────────────────────────────────
+    if best_lag > 0:
+        dev_aligned = dev_norm[best_lag:]
+        bit_aligned = bit_norm[:len(dev_aligned)]
+    elif best_lag < 0:
+        bit_aligned = bit_norm[-best_lag:]
+        dev_aligned = dev_norm[:len(bit_aligned)]
+    else:
+        dev_aligned = dev_norm
+        bit_aligned = bit_norm
+
+    min_len = min(len(dev_aligned), len(bit_aligned))
+    return dev_aligned[:min_len], bit_aligned[:min_len], best_lag
