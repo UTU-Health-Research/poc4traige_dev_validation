@@ -689,14 +689,24 @@ def plot_all_signals_overview(preprocessed, fs=250,
     # Collect signals that exist
     plot_signals = []
     group_labels = []
+    # group_colors = {
+    #     'ECG': '#3498db',
+    #     'Respiration': '#2ecc71',
+    #     'Accelerometer (Ribs)': '#e74c3c',
+    #     'Gyroscope (Ribs)': '#e67e22',
+    #     'Accelerometer (Chest)': '#9b59b6',
+    #     'Gyroscope (Chest)': '#f1c40f',
+    #     'Temperature': '#1abc9c',
+    # }
+
     group_colors = {
         'ECG': '#3498db',
-        'Respiration': '#2ecc71',
-        'Accelerometer (Ribs)': '#e74c3c',
-        'Gyroscope (Ribs)': '#e67e22',
-        'Accelerometer (Chest)': '#9b59b6',
-        'Gyroscope (Chest)': '#f1c40f',
-        'Temperature': '#1abc9c',
+        'Respiration': '#3498db',
+        'Accelerometer (Ribs)': '#3498db',
+        'Gyroscope (Ribs)': '#3498db',
+        'Accelerometer (Chest)': '#3498db',
+        'Gyroscope (Chest)': '#3498db',
+        'Temperature': '#3498db',
     }
 
     for group_name, signal_names in signal_groups.items():
@@ -710,11 +720,11 @@ def plot_all_signals_overview(preprocessed, fs=250,
         return
 
     # ─── Full Overview (all time) ─────────────────────────
-    n_cols = 3
+    n_cols = 2
     n_rows = math.ceil(n_signals / n_cols)
 
     fig, axes = plt.subplots(n_rows, n_cols,
-                              figsize=(18, n_rows * 1.2))
+                              figsize=(18, n_rows * 1.8))
 
     # Normalise to 2-D array for uniform indexing
     axes = np.array(axes).reshape(n_rows, n_cols)
@@ -722,36 +732,46 @@ def plot_all_signals_overview(preprocessed, fs=250,
     fig.suptitle("Device Signals Overview — All Channels",
                  fontsize=14, fontweight='bold', y=1.0)
 
+    window_end = int(30 * fs)
     for i, (name, group) in enumerate(plot_signals):
-        row, col = divmod(i, n_cols)
+        col, row = divmod(i, n_rows)
         ax = axes[row, col]
 
         sig = np.array(preprocessed[name], dtype=np.float64).flatten()
-        t = np.arange(len(sig)) / fs
+        end = min(window_end, len(sig))
 
         color = group_colors.get(group, '#95a5a6')
-
-        ax.plot(t, sig, color=color, linewidth=0.4)
+        # print(f'Plotting {name} ({group}) with color {color}')
+        if group != "Temperature":
+            t = np.arange(end) / fs 
+            ax.plot(t, sig[:end], color=color, linewidth=2)
+        else:
+            t = np.arange(len(sig)) / fs
+            ax.plot(t, sig, color=color, linewidth=2)
         # ax.set_ylabel(name, fontsize=6, rotation=0, ha='right', va='center')
         ax.yaxis.set_label_coords(-0.01, 0.5)
 
-        ax.tick_params(axis='y', labelsize=5)
-        ax.tick_params(axis='x', labelsize=7)
+        ax.tick_params(axis='y', labelsize=13, width=2)
+        ax.tick_params(axis='x', labelsize=13, width=2)
         ax.grid(True, alpha=0.2)
 
         # Group label on right side
-        ax_right = ax.twinx()
-        ax_right.set_ylabel(name, fontsize=5, fontweight='bold', rotation=360, ha='left',
-                             va='bottom', color=color)
-        ax_right.set_yticks([])
+        # ax_right = ax.twinx()
+        # ax_right.set_ylabel(name, fontsize=13, fontweight='bold', rotation=360, ha='left',
+        #                      va='bottom', color=color)
+        # ax_right.set_yticks([])
+
+        # ax.spines['top'].set_visible(False)
+        # ax.spines['right'].set_visible(False)
+        # ax_right.spines['top'].set_visible(False)
+        ax.set_title(name, fontsize=16, fontweight='bold', color=color, loc='center', pad=3)
 
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax_right.spines['top'].set_visible(False)
 
         # X-axis label only on bottom row
-        if row == n_rows - 1:
-            ax.set_xlabel("Time (s)", fontsize=9)
+        if row == n_rows - 1 or i >= n_signals - n_cols:
+            ax.set_xlabel("Time (s)", fontsize=13, fontweight='bold')
 
     # Hide any unused subplots (when n_signals isn't divisible by 3)
     for j in range(n_signals, n_rows * n_cols):
@@ -762,7 +782,7 @@ def plot_all_signals_overview(preprocessed, fs=250,
 
     if save:
         filepath = os.path.join(output_dir, "all_signals_overview.png")
-        fig.savefig(filepath, dpi=100, bbox_inches='tight')
+        fig.savefig(filepath, dpi=700, bbox_inches='tight')
         print(f"  [SAVED] {filepath}")
 
     if show:
