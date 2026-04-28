@@ -32,6 +32,37 @@ def _make_serializable(value):
         return str(value)
 
 
+def _minmax_normalize(signal, target_min=-1.0, target_max=1.0):
+    """
+    Min-max normalize signal to [target_min, target_max].
+
+    Parameters
+    ----------
+    signal : np.ndarray
+    target_min : float
+    target_max : float
+
+    Returns
+    -------
+    np.ndarray
+        Normalized signal with values in [target_min, target_max].
+    """
+
+    sig = np.array(signal, dtype=np.float64).flatten()
+    sig_min = np.min(sig)
+    sig_max = np.max(sig)
+    denom = sig_max - sig_min
+
+    if denom < 1e-10:
+        return np.zeros_like(sig)
+
+    normalized = (sig - sig_min) / denom                     # [0, 1]
+    normalized = normalized * (target_max - target_min) + target_min  # [target_min, target_max]
+
+    return normalized
+
+
+
 # ═══════════════════════════════════════════════════════════════
 #  1. FEATURE MAPPING (Device ↔ Reference)
 # ═══════════════════════════════════════════════════════════════
@@ -684,6 +715,396 @@ def _plot_heatmap_comparison(matched, result, output_dir):
     print(f"  [PLOT] {filepath}")
 
 
+def _compute_alma(signal, window=50, offset=0.85, sigma=6.0):
+    """
+    Arnaud Legoux Moving Average (ALMA).
+
+    Parameters
+    ----------
+    signal : np.ndarray
+        Input signal.
+    window : int
+        Window size (default: 50).
+    offset : float
+        Offset factor 0-1 (default: 0.85). Controls center of Gaussian.
+    sigma : float
+        Sigma for Gaussian (default: 6.0). Controls smoothness.
+
+    Returns
+    -------
+    np.ndarray
+        ALMA smoothed signal (same length, NaN-padded at start).
+    """
+
+    sig = np.array(signal, dtype=np.float64).flatten()
+    n = len(sig)
+    alma = np.full(n, np.nan)
+
+    m = int(offset * (window - 1))
+    s = window / sigma
+
+    # Precompute weights
+    w = np.zeros(window)
+    for i in range(window):
+        w[i] = np.exp(-((i - m) ** 2) / (2 * s * s))
+    w_sum = np.sum(w)
+
+    if w_sum < 1e-10:
+        return alma
+
+    w = w / w_sum
+
+    for j in range(window - 1, n):
+        alma[j] = np.sum(sig[j - window + 1:j + 1] * w)
+
+    return alma
+
+
+def plot_correlation_analysis(dev_preprocessed, ref_preprocessed,
+                               dev_signal, ref_signal,
+                               fs=250, output_dir="outputs/comparison/plots",
+                               show=False, save=True):
+    """
+    Correlation analysis between device and reference signals.
+
+    Generates:
+        1. Scatter plot with regression line
+        2. Cross-correlation function
+        3. Rolling correlation over time
+
+    Parameters
+    ----------
+    dev_preprocessed : dict
+    ref_preprocessed : dict
+    dev_signal : str
+    ref_signal : str
+    fs : int
+    output_dir : str
+    show : bool
+    save : bool
+    """
+
+    if save:
+        _ensure_dir(output_dir)
+
+    if dev_signal not in dev_preprocessed or ref_signal not in ref_preprocessed:
+        print(f"[WARNING] Signal not found: {dev_signal} or {ref_signal}")
+        return
+
+    dev_sig = np.array(dev_preprocessed[dev_signal], dtype=np.float64).flatten()
+    ref_sig = np.array(ref_preprocessed[ref_signal], dtype=np.float64).flatten()
+
+    # Normalize both to [-1, 1]
+    dev_norm = _minmax_normalize(dev_sig)
+    ref_norm = _minmax_normalize(ref_sig)
+
+    # Trim to common length
+    min_len = min(len(dev_norm), len(ref_norm))
+    dev_trim = dev_norm[:min_len]
+    ref_trim = ref_norm[:min_len]
+    t = np.arange(min_len) / fs
+
+    fig = plt.figure(figsize=(18, 14))
+    gs = gridspec.GridSpec(3, 2, hspace=0.35, wspace=0.3)
+
+    # ─── Panel 1: Scatter + Regression ────────────────────
+    ax1 = fig.add_subplot(gs[0, 0])
+
+    # Downsample for scatter (avoid millions of points)
+    step = max(1, min_len // 5000)
+    dev_ds = dev_trim[::step]
+    ref_ds = ref_trim[::step]
+
+    ax1.scatter(ref_ds, dev_ds, c='steelblue', s=3, alpha=0.3)
+
+    # Regression line
+    coeffs = np.polyfit(ref_ds, dev_ds, 1)
+    x_line = np.linspace(ref_ds.min(), ref_ds.max(), 100)
+    y_line = np.polyval(coeffs, x_line)
+    ax1.plot(x_line, y_line, 'r-', linewidth=2, label=f'y = {coeffs[0]:.3f}x + {coeffs[1]:.3f}')
+
+    # Identity line
+    lims = [-1.1, 1.1]
+    ax1.plot(lims, lims, 'k--', alpha=0.3, label='Identity')
+
+    # Pearson correlation
+    from scipy.stats import pearsonr, spearmanr
+    r_pearson, p_pearson = pearsonr(dev_trim, ref_trim)
+    r_spearman, p_spearman = spearmanr(dev_trim, ref_trim)
+
+    ax1.set_title(f"Scatter: Pearson r={r_pearson:.4f} (p={p_pearson:.2e})", fontweight='bold')
+    ax1.set_xlabel(f"Reference ({ref_signal})")
+    ax1.set_ylabel(f"Device ({dev_signal})")
+    ax1.legend(fontsize=8)
+    ax1.set_aspect('equal', adjustable='box')
+    ax1.grid(True, alpha=0.3)
+
+    # ─── Panel 2: Correlation Summary Box ─────────────────
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax2.axis('off')
+
+    # R² calculation
+    ss_res = np.sum((dev_trim - np.polyval(coeffs, ref_trim)) ** 2)
+    ss_tot = np.sum((dev_trim - np.mean(dev_trim)) ** 2)
+    r_squared = 1 - (ss_res / max(ss_tot, 1e-10))
+
+    summary_text = (
+        f"CORRELATION SUMMARY\n"
+        f"{'=' * 35}\n\n"
+        f"Pearson r:     {r_pearson:.4f}\n"
+        f"Pearson p:     {p_pearson:.2e}\n\n"
+        f"Spearman rho:  {r_spearman:.4f}\n"
+        f"Spearman p:    {p_spearman:.2e}\n\n"
+        f"R²:            {r_squared:.4f}\n"
+        f"Slope:         {coeffs[0]:.4f}\n"
+        f"Intercept:     {coeffs[1]:.4f}\n\n"
+        f"Samples:       {min_len}\n"
+        f"Duration:      {min_len/fs:.2f} s\n"
+    )
+
+    # Interpretation
+    if abs(r_pearson) >= 0.9:
+        interpretation = "EXCELLENT agreement"
+        color = '#2ecc71'
+    elif abs(r_pearson) >= 0.7:
+        interpretation = "GOOD agreement"
+        color = '#f1c40f'
+    elif abs(r_pearson) >= 0.5:
+        interpretation = "MODERATE agreement"
+        color = '#e67e22'
+    else:
+        interpretation = "POOR agreement"
+        color = '#e74c3c'
+
+    summary_text += f"\nInterpretation: {interpretation}"
+
+    ax2.text(0.1, 0.95, summary_text, transform=ax2.transAxes,
+             fontsize=10, fontfamily='monospace', verticalalignment='top',
+             bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+
+    ax2.add_patch(plt.Rectangle((0.05, 0.02), 0.9, 0.08,
+                                 transform=ax2.transAxes,
+                                 facecolor=color, alpha=0.3))
+    ax2.text(0.5, 0.06, interpretation, transform=ax2.transAxes,
+             ha='center', fontsize=12, fontweight='bold', color=color)
+
+    # ─── Panel 3: Cross-Correlation ───────────────────────
+    ax3 = fig.add_subplot(gs[1, :])
+
+    max_lag_sec = 5
+    max_lag_samples = int(max_lag_sec * fs)
+
+    # Normalized cross-correlation
+    dev_centered = dev_trim - np.mean(dev_trim)
+    ref_centered = ref_trim - np.mean(ref_trim)
+
+    cross_corr = np.correlate(dev_centered, ref_centered, mode='full')
+    cross_corr = cross_corr / (np.sqrt(np.sum(dev_centered ** 2) * np.sum(ref_centered ** 2)) + 1e-10)
+
+    mid = len(cross_corr) // 2
+    lag_start = max(0, mid - max_lag_samples)
+    lag_end = min(len(cross_corr), mid + max_lag_samples + 1)
+
+    lags = (np.arange(lag_start, lag_end) - mid) / fs  # in seconds
+    cc_subset = cross_corr[lag_start:lag_end]
+
+    ax3.plot(lags, cc_subset, color='steelblue', linewidth=0.8)
+
+    # Mark peak
+    peak_idx = np.argmax(cc_subset)
+    peak_lag = lags[peak_idx]
+    peak_val = cc_subset[peak_idx]
+    ax3.scatter([peak_lag], [peak_val], c='red', s=80, zorder=5,
+                label=f'Peak: r={peak_val:.4f} at lag={peak_lag:.3f}s')
+
+    ax3.axvline(x=0, color='gray', linestyle=':', alpha=0.5)
+    ax3.axhline(y=0, color='gray', linestyle=':', alpha=0.5)
+
+    ax3.set_title("Cross-Correlation Function", fontweight='bold')
+    ax3.set_xlabel("Lag (seconds)")
+    ax3.set_ylabel("Normalized Correlation")
+    ax3.legend(loc='upper right')
+    ax3.grid(True, alpha=0.3)
+
+    # ─── Panel 4: Rolling Correlation ─────────────────────
+    ax4 = fig.add_subplot(gs[2, :])
+
+    window_sec = 10
+    window_samples = window_sec * fs
+    step_samples = window_samples // 4  # 75% overlap
+
+    rolling_times = []
+    rolling_corrs = []
+
+    for start in range(0, min_len - window_samples, step_samples):
+        end = start + window_samples
+        r, _ = pearsonr(dev_trim[start:end], ref_trim[start:end])
+        rolling_times.append((start + window_samples // 2) / fs)
+        rolling_corrs.append(r)
+
+    if len(rolling_corrs) > 0:
+        rolling_corrs = np.array(rolling_corrs)
+        rolling_times = np.array(rolling_times)
+
+        # Color by correlation strength
+        colors_roll = ['#2ecc71' if abs(r) >= 0.7 else '#f1c40f' if abs(r) >= 0.5
+                        else '#e74c3c' for r in rolling_corrs]
+
+        ax4.bar(rolling_times, rolling_corrs, width=window_sec / 4 * 0.8,
+                color=colors_roll, alpha=0.7, edgecolor='white')
+
+        ax4.axhline(y=0.7, color='green', linestyle='--', alpha=0.5, label='Good (0.7)')
+        ax4.axhline(y=0.5, color='orange', linestyle='--', alpha=0.5, label='Moderate (0.5)')
+        ax4.axhline(y=0, color='gray', linestyle=':', alpha=0.3)
+
+        ax4.set_title(f"Rolling Pearson Correlation ({window_sec}s windows)", fontweight='bold')
+        ax4.set_xlabel("Time (s)")
+        ax4.set_ylabel("Pearson r")
+        ax4.set_ylim(-1.1, 1.1)
+        ax4.legend(loc='lower right', fontsize=8)
+        ax4.grid(True, alpha=0.3)
+
+    fig.suptitle(f"Correlation Analysis: {dev_signal} vs {ref_signal}",
+                 fontsize=14, fontweight='bold', y=1.01)
+
+    plt.tight_layout()
+
+    if save:
+        filepath = os.path.join(output_dir,
+                                f"correlation_{dev_signal}_vs_{ref_signal}.png")
+        fig.savefig(filepath, dpi=150, bbox_inches='tight')
+        print(f"  [PLOT] {filepath}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    return {
+        'pearson_r': r_pearson,
+        'pearson_p': p_pearson,
+        'spearman_r': r_spearman,
+        'spearman_p': p_spearman,
+        'r_squared': r_squared,
+        'slope': coeffs[0],
+        'intercept': coeffs[1],
+        'peak_cross_corr': peak_val,
+        'peak_lag_sec': peak_lag,
+    }
+
+
+def plot_alma_comparison(dev_preprocessed, ref_preprocessed,
+                          dev_signal, ref_signal,
+                          fs=250, alma_window=250, alma_offset=0.85, alma_sigma=6.0,
+                          time_window=None,
+                          output_dir="outputs/comparison/plots",
+                          show=False, save=True):
+    """
+    ALMA (Arnaud Legoux Moving Average) trend comparison.
+
+    Shows smoothed trends of both signals for morphology comparison.
+
+    Parameters
+    ----------
+    dev_preprocessed : dict
+    ref_preprocessed : dict
+    dev_signal : str
+    ref_signal : str
+    fs : int
+    alma_window : int
+        ALMA window size in samples (default: 250 = 1 second at 250Hz).
+    alma_offset : float
+        ALMA offset (default: 0.85).
+    alma_sigma : float
+        ALMA sigma (default: 6.0).
+    time_window : tuple, optional
+    output_dir : str
+    show : bool
+    save : bool
+    """
+
+    if save:
+        _ensure_dir(output_dir)
+
+    if dev_signal not in dev_preprocessed or ref_signal not in ref_preprocessed:
+        print(f"[WARNING] Signal not found: {dev_signal} or {ref_signal}")
+        return
+
+    dev_sig = np.array(dev_preprocessed[dev_signal], dtype=np.float64).flatten()
+    ref_sig = np.array(ref_preprocessed[ref_signal], dtype=np.float64).flatten()
+
+    # Normalize
+    dev_norm = _minmax_normalize(dev_sig)
+    ref_norm = _minmax_normalize(ref_sig)
+
+    # Trim to common length
+    min_len = min(len(dev_norm), len(ref_norm))
+    dev_trim = dev_norm[:min_len]
+    ref_trim = ref_norm[:min_len]
+    t = np.arange(min_len) / fs
+
+    # Compute ALMA
+    dev_alma = _compute_alma(dev_trim, window=alma_window,
+                              offset=alma_offset, sigma=alma_sigma)
+    ref_alma = _compute_alma(ref_trim, window=alma_window,
+                              offset=alma_offset, sigma=alma_sigma)
+
+    fig, axes = plt.subplots(3, 1, figsize=(16, 12), sharex=True)
+    fig.suptitle(f"ALMA Trend Comparison: {dev_signal} vs {ref_signal}\n"
+                 f"(window={alma_window}, offset={alma_offset}, sigma={alma_sigma})",
+                 fontsize=13, fontweight='bold')
+
+    # ─── Panel 1: Device signal + ALMA ────────────────────
+    axes[0].plot(t, dev_trim, color='steelblue', linewidth=0.3, alpha=0.5, label='Device (raw)')
+    axes[0].plot(t, dev_alma, color='darkblue', linewidth=1.5, label='Device ALMA')
+    axes[0].set_title(f"Device: {dev_signal}")
+    axes[0].set_ylabel("Normalized Amplitude")
+    axes[0].legend(loc='upper right', fontsize=8)
+    axes[0].grid(True, alpha=0.3)
+
+    # ─── Panel 2: Reference signal + ALMA ─────────────────
+    axes[1].plot(t, ref_trim, color='coral', linewidth=0.3, alpha=0.5, label='Reference (raw)')
+    axes[1].plot(t, ref_alma, color='darkred', linewidth=1.5, label='Reference ALMA')
+    axes[1].set_title(f"Reference: {ref_signal}")
+    axes[1].set_ylabel("Normalized Amplitude")
+    axes[1].legend(loc='upper right', fontsize=8)
+    axes[1].grid(True, alpha=0.3)
+
+    # ─── Panel 3: ALMA Overlay ────────────────────────────
+    axes[2].plot(t, dev_alma, color='darkblue', linewidth=1.5, alpha=0.8, label='Device ALMA')
+    axes[2].plot(t, ref_alma, color='darkred', linewidth=1.5, alpha=0.8, label='Reference ALMA')
+
+    # Difference shading
+    valid = ~(np.isnan(dev_alma) | np.isnan(ref_alma))
+    if np.any(valid):
+        axes[2].fill_between(t, dev_alma, ref_alma,
+                              where=valid,
+                              alpha=0.15, color='purple', label='Difference')
+
+    axes[2].set_title("ALMA Trend Overlay")
+    axes[2].set_xlabel("Time (s)")
+    axes[2].set_ylabel("ALMA Value")
+    axes[2].legend(loc='upper right', fontsize=8)
+    axes[2].grid(True, alpha=0.3)
+
+    if time_window is not None:
+        for ax in axes:
+            ax.set_xlim(time_window)
+
+    plt.tight_layout()
+
+    if save:
+        suffix = f"_{time_window[0]}s_{time_window[1]}s" if time_window else ""
+        filepath = os.path.join(output_dir,
+                                f"alma_{dev_signal}_vs_{ref_signal}{suffix}.png")
+        fig.savefig(filepath, dpi=150, bbox_inches='tight')
+        print(f"  [PLOT] {filepath}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
 # ═══════════════════════════════════════════════════════════════
 #  5. SIGNAL-LEVEL COMPARISON PLOTS
 # ═══════════════════════════════════════════════════════════════
@@ -742,22 +1163,27 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
     axes[1].grid(True, alpha=0.3)
 
     # Panel 3: Overlay (normalized for visual comparison)
-    dev_norm = (dev_sig - np.mean(dev_sig)) / max(np.std(dev_sig), 1e-8)
-    ref_norm = (ref_sig - np.mean(ref_sig)) / max(np.std(ref_sig), 1e-8)
+    # dev_norm = (dev_sig - np.mean(dev_sig)) / max(np.std(dev_sig), 1e-8)
+    # ref_norm = (ref_sig - np.mean(ref_sig)) / max(np.std(ref_sig), 1e-8)
+    # True min-max normalization to [-1, 1]
+    dev_norm = _minmax_normalize(dev_sig)
+    ref_norm = _minmax_normalize(ref_sig)
 
     # Trim to shorter signal for overlay
     min_len = min(len(dev_norm), len(ref_norm))
     t_common = np.arange(min_len) / fs
 
     axes[2].plot(t_common, dev_norm[:min_len], color='steelblue',
-                 linewidth=0.5, alpha=0.7, label='Device (normalized)')
+             linewidth=2, alpha=0.7, label='Device (min-max normalized)')
     axes[2].plot(t_common, ref_norm[:min_len], color='coral',
-                 linewidth=0.5, alpha=0.7, label='Reference (normalized)')
-    axes[2].set_title("Normalized Overlay")
+                linewidth=2, alpha=0.7, label='Reference (min-max normalized)')
+    axes[2].set_title("Min-Max Normalized Overlay [-1, 1]")
     axes[2].set_xlabel("Time (s)")
     axes[2].set_ylabel("Normalized Amplitude")
     axes[2].legend(loc='upper right')
     axes[2].grid(True, alpha=0.3)
+
+    
 
     if time_window is not None:
         for ax in axes:
@@ -782,17 +1208,19 @@ def plot_all_signal_overlays(dev_preprocessed, ref_preprocessed,
                               fs=250, output_dir="outputs/comparison/plots",
                               show=False, save=True):
     """
-    Generate signal overlay plots for all device-reference pairs.
+    Generate all comparison plots: overlay, correlation, and ALMA
+    for all device-reference pairs.
     """
 
-    print("\n[COMPARISON PLOTS] Signal Overlays")
-    print("-" * 40)
-
     all_pairs = {**ECG_SIGNAL_PAIRS, **RESP_SIGNAL_PAIRS}
+    correlation_results = {}
 
     for dev_signal, ref_signal in all_pairs.items():
 
-        # Full signal
+        print(f"\n  [COMPARISON PLOTS] {dev_signal} vs {ref_signal}")
+        print(f"  {'-' * 40}")
+
+        # ─── Signal Overlay ───────────────────────────────
         plot_signal_overlay(
             dev_preprocessed, ref_preprocessed,
             dev_signal, ref_signal,
@@ -800,7 +1228,7 @@ def plot_all_signal_overlays(dev_preprocessed, ref_preprocessed,
             show=show, save=save
         )
 
-        # Zoomed (first 10 seconds)
+        # Zoomed overlay (first 10 seconds)
         plot_signal_overlay(
             dev_preprocessed, ref_preprocessed,
             dev_signal, ref_signal,
@@ -808,3 +1236,67 @@ def plot_all_signal_overlays(dev_preprocessed, ref_preprocessed,
             output_dir=output_dir,
             show=show, save=save
         )
+
+        # ─── Correlation Analysis ─────────────────────────
+        corr_stats = plot_correlation_analysis(
+            dev_preprocessed, ref_preprocessed,
+            dev_signal, ref_signal,
+            fs=fs, output_dir=output_dir,
+            show=show, save=save
+        )
+
+        if corr_stats:
+            correlation_results[f"{dev_signal}_vs_{ref_signal}"] = corr_stats
+
+        # ─── ALMA Comparison ──────────────────────────────
+        # Full signal
+        plot_alma_comparison(
+            dev_preprocessed, ref_preprocessed,
+            dev_signal, ref_signal,
+            fs=fs, alma_window=250,
+            output_dir=output_dir,
+            show=show, save=save
+        )
+
+        # Zoomed ALMA (first 20 seconds)
+        plot_alma_comparison(
+            dev_preprocessed, ref_preprocessed,
+            dev_signal, ref_signal,
+            fs=fs, alma_window=250,
+            time_window=(0, 20),
+            output_dir=output_dir,
+            show=show, save=save
+        )
+
+    # ─── Export correlation summary ───────────────────────
+    if correlation_results and save:
+        _export_correlation_summary(correlation_results, output_dir)
+
+    return correlation_results
+
+
+def _export_correlation_summary(correlation_results, output_dir):
+    """Export correlation results as CSV and JSON."""
+
+    _ensure_dir(output_dir)
+
+    # CSV
+    rows = []
+    for pair, stats in correlation_results.items():
+        row = {'pair': pair}
+        row.update(stats)
+        rows.append(row)
+
+    if rows:
+        df = pd.DataFrame(rows)
+        csv_path = os.path.join(output_dir, "correlation_summary.csv")
+        df.to_csv(csv_path, index=False)
+        print(f"  [EXPORT] {csv_path}")
+
+    # JSON
+    json_path = os.path.join(output_dir, "correlation_summary.json")
+    clean = {k: {kk: _make_serializable(vv) for kk, vv in v.items()}
+             for k, v in correlation_results.items()}
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(clean, f, indent=4)
+    print(f"  [EXPORT] {json_path}")

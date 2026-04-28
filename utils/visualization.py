@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from datetime import datetime
+import math
 
 
 def _ensure_dir(path):
@@ -575,6 +576,14 @@ def visualize_all(raw_signals, preprocessed, fiducials, features,
     print("[VISUALIZATION] Generating all plots")
     print("=" * 60)
 
+    # 0. All signals overview (NEW)
+    print("\n[0/7] All signals overview")
+    plot_all_signals_overview(
+        preprocessed, fs=fs,
+        output_dir=output_dir,
+        show=show, save=save
+    )
+
     # 1. Raw vs Preprocessed — select representative signals
     print("\n[1/7] Raw vs Preprocessed comparisons")
     representative = ["lead1", "impedance_pneumography", "accx_ribs_imu", "body_temperature"]
@@ -643,3 +652,169 @@ def visualize_all(raw_signals, preprocessed, fiducials, features,
             )
 
     print(f"\n[OK] All visualizations complete → {output_dir}/")
+
+
+def plot_all_signals_overview(preprocessed, fs=250,
+                               output_dir="outputs/plots/device",
+                               show=False, save=True):
+    """
+    Plot ALL device signals in a single stacked figure.
+
+    Signals are min-max normalized for visual comparison.
+
+    Parameters
+    ----------
+    preprocessed : dict
+        All preprocessed device signals.
+    fs : int
+    output_dir : str
+    show : bool
+    save : bool
+    """
+
+    if save:
+        _ensure_dir(output_dir)
+
+    # Define signal groups and their display order
+    signal_groups = {
+        'ECG': ['lead1', 'lead2', 'c1', 'c2', 'c3', 'c4', 'c5'],
+        'Respiration': ['impedance_pneumography'],
+        'Accelerometer (Ribs)': ['accx_ribs_imu', 'accy_ribs_imu', 'accz_ribs_imu'],
+        'Gyroscope (Ribs)': ['gyrx_ribs_imu', 'gyry_ribs_imu', 'gyrz_ribs_imu'],
+        'Accelerometer (Chest)': ['accx_chest_imu', 'accy_chest_imu', 'accz_chest_imu'],
+        'Gyroscope (Chest)': ['gyrx_chest_imu', 'gyry_chest_imu', 'gyrz_chest_imu'],
+        'Temperature': ['body_temperature'],
+    }
+
+    # Collect signals that exist
+    plot_signals = []
+    group_labels = []
+    group_colors = {
+        'ECG': '#3498db',
+        'Respiration': '#2ecc71',
+        'Accelerometer (Ribs)': '#e74c3c',
+        'Gyroscope (Ribs)': '#e67e22',
+        'Accelerometer (Chest)': '#9b59b6',
+        'Gyroscope (Chest)': '#f1c40f',
+        'Temperature': '#1abc9c',
+    }
+
+    for group_name, signal_names in signal_groups.items():
+        for name in signal_names:
+            if name in preprocessed:
+                plot_signals.append((name, group_name))
+
+    n_signals = len(plot_signals)
+    if n_signals == 0:
+        print("[WARNING] No signals to plot")
+        return
+
+    # ─── Full Overview (all time) ─────────────────────────
+    n_cols = 3
+    n_rows = math.ceil(n_signals / n_cols)
+
+    fig, axes = plt.subplots(n_rows, n_cols,
+                              figsize=(18, n_rows * 1.2))
+
+    # Normalise to 2-D array for uniform indexing
+    axes = np.array(axes).reshape(n_rows, n_cols)
+
+    fig.suptitle("Device Signals Overview — All Channels",
+                 fontsize=14, fontweight='bold', y=1.0)
+
+    for i, (name, group) in enumerate(plot_signals):
+        row, col = divmod(i, n_cols)
+        ax = axes[row, col]
+
+        sig = np.array(preprocessed[name], dtype=np.float64).flatten()
+        t = np.arange(len(sig)) / fs
+
+        color = group_colors.get(group, '#95a5a6')
+
+        ax.plot(t, sig, color=color, linewidth=0.4)
+        # ax.set_ylabel(name, fontsize=6, rotation=0, ha='right', va='center')
+        ax.yaxis.set_label_coords(-0.01, 0.5)
+
+        ax.tick_params(axis='y', labelsize=5)
+        ax.tick_params(axis='x', labelsize=7)
+        ax.grid(True, alpha=0.2)
+
+        # Group label on right side
+        ax_right = ax.twinx()
+        ax_right.set_ylabel(name, fontsize=5, fontweight='bold', rotation=360, ha='left',
+                             va='bottom', color=color)
+        ax_right.set_yticks([])
+
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax_right.spines['top'].set_visible(False)
+
+        # X-axis label only on bottom row
+        if row == n_rows - 1:
+            ax.set_xlabel("Time (s)", fontsize=9)
+
+    # Hide any unused subplots (when n_signals isn't divisible by 3)
+    for j in range(n_signals, n_rows * n_cols):
+        row, col = divmod(j, n_cols)
+        axes[row, col].set_visible(False)
+
+    plt.tight_layout()
+
+    if save:
+        filepath = os.path.join(output_dir, "all_signals_overview.png")
+        fig.savefig(filepath, dpi=100, bbox_inches='tight')
+        print(f"  [SAVED] {filepath}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    # ─── Zoomed Version (first 10 seconds) ────────────────
+    fig2, axes2 = plt.subplots(n_signals, 1,
+                                figsize=(18, n_signals * 1.2),
+                                sharex=True)
+
+    if n_signals == 1:
+        axes2 = [axes2]
+
+    fig2.suptitle("Device Signals Overview — First 10 Seconds",
+                  fontsize=14, fontweight='bold', y=1.0)
+
+    window_end = int(10 * fs)
+
+    for i, (name, group) in enumerate(plot_signals):
+        sig = np.array(preprocessed[name], dtype=np.float64).flatten()
+        end = min(window_end, len(sig))
+        t = np.arange(end) / fs
+
+        color = group_colors.get(group, '#95a5a6')
+
+        axes2[i].plot(t, sig[:end], color=color, linewidth=0.6)
+        axes2[i].set_ylabel(name, fontsize=6, rotation=0, ha='right', va='center')
+        axes2[i].yaxis.set_label_coords(-0.01, 0.5)
+        axes2[i].tick_params(axis='y', labelsize=5)
+        axes2[i].tick_params(axis='x', labelsize=7)
+        axes2[i].grid(True, alpha=0.2)
+        axes2[i].spines['top'].set_visible(False)
+        axes2[i].spines['right'].set_visible(False)
+
+        ax_right2 = axes2[i].twinx()
+        ax_right2.set_ylabel(group, fontsize=5, rotation=270,
+                              va='bottom', color=color, alpha=0.6)
+        ax_right2.set_yticks([])
+        ax_right2.spines['top'].set_visible(False)
+
+    axes2[-1].set_xlabel("Time (s)", fontsize=9)
+
+    plt.tight_layout()
+
+    if save:
+        filepath2 = os.path.join(output_dir, "all_signals_overview_10s.png")
+        fig2.savefig(filepath2, dpi=200, bbox_inches='tight')
+        print(f"  [SAVED] {filepath2}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig2)
