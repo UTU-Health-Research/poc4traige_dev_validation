@@ -173,7 +173,24 @@ def main():
     print("[PIPELINE] Reference Signal Quality Assessment")
     print("=" * 60)
 
-    ref_quality = assess_all_quality(ref_preprocessed, fs=250)
+    ref_quality = {}
+
+    print("\n[1/2] Reference ECG Quality")
+    print("-" * 40)
+    for name in ['ref_lead1', 'ref_lead2', 'ref_lead3']:
+        if name in ref_preprocessed:
+            ref_quality[name] = assess_ecg_quality(
+                ref_preprocessed[name], fs=250, signal_name=name
+            )
+
+    print("\n[2/2] Reference Respiration Quality")
+    print("-" * 40)
+    if 'ref_respiration' in ref_preprocessed:
+        ref_quality['ref_respiration'] = assess_respiration_quality(
+            ref_preprocessed['ref_respiration'], fs=250,
+            signal_name='ref_respiration'
+        )
+
     export_quality_report(ref_quality, output_dir="outputs/quality/reference/reports")
     plot_quality_dashboard(ref_quality, output_dir="outputs/quality/reference/plots")
 
@@ -197,17 +214,28 @@ def main():
     )
 
     # ═════════════════════════════════════════════════════════
-    #  COMPARISON
+    #  SEGMENT-BASED COMPARISON (New)
     # ═════════════════════════════════════════════════════════
     print("\n" + "=" * 60)
-    print("[PIPELINE] Device vs Reference Comparison")
+    print("[PIPELINE] Segment-Based Feature Comparison")
     print("=" * 60)
 
     comparison_results = compare_features(
+        dev_preprocessed=preprocessed_signals,
+        ref_preprocessed=ref_preprocessed,
         dev_features=dev_features,
         ref_features=ref_features,
+        fs=250,
+        window_sec=10,
         output_dir="outputs/comparison"
     )
+
+    # ═════════════════════════════════════════════════════════
+    #  SIGNAL-LEVEL COMPARISON PLOTS
+    # ═════════════════════════════════════════════════════════
+    print("\n" + "=" * 60)
+    print("[PIPELINE] Signal-Level Comparison Plots")
+    print("=" * 60)
 
     plot_all_signal_overlays(
         dev_preprocessed=preprocessed_signals,
@@ -237,9 +265,10 @@ def main():
     print("\n" + "=" * 60)
     print("[DONE] Pipeline Complete")
     print("=" * 60)
-    print(f"  Device features:    {len(dev_features)}")
-    print(f"  Reference features: {len(ref_features)}")
-    print(f"  Comparison pairs:   {len(comparison_results)}")
+    print(f"  Device features:      {len(dev_features)}")
+    print(f"  Reference features:   {len(ref_features)}")
+    print(f"  Comparison pairs:     {len(comparison_results)}")
+    print(f"  Quality assessments:  {len(dev_quality) + len(ref_quality)} signals")
 
 
 if __name__ == "__main__":
