@@ -1,0 +1,178 @@
+══════════════════════════════════════════════════════════════════
+        FEATURE ABBREVIATION DICTIONARY
+        Multi-Signal Triage System
+══════════════════════════════════════════════════════════════════
+
+
+─── HEART RATE & HRV (Heart Rate Variability) ─────────────────
+
+HR          Heart Rate (beats per minute)
+RR          R-peak to R-peak interval (time between consecutive heartbeats)
+SDNN        Standard Deviation of NN (Normal-to-Normal) intervals
+            → Measures overall HRV
+RMSSD       Root Mean Square of Successive Differences
+            → Measures short-term HRV (parasympathetic activity)
+pNN50       Percentage of successive NN intervals differing by more than 50 ms
+            → Reflects vagal (parasympathetic) tone
+pNN20       Percentage of successive NN intervals differing by more than 20 ms
+            → More sensitive version of pNN50
+CV          Coefficient of Variation (std / mean)
+            → Normalized variability measure
+IQR         Interquartile Range (75th percentile - 25th percentile)
+            → Robust measure of spread
+BBI         Breath-to-Breath Interval (time between consecutive breaths)
+QTc         Corrected QT interval (Bazett's formula: QT / sqrt(RR))
+
+
+─── ECG MORPHOLOGY ─────────────────────────────────────────────
+
+P wave      Atrial depolarization wave
+Q wave      First downward deflection of QRS complex
+R wave      Main upward deflection of QRS complex (tallest peak)
+S wave      Downward deflection after R wave
+T wave      Ventricular repolarization wave
+
+PT interval Time from P-wave onset to T-wave end
+             → Covers atrial depolarization through ventricular repolarization
+QS interval Time from Q-wave to S-wave (= QRS duration)
+             → Ventricular depolarization time
+             → Normal: 80-120 ms; Wide QRS suggests conduction abnormality
+QT interval Time from Q-wave to T-wave end
+             → Total ventricular electrical activity duration
+             → Prolonged QT: risk of arrhythmia
+QTc Bazett  QT interval corrected for heart rate using Bazett's formula
+             → QTc = QT / sqrt(RR_seconds)
+
+
+─── ECG SIGNAL FEATURES ────────────────────────────────────────
+
+R-amp       R-peak amplitude (height of the R-wave)
+P2P         Peak-to-Peak amplitude (max - min of signal)
+RMS         Root Mean Square (sqrt of mean of squared values)
+             → Measures signal power/magnitude
+ZCR         Zero Crossing Rate (how often signal crosses zero per sample)
+MAV         Mean Absolute Value (mean of |signal|)
+meandist    Mean distance between successive differences (vitalwave metric)
+
+
+─── RESPIRATION ────────────────────────────────────────────────
+
+Resp Rate   Respiratory Rate (breaths per minute)
+AMPD        Automatic Multiscale-based Peak Detection (algorithm name)
+MSPTD       Modified Smoothed Peak and Trough Detection (algorithm name)
+Feets       Trough/valley points in respiration signal (expiration endpoints)
+Tidal Excursion  Amplitude difference between peak and preceding trough
+                  → Proxy for tidal volume (depth of breath)
+Envelope    Signal envelope extracted via Hilbert transform
+             → Captures amplitude modulation of the signal
+
+
+─── IMU (Inertial Measurement Unit) ────────────────────────────
+
+IMU         Inertial Measurement Unit (accelerometer + gyroscope)
+Acc         Accelerometer (measures linear acceleration, m/s²)
+Gyr         Gyroscope (measures angular velocity, °/s or rad/s)
+X/Y/Z       Three orthogonal axes of measurement
+Mag         Magnitude (sqrt(x² + y² + z²))
+             → Combined 3-axis magnitude
+
+Ribs IMU    IMU sensor placed on the rib cage
+Chest IMU   IMU sensor placed on the chest
+
+
+─── STATISTICAL FEATURES ──────────────────────────────────────
+
+mean        Arithmetic mean (average)
+std         Standard deviation
+var         Variance (std²)
+min         Minimum value
+max         Maximum value
+median      Middle value when sorted
+range       max - min
+iqr         Interquartile Range (Q3 - Q1)
+skewness    Measure of distribution asymmetry
+             → 0 = symmetric, positive = right tail, negative = left tail
+kurtosis    Measure of distribution tail heaviness (excess kurtosis)
+             → 0 = normal, positive = heavy tails, negative = light tails
+rms         Root Mean Square
+energy      Sum of squared values (total signal energy)
+zcr         Zero Crossing Rate
+mav         Mean Absolute Value
+p5/p25/p75/p95  5th/25th/75th/95th percentile values
+
+
+─── SIGNAL QUALITY INDICES (SQI) ──────────────────────────────
+
+SQI         Signal Quality Index
+SNR         Signal-to-Noise Ratio (in dB)
+             → Higher = cleaner signal
+dB          Decibels (logarithmic scale for power ratios)
+PSD         Power Spectral Density
+             → Distribution of signal power across frequencies
+BW          Baseline Wander (low-frequency drift in ECG)
+LOA         Limits of Agreement (Bland-Altman: mean ± 1.96*SD)
+
+
+─── COMPARISON METRICS ─────────────────────────────────────────
+
+abs_diff    Absolute Difference (|device - reference|)
+pct_diff    Percentage Difference (|device - reference| / |reference| × 100)
+Bland-Altman  Plot of difference vs mean for agreement analysis
+Correlation   Pearson/Spearman correlation between signals
+ALMA        Arnaud Legoux Moving Average (smoothed trend line)
+R²          Coefficient of Determination (goodness of fit)
+
+
+─── TEMPERATURE ────────────────────────────────────────────────
+
+°C          Degrees Celsius
+Fever       Body temperature > 37.5°C
+High Fever  Body temperature > 38.5°C
+Hypothermia Body temperature < 35.0°C
+Slope       Rate of temperature change over time
+
+
+─── FREQUENCY BANDS ────────────────────────────────────────────
+
+ECG signal band:        0.5 – 40 Hz
+QRS complex band:       5 – 15 Hz
+Breathing band:         0.1 – 0.5 Hz
+Baseline wander:        < 0.5 Hz
+HP / LP filter:         High-Pass / Low-Pass filter
+SOS                     Second-Order Sections (filter implementation)
+
+
+─── VITALWAVE LIBRARY ──────────────────────────────────────────
+
+ecg_modified_pan_tompkins   R-peak detection algorithm
+ampd                        Automatic Multiscale Peak Detection
+msptd                       Modified Smoothed Peak/Trough Detection
+butter_filter               Butterworth IIR filter
+filter_hr_peaks             Heart rate peak filtering/cleaning
+filter_hr                   Heart rate signal filtering
+homomorphic_hilbert_envelope  Envelope extraction via Hilbert transform
+segmenting                  Signal windowing/segmentation
+get_global_egc_features     Global ECG feature extraction
+get_ecg_signal_peaks        ECG morphology detection (P,Q,S,T)
+get_egc_interval_p_t        P-T interval computation
+get_egc_interval_q_s        Q-S (QRS duration) computation
+get_egc_interval_q_t        Q-T interval computation
+compute_meandist            Mean distance metric
+get_activity_features       IMU activity feature extraction
+calculate_gravity_and_movement_xyz  Gravity/movement separation
+calculate_gravity_statistics       Gravity component statistics
+extract_frequency_domain_features  Frequency-domain IMU features
+axes_corr                   Inter-axis correlation
+calculate_polynomial_fit    Polynomial curve fitting
+
+
+─── FILE FORMATS ───────────────────────────────────────────────
+
+EDF         European Data Format (Bittium Faros output)
+ACQ         AcqKnowledge format (Biopac output)
+CSV         Comma-Separated Values
+JSON        JavaScript Object Notation
+HDF5        Hierarchical Data Format version 5
+
+
+══════════════════════════════════════════════════════════════════

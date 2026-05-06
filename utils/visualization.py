@@ -539,44 +539,443 @@ def plot_spike_detection(raw_signals, spike_masks, preprocessed,
         plt.close(fig)
 
 
+def compute_derived_leads(preprocessed, fs=250):
+    """
+    Compute Lead-III, aVR, aVL, aVF from Lead-I and Lead-II.
+
+    Einthoven's Law:
+        Lead III = Lead II - Lead I
+        aVR = -(Lead I + Lead II) / 2
+        aVL = Lead I - Lead II / 2
+        aVF = Lead II - Lead I / 2
+
+    Parameters
+    ----------
+    preprocessed : dict
+        Must contain 'lead1' and 'lead2'.
+    fs : int
+
+    Returns
+    -------
+    derived : dict
+        Dictionary with computed leads.
+    """
+
+    derived = {}
+
+    if 'lead1' not in preprocessed or 'lead2' not in preprocessed:
+        print("[WARNING] Lead I and Lead II required for derived leads")
+        return derived
+
+    lead1 = np.array(preprocessed['lead1'], dtype=np.float64).flatten()
+    lead2 = np.array(preprocessed['lead2'], dtype=np.float64).flatten()
+
+    min_len = min(len(lead1), len(lead2))
+    lead1 = lead1[:min_len]
+    lead2 = lead2[:min_len]
+
+    derived['lead3'] = lead2 - lead1
+    derived['avr'] = -(lead1 + lead2) / 2.0
+    derived['avl'] = lead1 - lead2 / 2.0
+    derived['avf'] = lead2 - lead1 / 2.0
+
+    print(f"  [OK] Derived leads computed: Lead-III, aVR, aVL, aVF ({min_len} samples)")
+
+    return derived
+
+
+def plot_12lead_ecg(preprocessed, fs=250, start_sec=0,
+                     paper_speed_mm_per_s=25,
+                     amplitude_mm_per_mv=10,
+                     output_dir="outputs/plots/device",
+                     show=False, save=True):
+    """
+    Classical 12-lead ECG paper format plot.
+
+    Grid layout (3 rows x 4 columns), 2.5s per column:
+
+        Lead-I    aVR    V1    V4
+        Lead-II   aVL    V2    V5
+        Lead-III  aVF    V3    (empty)
+
+    Parameters
+    ----------
+    preprocessed : dict
+        Must contain lead1, lead2, and chest leads (c1-c5).
+    fs : int
+        Sampling frequency.
+    start_sec : float
+        Start time for the 2.5s windows.
+    paper_speed_mm_per_s : float
+        Standard: 25 mm/s.
+    amplitude_mm_per_mv : float
+        Standard: 10 mm/mV.
+    output_dir : str
+    show : bool
+    save : bool
+    """
+
+    if save:
+        _ensure_dir(output_dir)
+
+    # Compute derived leads
+    derived = compute_derived_leads(preprocessed, fs)
+
+    # Map all 12 leads
+    # Row 0: Lead-I, aVR, V1, V4
+    # Row 1: Lead-II, aVL, V2, V5
+    # Row 2: Lead-III, aVF, V3, (empty)
+
+    lead_grid = [
+        [('I',   'lead1'),  ('aVR', 'avr'),  ('V1', 'c1'), ('V4', 'c4')],
+        [('II',  'lead2'),  ('aVL', 'avl'),  ('V2', 'c2'), ('V5', 'c5')],
+        [('III', 'lead3'),  ('aVF', 'avf'),  ('V3', 'c3'), (None, None)],
+    ]
+
+    # Merge preprocessed + derived into one dict
+    all_signals = {**preprocessed, **derived}
+
+    # Window parameters
+    window_sec = 2.5
+    window_samples = int(window_sec * fs)
+    start_sample = int(start_sec * fs)
+
+    # ─── Figure Setup ─────────────────────────────────────
+    # Paper dimensions: 25mm/s × 2.5s = 62.5mm per column
+    # 4 columns + margins
+    n_rows = 3
+    n_cols = 4
+
+    # Figure size in inches (approximate paper ECG proportions)
+    col_width = 3.5  # inches per column
+    row_height = 2.5  # inches per row
+    fig_width = col_width * n_cols + 1.5
+    fig_height = row_height * n_rows + 2.0
+
+    fig = plt.figure(figsize=(fig_width, fig_height), facecolor='white')
+
+    # Main grid with small gaps
+    gs = gridspec.GridSpec(n_rows, n_cols,
+                            hspace=0.3, wspace=0.15,
+                            left=0.06, right=0.98,
+                            top=0.92, bottom=0.05)
+
+    # Title
+    fig.suptitle(f"12-Lead ECG — Paper Format\n"
+                 f"Speed: {paper_speed_mm_per_s} mm/s | "
+                 f"Gain: {amplitude_mm_per_mv} mm/mV | "
+                 f"Start: {start_sec}s",
+                 fontsize=12, fontweight='bold')
+
+    for row in range(n_rows):
+        for col in range(n_cols):
+
+            label, key = lead_grid[row][col]
+
+            ax = fig.add_subplot(gs[row, col])
+
+            if label is None or key is None:
+                ax.axis('off')
+                continue
+
+            if key not in all_signals:
+                ax.text(0.5, 0.5, f'{label}\nN/A',
+                        ha='center', va='center', fontsize=10, color='gray',
+                        transform=ax.transAxes)
+                ax.set_xlim(0, window_sec)
+                _draw_ecg_grid(ax, window_sec)
+                continue
+
+            sig = np.array(all_signals[key], dtype=np.float64).flatten()
+
+            # Extract window
+            end_sample = start_sample + window_samples
+            if end_sample > len(sig):
+                end_sample = len(sig)
+
+            segment = sig[start_sample:end_sample]
+            t = np.arange(len(segment)) / fs
+
+            # ─── Draw ECG grid ────────────────────────────
+            _draw_ecg_grid(ax, window_sec)
+
+            # ─── Plot signal ──────────────────────────────
+            ax.plot(t, segment, color='black', linewidth=0.8)
+
+            # ─── Lead label ───────────────────────────────
+            ax.text(0.02, 0.95, label,
+                    transform=ax.transAxes,
+                    fontsize=10, fontweight='bold',
+                    va='top', ha='left',
+                    bbox=dict(boxstyle='round,pad=0.2',
+                              facecolor='white', alpha=0.8))
+
+            # ─── Calibration pulse (1mV reference) ────────
+            # Small 1mV calibration bar at the left edge
+            y_center = np.mean(segment) if len(segment) > 0 else 0
+            cal_height = 1.0  # Assuming signal in mV-like units
+            ax.plot([0, 0], [y_center - cal_height / 2, y_center + cal_height / 2],
+                    color='black', linewidth=1.5, alpha=0.3)
+
+            ax.set_xlim(0, window_sec)
+
+            # Y-axis: show amplitude range
+            if len(segment) > 0:
+                y_margin = max(np.std(segment) * 3, 0.5)
+                y_center = np.mean(segment)
+                ax.set_ylim(y_center - y_margin, y_center + y_margin)
+
+            # Axis formatting
+            if row == n_rows - 1:
+                ax.set_xlabel('s', fontsize=7)
+                ax.tick_params(axis='x', labelsize=6)
+            else:
+                ax.set_xticklabels([])
+
+            if col == 0:
+                ax.tick_params(axis='y', labelsize=6)
+            else:
+                ax.set_yticklabels([])
+
+    plt.tight_layout()
+
+    if save:
+        filepath = os.path.join(output_dir,
+                                f"ecg_12lead_paper_t{start_sec}s.png")
+        fig.savefig(filepath, dpi=200, bbox_inches='tight', facecolor='white')
+        print(f"  [SAVED] {filepath}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+
+def _draw_ecg_grid(ax, duration_sec):
+    """
+    Draw ECG paper-style grid.
+
+    Major grid: 5mm equivalent (red, thicker)
+    Minor grid: 1mm equivalent (pink, thinner)
+    """
+
+    # Background color (cream/off-white like ECG paper)
+    ax.set_facecolor('#FFF8F0')
+
+    # Minor grid (1mm equivalent)
+    # At 25mm/s: 1mm = 0.04s
+    minor_x_step = 0.04
+    x_ticks_minor = np.arange(0, duration_sec + minor_x_step, minor_x_step)
+
+    for x in x_ticks_minor:
+        ax.axvline(x=x, color='#FFB0B0', linewidth=0.2, alpha=0.5)
+
+    # Major grid (5mm equivalent)
+    # At 25mm/s: 5mm = 0.2s
+    major_x_step = 0.2
+    x_ticks_major = np.arange(0, duration_sec + major_x_step, major_x_step)
+
+    for x in x_ticks_major:
+        ax.axvline(x=x, color='#FF6060', linewidth=0.4, alpha=0.5)
+
+    # Horizontal grid lines (amplitude)
+    y_lim = ax.get_ylim()
+    y_range = y_lim[1] - y_lim[0] if y_lim[1] != y_lim[0] else 2.0
+
+    # Minor horizontal (0.1 mV equivalent)
+    minor_y_step = y_range / 50  # approximate
+    if minor_y_step > 0:
+        y_minor = np.arange(y_lim[0], y_lim[1], minor_y_step)
+        for y in y_minor:
+            ax.axhline(y=y, color='#FFB0B0', linewidth=0.2, alpha=0.5)
+
+    # Major horizontal (0.5 mV equivalent)
+    major_y_step = y_range / 10
+    if major_y_step > 0:
+        y_major = np.arange(y_lim[0], y_lim[1], major_y_step)
+        for y in y_major:
+            ax.axhline(y=y, color='#FF6060', linewidth=0.4, alpha=0.5)
+
+    # Zero line
+    ax.axhline(y=0, color='#FF0000', linewidth=0.5, alpha=0.3)
+
+
+def plot_12lead_ecg_multi_window(preprocessed, fs=250,
+                                  n_windows=4,
+                                  output_dir="outputs/plots/device",
+                                  show=False, save=True):
+    """
+    Generate multiple 12-lead ECG paper plots at different time windows.
+
+    Parameters
+    ----------
+    preprocessed : dict
+    fs : int
+    n_windows : int
+        Number of windows to generate (evenly spaced).
+    output_dir : str
+    show : bool
+    save : bool
+    """
+
+    if 'lead1' not in preprocessed:
+        print("[WARNING] Lead I not found, skipping 12-lead plot")
+        return
+
+    sig_len = len(preprocessed['lead1'])
+    total_sec = sig_len / fs
+
+    # Window duration
+    window_sec = 2.5
+
+    # Generate evenly spaced start times
+    if total_sec <= window_sec:
+        start_times = [0]
+    else:
+        max_start = total_sec - window_sec
+        start_times = np.linspace(0, max_start, n_windows)
+
+    print(f"\n  [12-LEAD ECG] Generating {len(start_times)} paper plots")
+
+    for start_sec in start_times:
+        plot_12lead_ecg(
+            preprocessed, fs=fs,
+            start_sec=round(start_sec, 1),
+            output_dir=output_dir,
+            show=show, save=save
+        )
+
 # ═══════════════════════════════════════════════════════════════
 #  8. MASTER VISUALIZATION FUNCTION
 # ═══════════════════════════════════════════════════════════════
 
 ECG_SIGNALS = ["lead1", "lead2", "c1", "c2", "c3", "c4", "c5"]
 
+# def visualize_all(raw_signals, preprocessed, fiducials, features,
+#                    spike_masks=None, fs=250,
+#                    output_dir="outputs/plots",
+#                    show=False, save=True):
+#     """
+#     Master visualization function — generates all plots.
+
+#     Parameters
+#     ----------
+#     raw_signals : dict
+#         DC-removed signals (before preprocessing).
+#     preprocessed : dict
+#         Preprocessed signals.
+#     fiducials : dict
+#         Detected fiducial points.
+#     features : dict
+#         Extracted features.
+#     spike_masks : dict, optional
+#         Spike masks from IMU preprocessing.
+#     fs : int
+#         Sampling frequency.
+#     output_dir : str
+#     show : bool
+#     save : bool
+#     """
+
+#     print("\n" + "=" * 60)
+#     print("[VISUALIZATION] Generating all plots")
+#     print("=" * 60)
+
+#     # 1. Raw vs Preprocessed — select representative signals
+#     print("\n[1/7] Raw vs Preprocessed comparisons")
+#     representative = ["lead1", "impedance_pneumography", "accx_ribs_imu", "body_temperature"]
+#     plot_raw_vs_preprocessed(
+#         raw_signals, preprocessed,
+#         signal_names=representative,
+#         fs=fs, output_dir=output_dir, show=show, save=save
+#     )
+
+#     # 2. ECG with peaks — all leads
+#     print("\n[2/7] ECG with fiducial points")
+#     for name in ECG_SIGNALS:
+#         if name in preprocessed:
+#             plot_ecg_with_peaks(
+#                 preprocessed, fiducials,
+#                 signal_name=name, fs=fs,
+#                 output_dir=output_dir, show=show, save=save
+#             )
+#             # Zoomed version (first 10 seconds)
+#             plot_ecg_with_peaks(
+#                 preprocessed, fiducials,
+#                 signal_name=name, fs=fs,
+#                 time_window=(0, 10),
+#                 output_dir=output_dir, show=show, save=save
+#             )
+
+#     # 3. Respiration with peaks
+#     print("\n[3/7] Respiration with breath peaks")
+#     plot_respiration_with_peaks(
+#         preprocessed, fiducials,
+#         signal_name="impedance_pneumography",
+#         fs=fs, output_dir=output_dir, show=show, save=save
+#     )
+
+#     # 4. IMU overview
+#     print("\n[4/7] IMU 6-axis plots")
+#     for imu_name in ["ribs", "chest"]:
+#         plot_imu_signals(
+#             preprocessed, imu_name=imu_name, fs=fs,
+#             output_dir=output_dir, show=show, save=save
+#         )
+
+#     # 5. Temperature
+#     print("\n[5/7] Temperature plot")
+#     plot_temperature(
+#         preprocessed, fs=fs,
+#         output_dir=output_dir, show=show, save=save
+#     )
+
+#     # 6. HRV summary — primary lead
+#     print("\n[6/7] HRV summary")
+#     plot_hrv_summary(
+#         preprocessed, fiducials, features,
+#         signal_name="lead1", fs=fs,
+#         output_dir=output_dir, show=show, save=save
+#     )
+
+#     # 7. Spike detection (IMU)
+#     print("\n[7/7] IMU spike detection")
+#     if spike_masks:
+#         for name in spike_masks:
+#             plot_spike_detection(
+#                 raw_signals, spike_masks, preprocessed,
+#                 signal_name=name, fs=fs,
+#                 output_dir=output_dir, show=show, save=save
+#             )
+
+#     print(f"\n[OK] All visualizations complete → {output_dir}/")
+
 def visualize_all(raw_signals, preprocessed, fiducials, features,
                    spike_masks=None, fs=250,
-                   output_dir="outputs/plots",
+                   output_dir="outputs/plots/device",
                    show=False, save=True):
-    """
-    Master visualization function — generates all plots.
-
-    Parameters
-    ----------
-    raw_signals : dict
-        DC-removed signals (before preprocessing).
-    preprocessed : dict
-        Preprocessed signals.
-    fiducials : dict
-        Detected fiducial points.
-    features : dict
-        Extracted features.
-    spike_masks : dict, optional
-        Spike masks from IMU preprocessing.
-    fs : int
-        Sampling frequency.
-    output_dir : str
-    show : bool
-    save : bool
-    """
 
     print("\n" + "=" * 60)
     print("[VISUALIZATION] Generating all plots")
     print("=" * 60)
 
-    # 1. Raw vs Preprocessed — select representative signals
-    print("\n[1/7] Raw vs Preprocessed comparisons")
+    # # 0. All signals overview
+    # print("\n[0/8] All signals overview")
+    # plot_all_signals_overview(
+    #     preprocessed, fs=fs,
+    #     output_dir=output_dir, show=show, save=save
+    # )
+
+    # 1. 12-Lead ECG Paper Format (NEW)
+    print("\n[1/8] 12-Lead ECG Paper Format")
+    plot_12lead_ecg_multi_window(
+        preprocessed, fs=fs,
+        n_windows=4,
+        output_dir=output_dir, show=show, save=save
+    )
+
+    # 2. Raw vs Preprocessed
+    print("\n[2/8] Raw vs Preprocessed comparisons")
     representative = ["lead1", "impedance_pneumography", "accx_ribs_imu", "body_temperature"]
     plot_raw_vs_preprocessed(
         raw_signals, preprocessed,
@@ -584,8 +983,8 @@ def visualize_all(raw_signals, preprocessed, fiducials, features,
         fs=fs, output_dir=output_dir, show=show, save=save
     )
 
-    # 2. ECG with peaks — all leads
-    print("\n[2/7] ECG with fiducial points")
+    # 3. ECG with peaks
+    print("\n[3/8] ECG with fiducial points")
     for name in ECG_SIGNALS:
         if name in preprocessed:
             plot_ecg_with_peaks(
@@ -593,7 +992,6 @@ def visualize_all(raw_signals, preprocessed, fiducials, features,
                 signal_name=name, fs=fs,
                 output_dir=output_dir, show=show, save=save
             )
-            # Zoomed version (first 10 seconds)
             plot_ecg_with_peaks(
                 preprocessed, fiducials,
                 signal_name=name, fs=fs,
@@ -601,39 +999,39 @@ def visualize_all(raw_signals, preprocessed, fiducials, features,
                 output_dir=output_dir, show=show, save=save
             )
 
-    # 3. Respiration with peaks
-    print("\n[3/7] Respiration with breath peaks")
+    # 4. Respiration with peaks
+    print("\n[4/8] Respiration with breath peaks")
     plot_respiration_with_peaks(
         preprocessed, fiducials,
         signal_name="impedance_pneumography",
         fs=fs, output_dir=output_dir, show=show, save=save
     )
 
-    # 4. IMU overview
-    print("\n[4/7] IMU 6-axis plots")
+    # 5. IMU overview
+    print("\n[5/8] IMU 6-axis plots")
     for imu_name in ["ribs", "chest"]:
         plot_imu_signals(
             preprocessed, imu_name=imu_name, fs=fs,
             output_dir=output_dir, show=show, save=save
         )
 
-    # 5. Temperature
-    print("\n[5/7] Temperature plot")
+    # 6. Temperature
+    print("\n[6/8] Temperature plot")
     plot_temperature(
         preprocessed, fs=fs,
         output_dir=output_dir, show=show, save=save
     )
 
-    # 6. HRV summary — primary lead
-    print("\n[6/7] HRV summary")
+    # 7. HRV summary
+    print("\n[7/8] HRV summary")
     plot_hrv_summary(
         preprocessed, fiducials, features,
         signal_name="lead1", fs=fs,
         output_dir=output_dir, show=show, save=save
     )
 
-    # 7. Spike detection (IMU)
-    print("\n[7/7] IMU spike detection")
+    # 8. Spike detection
+    print("\n[8/8] IMU spike detection")
     if spike_masks:
         for name in spike_masks:
             plot_spike_detection(
@@ -642,4 +1040,4 @@ def visualize_all(raw_signals, preprocessed, fiducials, features,
                 output_dir=output_dir, show=show, save=save
             )
 
-    print(f"\n[OK] All visualizations complete → {output_dir}/")
+    print(f"\n[OK] All visualizations complete -> {output_dir}/")
