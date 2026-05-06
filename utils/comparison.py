@@ -688,13 +688,104 @@ def _plot_heatmap_comparison(matched, result, output_dir):
 #  5. SIGNAL-LEVEL COMPARISON PLOTS
 # ═══════════════════════════════════════════════════════════════
 
+# def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
+#                          dev_signal, ref_signal,
+#                          fs=250, time_window=None,
+#                          output_dir="outputs/comparison/plots",
+#                          show=False, save=True):
+#     """
+#     Overlay device and reference signals for visual comparison.
+
+#     Parameters
+#     ----------
+#     dev_preprocessed : dict
+#         Device preprocessed signals.
+#     ref_preprocessed : dict
+#         Reference preprocessed signals.
+#     dev_signal : str
+#         Device signal key.
+#     ref_signal : str
+#         Reference signal key.
+#     fs : int
+#         Sampling frequency.
+#     time_window : tuple, optional
+#         (start_sec, end_sec) for zoom.
+#     """
+
+#     if save:
+#         _ensure_dir(output_dir)
+
+#     if dev_signal not in dev_preprocessed or ref_signal not in ref_preprocessed:
+#         print(f"[WARNING] Signal not found: {dev_signal} or {ref_signal}")
+#         return
+
+#     dev_sig = np.array(dev_preprocessed[dev_signal], dtype=np.float64).flatten()
+#     ref_sig = np.array(ref_preprocessed[ref_signal], dtype=np.float64).flatten()
+
+#     t_dev = np.arange(len(dev_sig)) / fs
+#     t_ref = np.arange(len(ref_sig)) / fs
+
+#     fig, axes = plt.subplots(3, 1, figsize=(16, 10))
+#     fig.suptitle(f"Signal Overlay — {dev_signal} (Device) vs {ref_signal} (Reference)",
+#                  fontsize=13, fontweight='bold')
+
+#     # Panel 1: Device signal
+#     axes[0].plot(t_dev, dev_sig, color='steelblue', linewidth=0.5)
+#     axes[0].set_title(f"Device: {dev_signal}")
+#     axes[0].set_ylabel("Amplitude")
+#     axes[0].grid(True, alpha=0.3)
+
+#     # Panel 2: Reference signal
+#     axes[1].plot(t_ref, ref_sig, color='coral', linewidth=0.5)
+#     axes[1].set_title(f"Reference: {ref_signal}")
+#     axes[1].set_ylabel("Amplitude")
+#     axes[1].grid(True, alpha=0.3)
+
+#     # Panel 3: Overlay (normalized for visual comparison)
+#     dev_norm = (dev_sig - np.mean(dev_sig)) / max(np.std(dev_sig), 1e-8)
+#     ref_norm = (ref_sig - np.mean(ref_sig)) / max(np.std(ref_sig), 1e-8)
+
+#     # Trim to shorter signal for overlay
+#     min_len = min(len(dev_norm), len(ref_norm))
+#     t_common = np.arange(min_len) / fs
+
+#     axes[2].plot(t_common, dev_norm[:min_len], color='steelblue',
+#                  linewidth=0.5, alpha=0.7, label='Device (normalized)')
+#     axes[2].plot(t_common, ref_norm[:min_len], color='coral',
+#                  linewidth=0.5, alpha=0.7, label='Reference (normalized)')
+#     axes[2].set_title("Normalized Overlay")
+#     axes[2].set_xlabel("Time (s)")
+#     axes[2].set_ylabel("Normalized Amplitude")
+#     axes[2].legend(loc='upper right')
+#     axes[2].grid(True, alpha=0.3)
+
+#     if time_window is not None:
+#         for ax in axes:
+#             ax.set_xlim(time_window)
+
+#     plt.tight_layout()
+
+#     if save:
+#         suffix = f"_{time_window[0]}s_{time_window[1]}s" if time_window else ""
+#         filepath = os.path.join(output_dir,
+#                                 f"overlay_{dev_signal}_vs_{ref_signal}{suffix}.png")
+#         fig.savefig(filepath, dpi=150, bbox_inches='tight')
+#         print(f"  [PLOT] {filepath}")
+
+#     if show:
+#         plt.show()
+#     else:
+#         plt.close(fig)
+
+
+
 def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
-                         dev_signal, ref_signal,
+                         dev_signal_1, dev_signal_2, ref_signal,
                          fs=250, time_window=None,
                          output_dir="outputs/comparison/plots",
                          show=False, save=True):
     """
-    Overlay device and reference signals for visual comparison.
+    Overlay two device signals and one reference signal for visual comparison.
 
     Parameters
     ----------
@@ -702,8 +793,10 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
         Device preprocessed signals.
     ref_preprocessed : dict
         Reference preprocessed signals.
-    dev_signal : str
-        Device signal key.
+    dev_signal_1 : str
+        First device signal key.
+    dev_signal_2 : str
+        Second device signal key.
     ref_signal : str
         Reference signal key.
     fs : int
@@ -715,49 +808,68 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
     if save:
         _ensure_dir(output_dir)
 
-    if dev_signal not in dev_preprocessed or ref_signal not in ref_preprocessed:
-        print(f"[WARNING] Signal not found: {dev_signal} or {ref_signal}")
+    missing = [s for s in [dev_signal_1, dev_signal_2] if s not in dev_preprocessed]
+    if missing:
+        print(f"[WARNING] Device signal(s) not found: {missing}")
+        return
+    if ref_signal not in ref_preprocessed:
+        print(f"[WARNING] Reference signal not found: {ref_signal}")
         return
 
-    dev_sig = np.array(dev_preprocessed[dev_signal], dtype=np.float64).flatten()
-    ref_sig = np.array(ref_preprocessed[ref_signal], dtype=np.float64).flatten()
+    dev_sig_1 = np.array(dev_preprocessed[dev_signal_1], dtype=np.float64).flatten()
+    dev_sig_2 = np.array(dev_preprocessed[dev_signal_2], dtype=np.float64).flatten()
+    ref_sig   = np.array(ref_preprocessed[ref_signal],   dtype=np.float64).flatten()
 
-    t_dev = np.arange(len(dev_sig)) / fs
-    t_ref = np.arange(len(ref_sig)) / fs
+    t_dev_1 = np.arange(len(dev_sig_1)) / fs
+    t_dev_2 = np.arange(len(dev_sig_2)) / fs
+    t_ref   = np.arange(len(ref_sig))   / fs
 
-    fig, axes = plt.subplots(3, 1, figsize=(16, 10))
-    fig.suptitle(f"Signal Overlay — {dev_signal} (Device) vs {ref_signal} (Reference)",
-                 fontsize=13, fontweight='bold')
+    fig, axes = plt.subplots(4, 1, figsize=(16, 13))
+    fig.suptitle(
+        f"{dev_signal_1} & {dev_signal_2} (Device) vs {ref_signal} (Reference)",
+        fontsize=13, fontweight='bold'
+    )
 
-    # Panel 1: Device signal
-    axes[0].plot(t_dev, dev_sig, color='steelblue', linewidth=0.5)
-    axes[0].set_title(f"Device: {dev_signal}")
+    # Panel 1: Device signal 1
+    axes[0].plot(t_dev_1, dev_sig_1, color='steelblue', linewidth=2)
+    axes[0].set_title(f"Device: {dev_signal_1}")
     axes[0].set_ylabel("Amplitude")
     axes[0].grid(True, alpha=0.3)
 
-    # Panel 2: Reference signal
-    axes[1].plot(t_ref, ref_sig, color='coral', linewidth=0.5)
-    axes[1].set_title(f"Reference: {ref_signal}")
+    # Panel 2: Device signal 2
+    axes[1].plot(t_dev_2, dev_sig_2, color='mediumseagreen', linewidth=2)
+    axes[1].set_title(f"Device: {dev_signal_2}")
     axes[1].set_ylabel("Amplitude")
     axes[1].grid(True, alpha=0.3)
 
-    # Panel 3: Overlay (normalized for visual comparison)
-    dev_norm = (dev_sig - np.mean(dev_sig)) / max(np.std(dev_sig), 1e-8)
-    ref_norm = (ref_sig - np.mean(ref_sig)) / max(np.std(ref_sig), 1e-8)
+    # Panel 3: Reference signal
+    axes[2].plot(t_ref, ref_sig, color='coral', linewidth=2)
+    axes[2].set_title(f"Reference: {ref_signal}")
+    axes[2].set_ylabel("Amplitude")
+    axes[2].grid(True, alpha=0.3)
 
-    # Trim to shorter signal for overlay
-    min_len = min(len(dev_norm), len(ref_norm))
+    # Panel 4: Normalized overlay of all three signals
+    def normalize(sig):
+        return (sig - np.mean(sig)) / max(np.std(sig), 1e-8)
+
+    dev_norm_1 = normalize(dev_sig_1)
+    dev_norm_2 = normalize(dev_sig_2)
+    ref_norm   = normalize(ref_sig)
+
+    min_len  = min(len(dev_norm_1), len(dev_norm_2), len(ref_norm))
     t_common = np.arange(min_len) / fs
 
-    axes[2].plot(t_common, dev_norm[:min_len], color='steelblue',
-                 linewidth=0.5, alpha=0.7, label='Device (normalized)')
-    axes[2].plot(t_common, ref_norm[:min_len], color='coral',
-                 linewidth=0.5, alpha=0.7, label='Reference (normalized)')
-    axes[2].set_title("Normalized Overlay")
-    axes[2].set_xlabel("Time (s)")
-    axes[2].set_ylabel("Normalized Amplitude")
-    axes[2].legend(loc='upper right')
-    axes[2].grid(True, alpha=0.3)
+    axes[3].plot(t_common, dev_norm_1[:min_len], color='steelblue',
+                 linewidth=2, alpha=0.7, label=f'Device 1: {dev_signal_1}')
+    axes[3].plot(t_common, dev_norm_2[:min_len], color='mediumseagreen',
+                 linewidth=2, alpha=0.7, label=f'Device 2: {dev_signal_2}')
+    axes[3].plot(t_common, ref_norm[:min_len],   color='coral',
+                 linewidth=2, alpha=0.7, label=f'Reference: {ref_signal}')
+    axes[3].set_title("Normalized Overlay (All Three Signals)")
+    axes[3].set_xlabel("Time (s)")
+    axes[3].set_ylabel("Normalized Amplitude")
+    axes[3].legend(loc='upper right')
+    axes[3].grid(True, alpha=0.3)
 
     if time_window is not None:
         for ax in axes:
@@ -766,10 +878,12 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
     plt.tight_layout()
 
     if save:
-        suffix = f"_{time_window[0]}s_{time_window[1]}s" if time_window else ""
-        filepath = os.path.join(output_dir,
-                                f"overlay_{dev_signal}_vs_{ref_signal}{suffix}.png")
-        fig.savefig(filepath, dpi=150, bbox_inches='tight')
+        suffix   = f"_{time_window[0]}s_{time_window[1]}s" if time_window else ""
+        filepath = os.path.join(
+            output_dir,
+            f"overlay_{dev_signal_1}_{dev_signal_2}_vs_{ref_signal}{suffix}.png"
+        )
+        fig.savefig(filepath, dpi=700, bbox_inches='tight')
         print(f"  [PLOT] {filepath}")
 
     if show:
@@ -790,21 +904,36 @@ def plot_all_signal_overlays(dev_preprocessed, ref_preprocessed,
 
     all_pairs = {**ECG_SIGNAL_PAIRS, **RESP_SIGNAL_PAIRS}
 
-    for dev_signal, ref_signal in all_pairs.items():
-
-        # Full signal
-        plot_signal_overlay(
+    plot_signal_overlay(
             dev_preprocessed, ref_preprocessed,
-            dev_signal, ref_signal,
+            'impedance_pneumography', 'gyry_ribs_imu', 'ref_respiration',
             fs=fs, output_dir=output_dir,
             show=show, save=save
         )
-
-        # Zoomed (first 10 seconds)
-        plot_signal_overlay(
+    plot_signal_overlay(
             dev_preprocessed, ref_preprocessed,
-            dev_signal, ref_signal,
+            'impedance_pneumography', 'gyry_ribs_imu', 'ref_respiration',
             fs=fs, time_window=(0, 10),
             output_dir=output_dir,
             show=show, save=save
         )
+    
+
+    # for dev_signal, ref_signal in all_pairs.items():
+
+        # # Full signal
+        # plot_signal_overlay(
+        #     dev_preprocessed, ref_preprocessed,
+        #     dev_signal, ref_signal,
+        #     fs=fs, output_dir=output_dir,
+        #     show=show, save=save
+        # )
+
+        # # Zoomed (first 10 seconds)
+        # plot_signal_overlay(
+        #     dev_preprocessed, ref_preprocessed,
+        #     dev_signal, ref_signal,
+        #     fs=fs, time_window=(0, 10),
+        #     output_dir=output_dir,
+        #     show=show, save=save
+        # )

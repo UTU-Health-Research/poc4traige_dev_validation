@@ -1,3 +1,0 @@
-signal,imu_name,overall_score,overall_quality
-imu_ribs,ribs,50.0,moderate
-imu_chest,chest,50.0,moderate
