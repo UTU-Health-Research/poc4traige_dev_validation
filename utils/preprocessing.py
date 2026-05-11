@@ -211,20 +211,20 @@ def preprocess_ecg(signal, fs=250):
 
     sig = np.array(signal, dtype=np.float64).flatten()
 
-    # Step 1: High-pass at 0.5 Hz → remove baseline wander
+    # Step 1: High-pass at 5.0 Hz → remove baseline wander
     sig_hp = butter_filter(
         arr=sig,
         n=2,
-        wn=np.array([0.5]),
+        wn=np.array([5.0]),
         filter_type='high',
         fs=fs
     )
 
-    # Step 2: Low-pass at 20.0 Hz → remove high-frequency noise
+    # Step 2: Low-pass at 40.0 Hz → remove high-frequency noise
     sig_lp = butter_filter(
         arr=sig_hp,
         n=2,
-        wn=np.array([20.0]),
+        wn=np.array([40.0]),
         filter_type='low',
         fs=fs
     )

@@ -1,0 +1,157 @@
+======================================================================
+SIGNAL QUALITY ASSESSMENT REPORT
+Generated: 2026-05-11 16:57:23
+======================================================================
+
+Signal                            Score    Quality
+--------------------------------------------------
+ref_lead1                         83.5       good
+ref_lead2                         82.0       good
+ref_lead3                         52.0   moderate
+ref_respiration                   92.5       good
+
+==================================================
+  ref_lead1
+==================================================
+  signal_name                        : ref_lead1
+  snr_db                             : 20.0905
+  snr_quality                        : good
+  n_r_peaks_raw                      : 75
+  n_r_peaks_filtered                 : 75
+  peak_rejection_rate                : 0.0000
+  peak_consistency                   : good
+  rr_mean_ms                         : 1002.9730
+  rr_std_ms                          : 71.7716
+  rr_cv                              : 0.0716
+  rr_regularity                      : very_regular
+  n_impossible_rr                    : 0
+  impossible_rr_pct                  : 0.0000
+  skewness                           : 1.4313
+  skewness_quality                   : moderate
+  kurtosis                           : 13.0206
+  kurtosis_quality                   : poor
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 0.1272
+  rms_amplitude                      : 0.0121
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.6372
+  qrs_band_quality                   : moderate
+  baseline_wander_ratio              : 0.0000
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 63.6822
+  seg_quality_std                    : 2.7734
+  seg_quality_min                    : 57.8315
+  seg_quality_max                    : 70.4849
+  seg_n_good                         : 1
+  seg_n_moderate                     : 15
+  seg_n_poor                         : 0
+  seg_total                          : 16
+  overall_score                      : 83.5000
+  overall_quality                    : good
+
+==================================================
+  ref_lead2
+==================================================
+  signal_name                        : ref_lead2
+  snr_db                             : 25.9622
+  snr_quality                        : good
+  n_r_peaks_raw                      : 75
+  n_r_peaks_filtered                 : 75
+  peak_rejection_rate                : 0.0000
+  peak_consistency                   : good
+  rr_mean_ms                         : 1002.9730
+  rr_std_ms                          : 71.4999
+  rr_cv                              : 0.0713
+  rr_regularity                      : very_regular
+  n_impossible_rr                    : 0
+  impossible_rr_pct                  : 0.0000
+  skewness                           : 2.9641
+  skewness_quality                   : poor
+  kurtosis                           : 17.7403
+  kurtosis_quality                   : poor
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 1.1073
+  rms_amplitude                      : 0.1131
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.7611
+  qrs_band_quality                   : good
+  baseline_wander_ratio              : 0.0000
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 52.7321
+  seg_quality_std                    : 0.5234
+  seg_quality_min                    : 51.3041
+  seg_quality_max                    : 53.8387
+  seg_n_good                         : 0
+  seg_n_moderate                     : 16
+  seg_n_poor                         : 0
+  seg_total                          : 16
+  overall_score                      : 82.0000
+  overall_quality                    : good
+
+==================================================
+  ref_lead3
+==================================================
+  signal_name                        : ref_lead3
+  snr_db                             : 13.4873
+  snr_quality                        : good
+  n_r_peaks_raw                      : 150
+  n_r_peaks_filtered                 : 0
+  peak_rejection_rate                : 1.0000
+  peak_consistency                   : poor
+  skewness                           : -5.6315
+  skewness_quality                   : poor
+  kurtosis                           : 1759.5731
+  kurtosis_quality                   : poor
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 0.0482
+  rms_amplitude                      : 0.0004
+  amplitude_quality                  : poor
+  qrs_band_ratio                     : 0.7230
+  qrs_band_quality                   : good
+  baseline_wander_ratio              : 0.0000
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 51.0965
+  seg_quality_std                    : 10.4666
+  seg_quality_min                    : 14.5554
+  seg_quality_max                    : 63.8136
+  seg_n_good                         : 0
+  seg_n_moderate                     : 26
+  seg_n_poor                         : 4
+  seg_total                          : 30
+  overall_score                      : 52.0000
+  overall_quality                    : moderate
+
+==================================================
+  ref_respiration
+==================================================
+  signal_name                        : ref_respiration
+  snr_db                             : 18.7111
+  snr_quality                        : good
+  n_peaks_ampd                       : 13
+  n_peaks_msptd                      : 15
+  peak_method_agreement              : 0.8667
+  peak_agreement_quality             : good
+  bbi_cv                             : 0.2441
+  resp_rate_mean                     : 15.2130
+  bbi_regularity                     : moderate
+  n_impossible_breaths               : 0
+  impossible_breath_pct              : 0.0000
+  breathing_band_ratio               : 0.8006
+  breathing_band_quality             : good
+  skewness                           : 0.1332
+  skewness_quality                   : good
+  kurtosis                           : -1.4994
+  kurtosis_quality                   : good
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 1.2477
+  rms_amplitude                      : 0.3733
+  overall_score                      : 92.5000
+  overall_quality                    : good

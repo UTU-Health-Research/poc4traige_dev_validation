@@ -583,242 +583,242 @@ def compute_derived_leads(preprocessed, fs=250):
     return derived
 
 
-def plot_12lead_ecg(preprocessed, fs=250, start_sec=0,
-                     paper_speed=25, gain=10,
-                     output_dir="outputs/plots/device",
-                     show=False, save=True):
-    """
-    Classical 12-lead ECG paper format — authentic clinical style.
+# def plot_12lead_ecg(preprocessed, fs=250, start_sec=0,
+#                      paper_speed=25, gain=10,
+#                      output_dir="outputs/plots/device",
+#                      show=False, save=True):
+#     """
+#     Classical 12-lead ECG paper format — authentic clinical style.
 
-    Single continuous canvas with ECG paper grid background.
-    3 rows × 4 columns, 2.5s per column, total 10s display.
+#     Single continuous canvas with ECG paper grid background.
+#     3 rows × 4 columns, 2.5s per column, total 10s display.
 
-    Layout:
-        Row 0:  I     aVR    V1    V4
-        Row 1:  II    aVL    V2    V5
-        Row 2:  III   aVF    V3    V6
+#     Layout:
+#         Row 0:  I     aVR    V1    V4
+#         Row 1:  II    aVL    V2    V5
+#         Row 2:  III   aVF    V3    V6
 
-    Parameters
-    ----------
-    preprocessed : dict
-        Must contain lead1, lead2, and chest leads (c1-c5).
-    fs : int
-        Sampling frequency.
-    start_sec : float
-        Start time of the 10s window.
-    paper_speed : float
-        Paper speed in mm/s (standard: 25).
-    gain : float
-        Amplitude gain in mm/mV (standard: 10).
-    output_dir : str
-    show : bool
-    save : bool
-    """
+#     Parameters
+#     ----------
+#     preprocessed : dict
+#         Must contain lead1, lead2, and chest leads (c1-c5).
+#     fs : int
+#         Sampling frequency.
+#     start_sec : float
+#         Start time of the 10s window.
+#     paper_speed : float
+#         Paper speed in mm/s (standard: 25).
+#     gain : float
+#         Amplitude gain in mm/mV (standard: 10).
+#     output_dir : str
+#     show : bool
+#     save : bool
+#     """
 
-    if save:
-        _ensure_dir(output_dir)
+#     if save:
+#         _ensure_dir(output_dir)
 
-    # Compute derived leads
-    derived = compute_derived_leads(preprocessed, fs)
-    all_signals = {**preprocessed, **derived}
+#     # Compute derived leads
+#     derived = compute_derived_leads(preprocessed, fs)
+#     all_signals = {**preprocessed, **derived}
 
-    # ─── Grid Layout ──────────────────────────────────────
-    #   4 columns × 2.5s = 10s total
-    #   3 rows
-    n_rows = 3
-    n_cols = 4
-    col_duration = 2.5  # seconds per column
-    total_duration = n_cols * col_duration  # 10s total
+#     # ─── Grid Layout ──────────────────────────────────────
+#     #   4 columns × 2.5s = 10s total
+#     #   3 rows
+#     n_rows = 3
+#     n_cols = 4
+#     col_duration = 2.5  # seconds per column
+#     total_duration = n_cols * col_duration  # 10s total
 
-    # Lead mapping: [row][col] = (label, signal_key)
-    lead_grid = [
-        [('I',   'lead1'), ('aVR', 'avr'), ('V1', 'c1'), ('V4', 'c4')],
-        [('II',  'lead2'), ('aVL', 'avl'), ('V2', 'c2'), ('V5', 'c5')],
-        [('III', 'lead3'), ('aVF', 'avf'), ('V3', 'c3'), ('V6', None)],
-    ]
+#     # Lead mapping: [row][col] = (label, signal_key)
+#     lead_grid = [
+#         [('I',   'lead1'), ('aVR', 'avr'), ('V1', 'c1'), ('V4', 'c4')],
+#         [('II',  'lead2'), ('aVL', 'avl'), ('V2', 'c2'), ('V5', 'c5')],
+#         [('III', 'lead3'), ('aVF', 'avf'), ('V3', 'c3'), ('V6', None)],
+#     ]
 
-    # ─── Compute Y Layout ─────────────────────────────────
-    # Each row needs a vertical band. We'll compute a global
-    # amplitude scale from all signals, then assign row centers.
+#     # ─── Compute Y Layout ─────────────────────────────────
+#     # Each row needs a vertical band. We'll compute a global
+#     # amplitude scale from all signals, then assign row centers.
 
-    # Collect all signal segments to determine amplitude scale
-    window_samples = int(col_duration * fs)
-    start_sample = int(start_sec * fs)
+#     # Collect all signal segments to determine amplitude scale
+#     window_samples = int(col_duration * fs)
+#     start_sample = int(start_sec * fs)
 
-    all_segments = {}
-    for row in range(n_rows):
-        for col in range(n_cols):
-            label, key = lead_grid[row][col]
-            if key is None or key not in all_signals:
-                continue
+#     all_segments = {}
+#     for row in range(n_rows):
+#         for col in range(n_cols):
+#             label, key = lead_grid[row][col]
+#             if key is None or key not in all_signals:
+#                 continue
 
-            sig = np.array(all_signals[key], dtype=np.float64).flatten()
+#             sig = np.array(all_signals[key], dtype=np.float64).flatten()
 
-            # Each column shows a different time window offset
-            # Column 0: start_sec + 0.0 to 2.5
-            # Column 1: start_sec + 2.5 to 5.0
-            # Column 2: start_sec + 5.0 to 7.5
-            # Column 3: start_sec + 7.5 to 10.0
-            col_start = start_sample + int(col * col_duration * fs)
-            col_end = col_start + window_samples
+#             # Each column shows a different time window offset
+#             # Column 0: start_sec + 0.0 to 2.5
+#             # Column 1: start_sec + 2.5 to 5.0
+#             # Column 2: start_sec + 5.0 to 7.5
+#             # Column 3: start_sec + 7.5 to 10.0
+#             col_start = start_sample + int(col * col_duration * fs)
+#             col_end = col_start + window_samples
 
-            if col_end > len(sig):
-                col_end = len(sig)
-            if col_start >= len(sig):
-                continue
+#             if col_end > len(sig):
+#                 col_end = len(sig)
+#             if col_start >= len(sig):
+#                 continue
 
-            seg = sig[col_start:col_end]
-            all_segments[(row, col)] = seg
+#             seg = sig[col_start:col_end]
+#             all_segments[(row, col)] = seg
 
-    # Determine amplitude scale
-    # We want consistent y-scale across all leads
-    if len(all_segments) == 0:
-        print("[WARNING] No signal data for 12-lead plot")
-        return
+#     # Determine amplitude scale
+#     # We want consistent y-scale across all leads
+#     if len(all_segments) == 0:
+#         print("[WARNING] No signal data for 12-lead plot")
+#         return
 
-    all_amplitudes = np.concatenate(list(all_segments.values()))
-    global_max_amp = np.max(np.abs(all_amplitudes))
+#     all_amplitudes = np.concatenate(list(all_segments.values()))
+#     global_max_amp = np.max(np.abs(all_amplitudes))
 
-    # Row height in signal units — give each row enough room
-    # Use 2× the max amplitude as row height for comfortable spacing
-    row_height = max(global_max_amp * 2.5, 1.0)
+#     # Row height in signal units — give each row enough room
+#     # Use 2× the max amplitude as row height for comfortable spacing
+#     row_height = max(global_max_amp * 2.5, 1.0)
 
-    # Row centers (top to bottom: row 0 at top)
-    row_centers = [(n_rows - 1 - r) * row_height for r in range(n_rows)]
+#     # Row centers (top to bottom: row 0 at top)
+#     row_centers = [(n_rows - 1 - r) * row_height for r in range(n_rows)]
 
-    # ─── Figure Dimensions ────────────────────────────────
-    # Approximate clinical paper proportions
-    # Width: 10s at 25mm/s = 250mm ≈ 10 inches
-    # Height: 3 rows ≈ proportional
-    fig_width = 16
-    fig_height = fig_width * (n_rows * row_height) / (total_duration * row_height / row_height * 1.2)
-    fig_height = max(6, min(fig_height, 10))
+#     # ─── Figure Dimensions ────────────────────────────────
+#     # Approximate clinical paper proportions
+#     # Width: 10s at 25mm/s = 250mm ≈ 10 inches
+#     # Height: 3 rows ≈ proportional
+#     fig_width = 16
+#     fig_height = fig_width * (n_rows * row_height) / (total_duration * row_height / row_height * 1.2)
+#     fig_height = max(6, min(fig_height, 10))
 
-    fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
+#     fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height))
 
-    # ─── Draw ECG Paper Grid ──────────────────────────────
-    _draw_paper_grid(ax, total_duration, n_rows, row_height, row_centers, fs)
+#     # ─── Draw ECG Paper Grid ──────────────────────────────
+#     _draw_paper_grid(ax, total_duration, n_rows, row_height, row_centers, fs)
 
-    # ─── Plot Each Lead ───────────────────────────────────
-    for row in range(n_rows):
-        for col in range(n_cols):
-            label, key = lead_grid[row][col]
+#     # ─── Plot Each Lead ───────────────────────────────────
+#     for row in range(n_rows):
+#         for col in range(n_cols):
+#             label, key = lead_grid[row][col]
 
-            # Column time offset
-            col_time_offset = col * col_duration
+#             # Column time offset
+#             col_time_offset = col * col_duration
 
-            if key is None or key not in all_signals:
-                # Still draw label for empty cells
-                if label is not None:
-                    ax.text(col_time_offset + 0.02,
-                            row_centers[row] + row_height * 0.40,
-                            label, fontsize=9, fontweight='bold',
-                            color='black', va='top', ha='left')
-                continue
+#             if key is None or key not in all_signals:
+#                 # Still draw label for empty cells
+#                 if label is not None:
+#                     ax.text(col_time_offset + 0.02,
+#                             row_centers[row] + row_height * 0.40,
+#                             label, fontsize=9, fontweight='bold',
+#                             color='black', va='top', ha='left')
+#                 continue
 
-            if (row, col) not in all_segments:
-                ax.text(col_time_offset + 0.02,
-                        row_centers[row] + row_height * 0.40,
-                        f'{label} (N/A)', fontsize=9, color='gray',
-                        va='top', ha='left')
-                continue
+#             if (row, col) not in all_segments:
+#                 ax.text(col_time_offset + 0.02,
+#                         row_centers[row] + row_height * 0.40,
+#                         f'{label} (N/A)', fontsize=9, color='gray',
+#                         va='top', ha='left')
+#                 continue
 
-            seg = all_segments[(row, col)]
-            t_seg = np.arange(len(seg)) / fs + col_time_offset
+#             seg = all_segments[(row, col)]
+#             t_seg = np.arange(len(seg)) / fs + col_time_offset
 
-            # Center signal on the row's center line
-            y_offset = row_centers[row]
-            y_signal = seg + y_offset
+#             # Center signal on the row's center line
+#             y_offset = row_centers[row]
+#             y_signal = seg + y_offset
 
-            # Plot signal trace
-            ax.plot(t_seg, y_signal, color='black', linewidth=0.7, zorder=10)
+#             # Plot signal trace
+#             ax.plot(t_seg, y_signal, color='black', linewidth=0.7, zorder=10)
 
-            # ─── Lead Label ───────────────────────────────
-            # Place at top-left of column section, like real ECG paper
-            ax.text(col_time_offset + 0.03,
-                    y_offset + row_height * 0.42,
-                    label, fontsize=9, fontweight='bold',
-                    color='black', va='top', ha='left', zorder=15,
-                    bbox=dict(boxstyle='square,pad=0.05',
-                              facecolor='#FFF0F0', edgecolor='none',
-                              alpha=0.7))
+#             # ─── Lead Label ───────────────────────────────
+#             # Place at top-left of column section, like real ECG paper
+#             ax.text(col_time_offset + 0.03,
+#                     y_offset + row_height * 0.42,
+#                     label, fontsize=9, fontweight='bold',
+#                     color='black', va='top', ha='left', zorder=15,
+#                     bbox=dict(boxstyle='square,pad=0.05',
+#                               facecolor='#FFF0F0', edgecolor='none',
+#                               alpha=0.7))
 
-            # ─── Calibration Pulse ────────────────────────
-            # Small square pulse at the start of each lead section
-            # Width: 0.04s (1mm at 25mm/s), Height: represents 1mV
-            cal_x_start = col_time_offset
-            cal_x_width = 0.08
+#             # ─── Calibration Pulse ────────────────────────
+#             # Small square pulse at the start of each lead section
+#             # Width: 0.04s (1mm at 25mm/s), Height: represents 1mV
+#             cal_x_start = col_time_offset
+#             cal_x_width = 0.08
 
-            # Determine calibration height
-            # If signal is roughly in mV, 1mV reference
-            # Use a fraction of row_height as reference
-            cal_height = row_height * 0.15  # visual reference
+#             # Determine calibration height
+#             # If signal is roughly in mV, 1mV reference
+#             # Use a fraction of row_height as reference
+#             cal_height = row_height * 0.15  # visual reference
 
-            cal_x = [cal_x_start, cal_x_start,
-                     cal_x_start + cal_x_width / 2,
-                     cal_x_start + cal_x_width / 2,
-                     cal_x_start + cal_x_width,
-                     cal_x_start + cal_x_width]
-            cal_y = [y_offset, y_offset + cal_height,
-                     y_offset + cal_height, y_offset,
-                     y_offset, y_offset]
+#             cal_x = [cal_x_start, cal_x_start,
+#                      cal_x_start + cal_x_width / 2,
+#                      cal_x_start + cal_x_width / 2,
+#                      cal_x_start + cal_x_width,
+#                      cal_x_start + cal_x_width]
+#             cal_y = [y_offset, y_offset + cal_height,
+#                      y_offset + cal_height, y_offset,
+#                      y_offset, y_offset]
 
-            ax.plot(cal_x, cal_y, color='black', linewidth=0.8, zorder=11)
+#             ax.plot(cal_x, cal_y, color='black', linewidth=0.8, zorder=11)
 
-    # ─── Column Separator Lines ───────────────────────────
-    y_bottom = row_centers[-1] - row_height * 0.5
-    y_top = row_centers[0] + row_height * 0.5
+#     # ─── Column Separator Lines ───────────────────────────
+#     y_bottom = row_centers[-1] - row_height * 0.5
+#     y_top = row_centers[0] + row_height * 0.5
 
-    for col in range(1, n_cols):
-        x = col * col_duration
-        ax.axvline(x=x, color='black', linewidth=0.6, alpha=0.4,
-                   ymin=0.02, ymax=0.98, zorder=8)
+#     for col in range(1, n_cols):
+#         x = col * col_duration
+#         ax.axvline(x=x, color='black', linewidth=0.6, alpha=0.4,
+#                    ymin=0.02, ymax=0.98, zorder=8)
 
-    # ─── Row Separator Lines ──────────────────────────────
-    for row in range(1, n_rows):
-        y_sep = (row_centers[row - 1] + row_centers[row]) / 2
-        ax.axhline(y=y_sep, color='black', linewidth=0.3, alpha=0.3, zorder=8)
+#     # ─── Row Separator Lines ──────────────────────────────
+#     for row in range(1, n_rows):
+#         y_sep = (row_centers[row - 1] + row_centers[row]) / 2
+#         ax.axhline(y=y_sep, color='black', linewidth=0.3, alpha=0.3, zorder=8)
 
-    # ─── Axis Configuration ───────────────────────────────
-    ax.set_xlim(0, total_duration)
-    ax.set_ylim(y_bottom, y_top)
+#     # ─── Axis Configuration ───────────────────────────────
+#     ax.set_xlim(0, total_duration)
+#     ax.set_ylim(y_bottom, y_top)
 
-    # Remove all axis decorations — pure paper look
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+#     # Remove all axis decorations — pure paper look
+#     ax.set_xticks([])
+#     ax.set_yticks([])
+#     ax.spines['top'].set_visible(False)
+#     ax.spines['bottom'].set_visible(False)
+#     ax.spines['left'].set_visible(False)
+#     ax.spines['right'].set_visible(False)
 
-    # ─── Info Strip at Bottom ─────────────────────────────
-    info_text = (f"Speed: {paper_speed} mm/s  |  "
-                 f"Gain: {gain} mm/mV  |  "
-                 f"Fs: {fs} Hz  |  "
-                 f"Window: {start_sec:.1f}s – {start_sec + total_duration:.1f}s")
+#     # ─── Info Strip at Bottom ─────────────────────────────
+#     info_text = (f"Speed: {paper_speed} mm/s  |  "
+#                  f"Gain: {gain} mm/mV  |  "
+#                  f"Fs: {fs} Hz  |  "
+#                  f"Window: {start_sec:.1f}s – {start_sec + total_duration:.1f}s")
 
-    fig.text(0.5, 0.01, info_text, ha='center', va='bottom',
-             fontsize=7, color='#666666', fontfamily='monospace')
+#     fig.text(0.5, 0.01, info_text, ha='center', va='bottom',
+#              fontsize=7, color='#666666', fontfamily='monospace')
 
-    # ─── Time Markers at Bottom ───────────────────────────
-    for sec in range(int(total_duration) + 1):
-        fig.text(0.06 + (sec / total_duration) * 0.88, 0.035,
-                 f'{start_sec + sec:.0f}s', ha='center', va='bottom',
-                 fontsize=5, color='#999999')
+#     # ─── Time Markers at Bottom ───────────────────────────
+#     for sec in range(int(total_duration) + 1):
+#         fig.text(0.06 + (sec / total_duration) * 0.88, 0.035,
+#                  f'{start_sec + sec:.0f}s', ha='center', va='bottom',
+#                  fontsize=5, color='#999999')
 
-    plt.subplots_adjust(left=0.02, right=0.98, top=0.98, bottom=0.05)
+#     plt.subplots_adjust(left=0.02, right=0.98, top=0.98, bottom=0.05)
 
-    if save:
-        filepath = os.path.join(output_dir,
-                                f"ecg_12lead_paper_t{start_sec:.1f}s.png")
-        fig.savefig(filepath, dpi=250, bbox_inches='tight',
-                    facecolor='white', edgecolor='none')
-        print(f"  [SAVED] {filepath}")
+#     if save:
+#         filepath = os.path.join(output_dir,
+#                                 f"ecg_12lead_paper_t{start_sec:.1f}s.png")
+#         fig.savefig(filepath, dpi=250, bbox_inches='tight',
+#                     facecolor='white', edgecolor='none')
+#         print(f"  [SAVED] {filepath}")
 
-    if show:
-        plt.show()
-    else:
-        plt.close(fig)
+#     if show:
+#         plt.show()
+#     else:
+#         plt.close(fig)
 
 
 def _draw_paper_grid(ax, total_duration, n_rows, row_height, row_centers, fs):
@@ -912,13 +912,13 @@ def plot_12lead_ecg_multi_window(preprocessed, fs=250,
         print(f"\n  Window {i + 1}/{len(start_times)}: "
               f"{start_rounded}s – {start_rounded + window_duration:.1f}s")
 
-        # Standard 3×4 grid
-        plot_12lead_ecg(
-            preprocessed, fs=fs,
-            start_sec=start_rounded,
-            output_dir=output_dir,
-            show=show, save=save
-        )
+        # # Standard 3×4 grid
+        # plot_12lead_ecg(
+        #     preprocessed, fs=fs,
+        #     start_sec=start_rounded,
+        #     output_dir=output_dir,
+        #     show=show, save=save
+        # )
 
         # Full page with rhythm strip
         plot_12lead_full_page(
@@ -1121,7 +1121,8 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
     row_height = max(global_max * 2.5, 1.0)
 
     # 3 lead rows + 1 rhythm row (slightly smaller)
-    total_rows = 4
+    # total_rows = 3 + (1 if rhythm_sig is not None else 0)
+    total_rows = 3
     row_centers = [(total_rows - 1 - r) * row_height for r in range(total_rows)]
 
     # ─── Figure ───────────────────────────────────────────
@@ -1164,14 +1165,14 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
                     color='black', va='top', ha='left', zorder=15)
 
     # ─── Rhythm Strip (Row 4) ─────────────────────────────
-    if rhythm_sig is not None:
-        t_rhythm = np.arange(len(rhythm_sig)) / fs
-        ax.plot(t_rhythm, rhythm_sig + row_centers[3],
-                color='black', linewidth=0.7, zorder=10)
+    # if rhythm_sig is not None:
+        # t_rhythm = np.arange(len(rhythm_sig)) / fs
+        # ax.plot(t_rhythm, rhythm_sig + row_centers[3],
+        #         color='black', linewidth=0.7, zorder=10)
 
-        ax.text(0.05, row_centers[3] + row_height * 0.40,
-                'II (rhythm)', fontsize=9, fontweight='bold',
-                color='black', va='top', ha='left', zorder=15)
+        # ax.text(0.05, row_centers[3] + row_height * 0.40,
+        #         'II (rhythm)', fontsize=9, fontweight='bold',
+        #         color='black', va='top', ha='left', zorder=15)
 
     # ─── Column Separators ────────────────────────────────
     for col in range(1, n_cols):
@@ -1210,7 +1211,7 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
     if save:
         filepath = os.path.join(output_dir,
                                 f"ecg_12lead_full_t{start_sec:.1f}s.png")
-        fig.savefig(filepath, dpi=250, bbox_inches='tight',
+        fig.savefig(filepath, dpi=500, bbox_inches='tight',
                     facecolor='white', edgecolor='none')
         print(f"  [SAVED] {filepath}")
 

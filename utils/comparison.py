@@ -863,23 +863,6 @@ def _minmax_normalize(signal, target_min=-1.0, target_max=1.0):
     return normalized
 
 
-def _compute_alma(signal, window=50, offset=0.85, sigma=6.0):
-    sig = np.array(signal, dtype=np.float64).flatten()
-    n = len(sig)
-    alma = np.full(n, np.nan)
-    m = int(offset * (window - 1))
-    s = window / sigma
-    w = np.zeros(window)
-    for i in range(window):
-        w[i] = np.exp(-((i - m) ** 2) / (2 * s * s))
-    w_sum = np.sum(w)
-    if w_sum < 1e-10:
-        return alma
-    w = w / w_sum
-    for j in range(window - 1, n):
-        alma[j] = np.sum(sig[j - window + 1:j + 1] * w)
-    return alma
-
 
 # Signal pair mappings
 ECG_SIGNAL_PAIRS = {
@@ -1283,7 +1266,7 @@ def compare_features(dev_preprocessed, ref_preprocessed,
     # ─── Export & Plot ────────────────────────────────────
     _export_segment_tables(comparison_results, output_dir)
     _export_segment_report(comparison_results, output_dir)
-    _plot_all_segment_comparisons(comparison_results, output_dir)
+    # _plot_all_segment_comparisons(comparison_results, output_dir)
 
     return comparison_results
 
@@ -1383,108 +1366,108 @@ def _export_segment_report(comparison_results, output_dir):
 #  5. SEGMENT COMPARISON PLOTS
 # ═══════════════════════════════════════════════════════════════
 
-def _plot_all_segment_comparisons(comparison_results, output_dir):
-    """Generate all segment-based comparison plots."""
+# def _plot_all_segment_comparisons(comparison_results, output_dir):
+#     """Generate all segment-based comparison plots."""
 
-    plots_dir = os.path.join(output_dir, "plots")
+#     plots_dir = os.path.join(output_dir, "plots")
 
-    for pair_name, result in comparison_results.items():
+#     for pair_name, result in comparison_results.items():
 
-        paired_df = result['paired_df']
-        if len(paired_df) < 3:
-            print(f"  [SKIP] {pair_name}: not enough paired segments")
-            continue
+#         paired_df = result['paired_df']
+#         if len(paired_df) < 3:
+#             print(f"  [SKIP] {pair_name}: not enough paired segments")
+#             continue
 
-        pair_dir = os.path.join(plots_dir, pair_name)
-        _ensure_dir(pair_dir)
+#         pair_dir = os.path.join(plots_dir, pair_name)
+#         _ensure_dir(pair_dir)
 
-        signal_type = result['signal_type']
+#         signal_type = result['signal_type']
 
-        # Select key features based on signal type
-        if signal_type == "ECG":
-            key_features = ['mean_hr', 'sdnn', 'rmssd', 'pnn50', 'mean_rr',
-                            'r_amp_mean', 'n_r_peaks']
-        else:
-            key_features = ['resp_rate_mean', 'bbi_mean', 'bbi_std',
-                            'bbi_cv', 'peak_amp_mean', 'n_breaths']
+#         # Select key features based on signal type
+#         if signal_type == "ECG":
+#             key_features = ['mean_hr', 'sdnn', 'rmssd', 'pnn50', 'mean_rr',
+#                             'r_amp_mean', 'n_r_peaks']
+#         else:
+#             key_features = ['resp_rate_mean', 'bbi_mean', 'bbi_std',
+#                             'bbi_cv', 'peak_amp_mean', 'n_breaths']
 
-        # Filter to features that exist in paired_df
-        available = [f for f in key_features if f'dev_{f}' in paired_df.columns]
+#         # Filter to features that exist in paired_df
+#         available = [f for f in key_features if f'dev_{f}' in paired_df.columns]
 
-        if len(available) == 0:
-            print(f"  [SKIP] {pair_name}: no matching features")
-            continue
+#         if len(available) == 0:
+#             print(f"  [SKIP] {pair_name}: no matching features")
+#             continue
 
-        # Generate plots for each key feature
-        for feat in available:
-            _plot_bland_altman_segment(paired_df, feat, pair_name, pair_dir)
-            _plot_scatter_segment(paired_df, feat, pair_name, pair_dir)
-            _plot_time_series_segment(paired_df, feat, pair_name, pair_dir)
+#         # Generate plots for each key feature
+#         for feat in available:
+#             _plot_bland_altman_segment(paired_df, feat, pair_name, pair_dir)
+#             _plot_scatter_segment(paired_df, feat, pair_name, pair_dir)
+#             _plot_time_series_segment(paired_df, feat, pair_name, pair_dir)
 
-        # Summary plots
-        _plot_multi_feature_bland_altman(paired_df, available, pair_name, pair_dir)
-        _plot_feature_correlation_heatmap(paired_df, available, pair_name, pair_dir)
-        _plot_segment_bar_comparison(paired_df, available, pair_name, pair_dir)
-        _plot_feature_boxplots(paired_df, available, pair_name, pair_dir)
+#         # Summary plots
+#         _plot_multi_feature_bland_altman(paired_df, available, pair_name, pair_dir)
+#         _plot_feature_correlation_heatmap(paired_df, available, pair_name, pair_dir)
+#         _plot_segment_bar_comparison(paired_df, available, pair_name, pair_dir)
+#         _plot_feature_boxplots(paired_df, available, pair_name, pair_dir)
 
 
-def _plot_bland_altman_segment(paired_df, feature, pair_name, output_dir):
-    """Bland-Altman plot for a single feature across segments."""
+# def _plot_bland_altman_segment(paired_df, feature, pair_name, output_dir):
+#     """Bland-Altman plot for a single feature across segments."""
 
-    dev_col = f'dev_{feature}'
-    ref_col = f'ref_{feature}'
+#     dev_col = f'dev_{feature}'
+#     ref_col = f'ref_{feature}'
 
-    dev_vals = paired_df[dev_col].values.astype(float)
-    ref_vals = paired_df[ref_col].values.astype(float)
+#     dev_vals = paired_df[dev_col].values.astype(float)
+#     ref_vals = paired_df[ref_col].values.astype(float)
 
-    mean_vals = (dev_vals + ref_vals) / 2
-    diff_vals = dev_vals - ref_vals
+#     mean_vals = (dev_vals + ref_vals) / 2
+#     diff_vals = dev_vals - ref_vals
 
-    mean_diff = np.mean(diff_vals)
-    std_diff = np.std(diff_vals)
-    upper_loa = mean_diff + 1.96 * std_diff
-    lower_loa = mean_diff - 1.96 * std_diff
+#     mean_diff = np.mean(diff_vals)
+#     std_diff = np.std(diff_vals)
+#     upper_loa = mean_diff + 1.96 * std_diff
+#     lower_loa = mean_diff - 1.96 * std_diff
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+#     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Color by segment index
-    segments = paired_df['segment'].values
-    scatter = ax.scatter(mean_vals, diff_vals, c=segments,
-                          cmap='viridis', s=50, alpha=0.8, edgecolors='gray')
+#     # Color by segment index
+#     segments = paired_df['segment'].values
+#     scatter = ax.scatter(mean_vals, diff_vals, c=segments,
+#                           cmap='viridis', s=50, alpha=0.8, edgecolors='gray')
 
-    ax.axhline(y=mean_diff, color='red', linestyle='-', linewidth=1.5,
-               label=f'Mean Diff: {mean_diff:.3f}')
-    ax.axhline(y=upper_loa, color='orange', linestyle='--', linewidth=1,
-               label=f'+1.96 SD: {upper_loa:.3f}')
-    ax.axhline(y=lower_loa, color='orange', linestyle='--', linewidth=1,
-               label=f'-1.96 SD: {lower_loa:.3f}')
-    ax.axhline(y=0, color='gray', linestyle=':', alpha=0.5)
-    ax.axhspan(lower_loa, upper_loa, alpha=0.05, color='orange')
+#     ax.axhline(y=mean_diff, color='red', linestyle='-', linewidth=1.5,
+#                label=f'Mean Diff: {mean_diff:.3f}')
+#     ax.axhline(y=upper_loa, color='orange', linestyle='--', linewidth=1,
+#                label=f'+1.96 SD: {upper_loa:.3f}')
+#     ax.axhline(y=lower_loa, color='orange', linestyle='--', linewidth=1,
+#                label=f'-1.96 SD: {lower_loa:.3f}')
+#     ax.axhline(y=0, color='gray', linestyle=':', alpha=0.5)
+#     ax.axhspan(lower_loa, upper_loa, alpha=0.05, color='orange')
 
-    cbar = plt.colorbar(scatter, ax=ax)
-    cbar.set_label('Segment Index')
+#     cbar = plt.colorbar(scatter, ax=ax)
+#     cbar.set_label('Segment Index')
 
-    ax.set_xlabel(f'Mean of Device & Reference ({feature})')
-    ax.set_ylabel(f'Difference: Device - Reference ({feature})')
-    ax.set_title(f'Bland-Altman: {feature}\n{pair_name} ({len(paired_df)} segments)',
-                 fontweight='bold')
-    ax.legend(loc='upper right', fontsize=8)
-    ax.grid(True, alpha=0.3)
+#     ax.set_xlabel(f'Mean of Device & Reference ({feature})')
+#     ax.set_ylabel(f'Difference: Device - Reference ({feature})')
+#     ax.set_title(f'Bland-Altman: {feature}\n{pair_name} ({len(paired_df)} segments)',
+#                  fontweight='bold')
+#     ax.legend(loc='upper right', fontsize=8)
+#     ax.grid(True, alpha=0.3)
 
-    # Add stats text
-    stats_text = (f"N = {len(paired_df)}\n"
-                  f"Bias = {mean_diff:.3f}\n"
-                  f"SD = {std_diff:.3f}\n"
-                  f"LOA = [{lower_loa:.3f}, {upper_loa:.3f}]")
-    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes,
-            fontsize=8, fontfamily='monospace', va='top',
-            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+#     # Add stats text
+#     stats_text = (f"N = {len(paired_df)}\n"
+#                   f"Bias = {mean_diff:.3f}\n"
+#                   f"SD = {std_diff:.3f}\n"
+#                   f"LOA = [{lower_loa:.3f}, {upper_loa:.3f}]")
+#     ax.text(0.02, 0.98, stats_text, transform=ax.transAxes,
+#             fontsize=8, fontfamily='monospace', va='top',
+#             bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
 
-    plt.tight_layout()
-    filepath = os.path.join(output_dir, f"bland_altman_{feature}.png")
-    fig.savefig(filepath, dpi=150, bbox_inches='tight')
-    plt.close(fig)
-    print(f"    [PLOT] {filepath}")
+#     plt.tight_layout()
+#     filepath = os.path.join(output_dir, f"bland_altman_{feature}.png")
+#     fig.savefig(filepath, dpi=150, bbox_inches='tight')
+#     plt.close(fig)
+#     print(f"    [PLOT] {filepath}")
 
 
 def _plot_scatter_segment(paired_df, feature, pair_name, output_dir):
@@ -1773,7 +1756,7 @@ def _plot_feature_boxplots(paired_df, features, pair_name, output_dir):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  6. SIGNAL-LEVEL PLOTS (Overlay, Correlation, ALMA)
+#  6. SIGNAL-LEVEL PLOTS (Overlay, Correlation)
 # ═══════════════════════════════════════════════════════════════
 
 def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
@@ -1977,84 +1960,10 @@ def plot_correlation_analysis(dev_preprocessed, ref_preprocessed,
             'peak_lag_sec': lags[pk]}
 
 
-def plot_alma_comparison(dev_preprocessed, ref_preprocessed,
-                          dev_signal, ref_signal,
-                          fs=250, alma_window=250,
-                          alma_offset=0.85, alma_sigma=6.0,
-                          time_window=None,
-                          output_dir="outputs/comparison/plots",
-                          show=False, save=True):
-    """ALMA trend comparison."""
-
-    if save:
-        _ensure_dir(output_dir)
-
-    if dev_signal not in dev_preprocessed or ref_signal not in ref_preprocessed:
-        return
-
-    dev_sig = np.array(dev_preprocessed[dev_signal], dtype=np.float64).flatten()
-    ref_sig = np.array(ref_preprocessed[ref_signal], dtype=np.float64).flatten()
-
-    dev_norm = _minmax_normalize(dev_sig)
-    ref_norm = _minmax_normalize(ref_sig)
-
-    min_len = min(len(dev_norm), len(ref_norm))
-    dev_trim = dev_norm[:min_len]
-    ref_trim = ref_norm[:min_len]
-    t = np.arange(min_len) / fs
-
-    dev_alma = _compute_alma(dev_trim, window=alma_window, offset=alma_offset, sigma=alma_sigma)
-    ref_alma = _compute_alma(ref_trim, window=alma_window, offset=alma_offset, sigma=alma_sigma)
-
-    fig, axes = plt.subplots(3, 1, figsize=(16, 12), sharex=True)
-    fig.suptitle(f"ALMA Trend: {dev_signal} vs {ref_signal}",
-                 fontsize=13, fontweight='bold')
-
-    axes[0].plot(t, dev_trim, color='steelblue', linewidth=0.3, alpha=0.5)
-    axes[0].plot(t, dev_alma, color='darkblue', linewidth=1.5, label='Device ALMA')
-    axes[0].set_title(f"Device: {dev_signal}")
-    axes[0].legend(fontsize=8)
-    axes[0].grid(True, alpha=0.3)
-
-    axes[1].plot(t, ref_trim, color='coral', linewidth=0.3, alpha=0.5)
-    axes[1].plot(t, ref_alma, color='darkred', linewidth=1.5, label='Reference ALMA')
-    axes[1].set_title(f"Reference: {ref_signal}")
-    axes[1].legend(fontsize=8)
-    axes[1].grid(True, alpha=0.3)
-
-    axes[2].plot(t, dev_alma, color='darkblue', linewidth=1.5, alpha=0.8, label='Device ALMA')
-    axes[2].plot(t, ref_alma, color='darkred', linewidth=1.5, alpha=0.8, label='Reference ALMA')
-    valid = ~(np.isnan(dev_alma) | np.isnan(ref_alma))
-    if np.any(valid):
-        axes[2].fill_between(t, dev_alma, ref_alma, where=valid,
-                              alpha=0.15, color='purple', label='Difference')
-    axes[2].set_title("ALMA Overlay")
-    axes[2].set_xlabel("Time (s)")
-    axes[2].legend(fontsize=8)
-    axes[2].grid(True, alpha=0.3)
-
-    if time_window:
-        for ax in axes:
-            ax.set_xlim(time_window)
-
-    plt.tight_layout()
-
-    if save:
-        suffix = f"_{time_window[0]}s_{time_window[1]}s" if time_window else ""
-        filepath = os.path.join(output_dir,
-                                f"alma_{dev_signal}_vs_{ref_signal}{suffix}.png")
-        fig.savefig(filepath, dpi=150, bbox_inches='tight')
-        print(f"  [PLOT] {filepath}")
-    if show:
-        plt.show()
-    else:
-        plt.close(fig)
-
-
 def plot_all_signal_overlays(dev_preprocessed, ref_preprocessed,
                               fs=250, output_dir="outputs/comparison/plots",
                               show=False, save=True):
-    """Generate all signal-level comparison plots."""
+    """Generate all signal-level comparison plots: overlay + correlation."""
 
     all_pairs = {**ECG_SIGNAL_PAIRS, **RESP_SIGNAL_PAIRS}
     correlation_results = {}
@@ -2062,36 +1971,38 @@ def plot_all_signal_overlays(dev_preprocessed, ref_preprocessed,
     for dev_signal, ref_signal in all_pairs.items():
         print(f"\n  [SIGNAL PLOTS] {dev_signal} vs {ref_signal}")
 
-        plot_signal_overlay(dev_preprocessed, ref_preprocessed,
-                             dev_signal, ref_signal, fs=fs,
-                             output_dir=output_dir, show=show, save=save)
+        # Full signal overlay
+        plot_signal_overlay(
+            dev_preprocessed, ref_preprocessed,
+            dev_signal, ref_signal, fs=fs,
+            output_dir=output_dir, show=show, save=save
+        )
 
-        plot_signal_overlay(dev_preprocessed, ref_preprocessed,
-                             dev_signal, ref_signal, fs=fs,
-                             time_window=(0, 10),
-                             output_dir=output_dir, show=show, save=save)
+        # Zoomed overlay (first 10 seconds)
+        plot_signal_overlay(
+            dev_preprocessed, ref_preprocessed,
+            dev_signal, ref_signal, fs=fs,
+            time_window=(0, 10),
+            output_dir=output_dir, show=show, save=save
+        )
 
-        corr = plot_correlation_analysis(dev_preprocessed, ref_preprocessed,
-                                          dev_signal, ref_signal, fs=fs,
-                                          output_dir=output_dir, show=show, save=save)
+        # Correlation analysis
+        corr = plot_correlation_analysis(
+            dev_preprocessed, ref_preprocessed,
+            dev_signal, ref_signal, fs=fs,
+            output_dir=output_dir, show=show, save=save
+        )
         if corr:
             correlation_results[f"{dev_signal}_vs_{ref_signal}"] = corr
-
-        plot_alma_comparison(dev_preprocessed, ref_preprocessed,
-                              dev_signal, ref_signal, fs=fs,
-                              output_dir=output_dir, show=show, save=save)
-
-        plot_alma_comparison(dev_preprocessed, ref_preprocessed,
-                              dev_signal, ref_signal, fs=fs,
-                              time_window=(0, 20),
-                              output_dir=output_dir, show=show, save=save)
 
     # Export correlation summary
     if correlation_results and save:
         _ensure_dir(output_dir)
         df = pd.DataFrame([{'pair': k, **v} for k, v in correlation_results.items()])
         df.to_csv(os.path.join(output_dir, "correlation_summary.csv"), index=False)
-        with open(os.path.join(output_dir, "correlation_summary.json"), 'w', encoding='utf-8') as f:
+
+        with open(os.path.join(output_dir, "correlation_summary.json"), 'w',
+                  encoding='utf-8') as f:
             json.dump({k: {kk: _make_serializable(vv) for kk, vv in v.items()}
                        for k, v in correlation_results.items()}, f, indent=4)
 
