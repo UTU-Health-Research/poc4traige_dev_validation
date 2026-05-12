@@ -173,7 +173,7 @@ def preprocess_respiration(signal, fs=250):
     sig_hp = butter_filter(
         arr=sig,
         n=2,
-        wn=np.array([0.05]),
+        wn=np.array([0.1]),
         filter_type='high',
         fs=fs
     )

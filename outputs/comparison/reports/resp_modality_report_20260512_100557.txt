@@ -1,0 +1,108 @@
+======================================================================
+RESPIRATORY MODALITY COMPARISON REPORT
+Generated: 2026-05-12 10:05:57
+Window size: 10s
+======================================================================
+
+PER-MODALITY SUMMARY
+--------------------------------------------------
+
+  impedance_pneumography:
+    Valid segments: 5
+    Resp rate: 17.46 ± 6.00 bpm [13.6 – 28.0]
+    Peak methods: {'ampd': 5}
+
+  rms_acc_ribs:
+    Valid segments: 6
+    Resp rate: 25.82 ± 12.87 bpm [13.1 – 42.4]
+    Peak methods: {'ampd': 5, 'simple_threshold': 1}
+
+  rms_gyr_ribs:
+    Valid segments: 6
+    Resp rate: 32.21 ± 2.84 bpm [29.1 – 36.7]
+    Peak methods: {'ampd': 6}
+
+  rms_acc_chest:
+    Valid segments: 6
+    Resp rate: 28.97 ± 14.11 bpm [13.8 – 50.9]
+    Peak methods: {'ampd': 6}
+
+  rms_gyr_chest:
+    Valid segments: 6
+    Resp rate: 26.48 ± 8.90 bpm [13.9 – 38.2]
+    Peak methods: {'ampd': 6}
+
+
+PAIRWISE COMPARISONS
+--------------------------------------------------
+
+  impedance_pneumography_vs_rms_acc_ribs
+    Paired segments: 5
+    Resp rate mean diff: -5.04 ± 12.35
+    Pearson r: -0.2259 (p=7.148e-01)
+    Bland-Altman bias: -5.04
+    LOA: [-29.24, 19.16]
+
+  impedance_pneumography_vs_rms_gyr_ribs
+    Paired segments: 5
+    Resp rate mean diff: -13.85 ± 4.68
+    Pearson r: 0.5265 (p=3.620e-01)
+    Bland-Altman bias: -13.85
+    LOA: [-23.02, -4.68]
+
+  impedance_pneumography_vs_rms_acc_chest
+    Paired segments: 5
+    Resp rate mean diff: -9.93 ± 13.14
+    Pearson r: 0.2755 (p=6.537e-01)
+    Bland-Altman bias: -9.93
+    LOA: [-35.69, 15.83]
+
+  impedance_pneumography_vs_rms_gyr_chest
+    Paired segments: 5
+    Resp rate mean diff: -10.54 ± 7.78
+    Pearson r: 0.3882 (p=5.184e-01)
+    Bland-Altman bias: -10.54
+    LOA: [-25.79, 4.72]
+
+  rms_acc_ribs_vs_rms_gyr_ribs
+    Paired segments: 6
+    Resp rate mean diff: -6.39 ± 10.70
+    Pearson r: 0.4954 (p=3.177e-01)
+    Bland-Altman bias: -6.39
+    LOA: [-27.37, 14.58]
+
+  rms_acc_ribs_vs_rms_acc_chest
+    Paired segments: 6
+    Resp rate mean diff: -3.16 ± 8.51
+    Pearson r: 0.7652 (p=7.625e-02)
+    Bland-Altman bias: -3.16
+    LOA: [-19.83, 13.52]
+
+  rms_acc_ribs_vs_rms_gyr_chest
+    Paired segments: 6
+    Resp rate mean diff: -0.66 ± 18.63
+    Pearson r: -0.7495 (p=8.623e-02)
+    Bland-Altman bias: -0.66
+    LOA: [-37.18, 35.86]
+
+  rms_gyr_ribs_vs_rms_acc_chest
+    Paired segments: 6
+    Resp rate mean diff: 3.24 ± 11.80
+    Pearson r: 0.5012 (p=3.112e-01)
+    Bland-Altman bias: 3.24
+    LOA: [-19.89, 26.36]
+
+  rms_gyr_ribs_vs_rms_gyr_chest
+    Paired segments: 6
+    Resp rate mean diff: 5.73 ± 9.02
+    Pearson r: -0.2025 (p=7.004e-01)
+    Bland-Altman bias: 5.73
+    LOA: [-11.95, 23.40]
+
+  rms_acc_chest_vs_rms_gyr_chest
+    Paired segments: 6
+    Resp rate mean diff: 2.49 ± 17.16
+    Pearson r: -0.2989 (p=5.650e-01)
+    Bland-Altman bias: 2.49
+    LOA: [-31.15, 36.13]
+

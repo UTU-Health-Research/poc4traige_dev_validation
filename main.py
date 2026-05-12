@@ -126,15 +126,15 @@ def main():
     # ═════════════════════════════════════════════════════════
     #  DEVICE SIGNAL QUALITY
     # ═════════════════════════════════════════════════════════
-    print("\n" + "=" * 60)
-    print("[PIPELINE] Device Signal Quality Assessment")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("[PIPELINE] Device Signal Quality Assessment")
+    # print("=" * 60)
 
-    dev_quality = assess_all_quality(
-        preprocessed_signals, fs=250, spike_masks=spike_masks
-    )
-    export_quality_report(dev_quality, output_dir="outputs/quality/device/reports")
-    plot_quality_dashboard(dev_quality, output_dir="outputs/quality/device/plots")
+    # dev_quality = assess_all_quality(
+    #     preprocessed_signals, fs=250, spike_masks=spike_masks
+    # )
+    # export_quality_report(dev_quality, output_dir="outputs/quality/device/reports")
+    # plot_quality_dashboard(dev_quality, output_dir="outputs/quality/device/plots")
 
 
     # ═════════════════════════════════════════════════════════
@@ -169,30 +169,30 @@ def main():
     # ═════════════════════════════════════════════════════════
     #  REFERENCE SIGNAL QUALITY
     # ═════════════════════════════════════════════════════════
-    print("\n" + "=" * 60)
-    print("[PIPELINE] Reference Signal Quality Assessment")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("[PIPELINE] Reference Signal Quality Assessment")
+    # print("=" * 60)
 
-    ref_quality = {}
+    # ref_quality = {}
 
-    print("\n[1/2] Reference ECG Quality")
-    print("-" * 40)
-    for name in ['ref_lead1', 'ref_lead2', 'ref_lead3']:
-        if name in ref_preprocessed:
-            ref_quality[name] = assess_ecg_quality(
-                ref_preprocessed[name], fs=250, signal_name=name
-            )
+    # print("\n[1/2] Reference ECG Quality")
+    # print("-" * 40)
+    # for name in ['ref_lead1', 'ref_lead2', 'ref_lead3']:
+    #     if name in ref_preprocessed:
+    #         ref_quality[name] = assess_ecg_quality(
+    #             ref_preprocessed[name], fs=250, signal_name=name
+    #         )
 
-    print("\n[2/2] Reference Respiration Quality")
-    print("-" * 40)
-    if 'ref_respiration' in ref_preprocessed:
-        ref_quality['ref_respiration'] = assess_respiration_quality(
-            ref_preprocessed['ref_respiration'], fs=250,
-            signal_name='ref_respiration'
-        )
+    # print("\n[2/2] Reference Respiration Quality")
+    # print("-" * 40)
+    # if 'ref_respiration' in ref_preprocessed:
+    #     ref_quality['ref_respiration'] = assess_respiration_quality(
+    #         ref_preprocessed['ref_respiration'], fs=250,
+    #         signal_name='ref_respiration'
+    #     )
 
-    export_quality_report(ref_quality, output_dir="outputs/quality/reference/reports")
-    plot_quality_dashboard(ref_quality, output_dir="outputs/quality/reference/plots")
+    # export_quality_report(ref_quality, output_dir="outputs/quality/reference/reports")
+    # plot_quality_dashboard(ref_quality, output_dir="outputs/quality/reference/plots")
 
     # ═════════════════════════════════════════════════════════
     #  EXPORT FEATURES
@@ -268,7 +268,7 @@ def main():
     print(f"  Device features:      {len(dev_features)}")
     print(f"  Reference features:   {len(ref_features)}")
     print(f"  Comparison pairs:     {len(comparison_results)}")
-    print(f"  Quality assessments:  {len(dev_quality) + len(ref_quality)} signals")
+    # print(f"  Quality assessments:  {len(dev_quality) + len(ref_quality)} signals")
 
 
 if __name__ == "__main__":

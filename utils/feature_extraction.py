@@ -756,7 +756,8 @@ def _compute_statistical_features(signal, prefix):
 #  6. MASTER FEATURE EXTRACTION FUNCTION
 # ═══════════════════════════════════════════════════════════════
 
-ECG_SIGNALS = ["lead1", "lead2", "c1", "c2", "c3", "c4", "c5"]
+# ECG_SIGNALS = ["lead1", "lead2", "c1", "c2", "c3", "c4", "c5"]
+ECG_SIGNALS = ["lead1", "lead2"]
 RESPIRATION_SIGNALS = ["impedance_pneumography"]
 TEMPERATURE_SIGNALS = ["body_temperature"]
 
@@ -828,15 +829,15 @@ def extract_all_features(preprocessed, fs=250):
         print(f"  IMU Chest feature extraction failed: {e}")
 
     # ─── Temperature Features ─────────────────────────────
-    print("\n" + "=" * 60)
-    print("[FEATURES] Temperature")
-    print("=" * 60)
-    for name in TEMPERATURE_SIGNALS:
-        if name in preprocessed:
-            feats = extract_temperature_features(
-                preprocessed[name], fs=fs, signal_name=name
-            )
-            all_features.update(feats)
+    # print("\n" + "=" * 60)
+    # print("[FEATURES] Temperature")
+    # print("=" * 60)
+    # for name in TEMPERATURE_SIGNALS:
+    #     if name in preprocessed:
+    #         feats = extract_temperature_features(
+    #             preprocessed[name], fs=fs, signal_name=name
+    #         )
+    #         all_features.update(feats)
 
     # ─── Summary ──────────────────────────────────────────
     print("\n" + "=" * 60)

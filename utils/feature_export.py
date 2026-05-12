@@ -355,21 +355,21 @@ def export_all(features, fiducials, output_dir="outputs/features"):
 
     _ensure_dir(output_dir)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     saved = {}
 
     print("\n" + "=" * 60)
     print("[EXPORT] Saving all outputs")
     print("=" * 60)
 
-    # 1. Flat CSV
-    saved['csv'] = export_features_csv(
-        features, output_dir, f"features_{timestamp}.csv"
-    )
+    # # 1. Flat CSV
+    # saved['csv'] = export_features_csv(
+    #     features, output_dir, f"features_{timestamp}.csv"
+    # )
 
     # 2. Flat JSON
     saved['json'] = export_features_json(
-        features, output_dir, f"features_{timestamp}.json"
+        features, output_dir, f"features.json"
     )
 
     # 3. Grouped CSVs
@@ -377,12 +377,12 @@ def export_all(features, fiducials, output_dir="outputs/features"):
 
     # 4. Fiducials
     saved['fiducials'] = export_fiducials(
-        fiducials, output_dir, f"fiducials_{timestamp}.json"
+        fiducials, output_dir, f"fiducials.json"
     )
 
     # 5. Summary
     saved['summary'] = export_feature_summary(
-        features, output_dir, f"feature_summary_{timestamp}.txt"
+        features, output_dir, f"feature_summary.txt"
     )
 
     print(f"\n[OK] All exports complete → {output_dir}/")
