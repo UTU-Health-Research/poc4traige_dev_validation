@@ -824,31 +824,30 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
     t_dev_2 = np.arange(len(dev_sig_2)) / fs
     t_ref   = np.arange(len(ref_sig))   / fs
 
-    fig, axes = plt.subplots(4, 1, figsize=(16, 13))
-    fig.suptitle(
-        f"{dev_signal_1} & {dev_signal_2} (Device) vs {ref_signal} (Reference)",
-        fontsize=13, fontweight='bold'
-    )
+    fig, axes = plt.subplots(4, 1, figsize=(7, 9))  # Narrow width, reduced height
 
     # Panel 1: Device signal 1
     axes[0].plot(t_dev_1, dev_sig_1, color='steelblue', linewidth=2)
-    axes[0].set_title(f"Device: {dev_signal_1}")
-    axes[0].set_ylabel("Amplitude")
+    axes[0].set_title(f"Device: {dev_signal_1}", fontweight='bold', fontsize=10)
+    axes[0].set_ylabel("Amplitude", fontsize=10)
+    axes[0].tick_params(axis='both', labelsize=10)
     axes[0].grid(True, alpha=0.3)
 
     # Panel 2: Device signal 2
     axes[1].plot(t_dev_2, dev_sig_2, color='mediumseagreen', linewidth=2)
-    axes[1].set_title(f"Device: {dev_signal_2}")
-    axes[1].set_ylabel("Amplitude")
+    axes[1].set_title(f"Device: {dev_signal_2}", fontweight='bold', fontsize=10)
+    axes[1].set_ylabel("Amplitude", fontsize=10)
+    axes[1].tick_params(axis='both', labelsize=10)
     axes[1].grid(True, alpha=0.3)
 
     # Panel 3: Reference signal
     axes[2].plot(t_ref, ref_sig, color='coral', linewidth=2)
-    axes[2].set_title(f"Reference: {ref_signal}")
-    axes[2].set_ylabel("Amplitude")
+    axes[2].set_title(f"Reference: {ref_signal}", fontweight='bold', fontsize=10)
+    axes[2].set_ylabel("Amplitude", fontsize=10)
+    axes[2].tick_params(axis='both', labelsize=10)
     axes[2].grid(True, alpha=0.3)
 
-    # Panel 4: Normalized overlay of all three signals
+    # Panel 4: Normalized overlay
     def normalize(sig):
         return (sig - np.mean(sig)) / max(np.std(sig), 1e-8)
 
@@ -860,22 +859,23 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
     t_common = np.arange(min_len) / fs
 
     axes[3].plot(t_common, dev_norm_1[:min_len], color='steelblue',
-                 linewidth=2, alpha=0.7, label=f'Device 1: {dev_signal_1}')
+                linewidth=2, alpha=0.7, label=f'Device: {dev_signal_1}')
     axes[3].plot(t_common, dev_norm_2[:min_len], color='mediumseagreen',
-                 linewidth=2, alpha=0.7, label=f'Device 2: {dev_signal_2}')
+                linewidth=2, alpha=0.7, label=f'Device: {dev_signal_2}')
     axes[3].plot(t_common, ref_norm[:min_len],   color='coral',
-                 linewidth=2, alpha=0.7, label=f'Reference: {ref_signal}')
-    axes[3].set_title("Normalized Overlay (All Three Signals)")
-    axes[3].set_xlabel("Time (s)")
-    axes[3].set_ylabel("Normalized Amplitude")
-    axes[3].legend(loc='upper right')
+                linewidth=2, alpha=0.7, label=f'Reference: {ref_signal}')
+    axes[3].set_title("Normalized Signal Overlay", fontweight='bold', fontsize=10)
+    axes[3].set_xlabel("Time (s)", fontsize=10)
+    axes[3].set_ylabel("Normalized Amplitude", fontsize=10)
+    axes[3].tick_params(axis='both', labelsize=10)
+    axes[3].legend(loc='upper right', fontsize=10, framealpha=0.8)
     axes[3].grid(True, alpha=0.3)
 
     if time_window is not None:
         for ax in axes:
             ax.set_xlim(time_window)
 
-    plt.tight_layout()
+    plt.tight_layout(h_pad=1.2)  # Tighter vertical padding
 
     if save:
         suffix   = f"_{time_window[0]}s_{time_window[1]}s" if time_window else ""
@@ -883,7 +883,7 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
             output_dir,
             f"overlay_{dev_signal_1}_{dev_signal_2}_vs_{ref_signal}{suffix}.png"
         )
-        fig.savefig(filepath, dpi=700, bbox_inches='tight')
+        fig.savefig(filepath, dpi=700, bbox_inches='tight')  # 700 dpi for high-resolution print
         print(f"  [PLOT] {filepath}")
 
     if show:
@@ -917,23 +917,3 @@ def plot_all_signal_overlays(dev_preprocessed, ref_preprocessed,
             output_dir=output_dir,
             show=show, save=save
         )
-    
-
-    # for dev_signal, ref_signal in all_pairs.items():
-
-        # # Full signal
-        # plot_signal_overlay(
-        #     dev_preprocessed, ref_preprocessed,
-        #     dev_signal, ref_signal,
-        #     fs=fs, output_dir=output_dir,
-        #     show=show, save=save
-        # )
-
-        # # Zoomed (first 10 seconds)
-        # plot_signal_overlay(
-        #     dev_preprocessed, ref_preprocessed,
-        #     dev_signal, ref_signal,
-        #     fs=fs, time_window=(0, 10),
-        #     output_dir=output_dir,
-        #     show=show, save=save
-        # )
