@@ -827,7 +827,7 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
     lead_grid = [
         [('I',   'lead1'), ('aVR', 'avr'), ('V1', 'c1'), ('V4', 'c4')],
         [('II',  'lead2'), ('aVL', 'avl'), ('V2', 'c2'), ('V5', 'c5')],
-        [('III', 'lead3'), ('aVF', 'avf'), ('V3', 'c3'), ('V6', None)],
+        [('III', 'lead3'), ('aVF', 'avf'), ('V3', 'c3'), (None, None)],
     ]
 
     window_samples = int(col_duration * fs)
@@ -910,12 +910,12 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
 
             # Plot trace
             ax.plot(t_seg, seg + row_centers[row],
-                    color='black', linewidth=0.7, zorder=10)
+                    color='black', linewidth=2, zorder=10)
 
             # Lead label
             ax.text(col_offset + 0.05,
                     row_centers[row] + row_height * 0.40,
-                    label, fontsize=9, fontweight='bold',
+                    label, fontsize=14, fontweight='bold',
                     color='black', va='top', ha='left', zorder=15)
 
     # ─── Rhythm Strip (Row 4) ─────────────────────────────
@@ -936,12 +936,12 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
         y_grid_top = row_centers[0] + row_height * 0.5
 
         ax.plot([x, x], [y_grid_bottom, y_grid_top],
-                color='black', linewidth=0.5, alpha=0.4, zorder=8)
+                color='black', linewidth=2, alpha=0.4, zorder=8)
 
     # ─── Row Separators ──────────────────────────────────
     for row in range(1, total_rows):
         y_sep = (row_centers[row - 1] + row_centers[row]) / 2
-        ax.axhline(y=y_sep, color='black', linewidth=0.3, alpha=0.25, zorder=8)
+        ax.axhline(y=y_sep, color='black', linewidth=2, alpha=0.4, zorder=8)
 
     # ─── Axis Config ──────────────────────────────────────
     ax.set_xlim(0, total_duration)
@@ -958,7 +958,7 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
             f"Window: {start_sec:.1f}s – {start_sec + total_duration:.1f}s")
 
     fig.text(0.5, 0.005, info, ha='center', va='bottom',
-             fontsize=7, color='#666666', fontfamily='monospace')
+             fontsize=14, color='#666666', fontweight='bold', fontfamily='monospace')
 
     plt.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.03)
 
