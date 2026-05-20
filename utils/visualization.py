@@ -851,6 +851,9 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
 
             all_segments[(row, col)] = sig[col_start:col_end]
 
+            print(f"  [OK] {label}: {col_end} - {col_start} samples "
+                  f"({(col_end - col_start) / fs:.2f}s)")
+
     if len(all_segments) == 0:
         print("[WARNING] No signal data for 12-lead plot")
         return
@@ -861,6 +864,10 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
         sig = np.array(all_signals['lead2'], dtype=np.float64).flatten()
         r_start = start_sample
         r_end = r_start + int(total_duration * fs)
+
+        print(f"  [OK] Rhythm strip: Lead II, {total_duration:.1f}s "
+              f"({r_end} - {r_start} samples)")
+
         if r_end <= len(sig):
             rhythm_sig = sig[r_start:r_end]
         elif r_start < len(sig):
@@ -875,8 +882,8 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
     row_height = max(global_max * 2.5, 1.0)
 
     # 3 lead rows + 1 rhythm row (slightly smaller)
-    # total_rows = 3 + (1 if rhythm_sig is not None else 0)
-    total_rows = 3
+    total_rows = 3 + (1 if rhythm_sig is not None else 0)
+    # total_rows = 3
     row_centers = [(total_rows - 1 - r) * row_height for r in range(total_rows)]
 
     # ─── Figure ───────────────────────────────────────────
@@ -919,14 +926,14 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
                     color='black', va='top', ha='left', zorder=15)
 
     # ─── Rhythm Strip (Row 4) ─────────────────────────────
-    # if rhythm_sig is not None:
-        # t_rhythm = np.arange(len(rhythm_sig)) / fs
-        # ax.plot(t_rhythm, rhythm_sig + row_centers[3],
-        #         color='black', linewidth=0.7, zorder=10)
+    if rhythm_sig is not None:
+        t_rhythm = np.arange(len(rhythm_sig)) / fs
+        ax.plot(t_rhythm, rhythm_sig + row_centers[3],
+                color='black', linewidth=2, zorder=10)
 
-        # ax.text(0.05, row_centers[3] + row_height * 0.40,
-        #         'II (rhythm)', fontsize=9, fontweight='bold',
-        #         color='black', va='top', ha='left', zorder=15)
+        ax.text(0.05, row_centers[3] + row_height * 0.40,
+                'II (rhythm)', fontsize=14, fontweight='bold',
+                color='black', va='top', ha='left', zorder=15)
 
     # ─── Column Separators ────────────────────────────────
     for col in range(1, n_cols):
@@ -936,12 +943,12 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
         y_grid_top = row_centers[0] + row_height * 0.5
 
         ax.plot([x, x], [y_grid_bottom, y_grid_top],
-                color='black', linewidth=2, alpha=0.4, zorder=8)
+                color='black', linewidth=1, alpha=0.4, zorder=8)
 
     # ─── Row Separators ──────────────────────────────────
     for row in range(1, total_rows):
         y_sep = (row_centers[row - 1] + row_centers[row]) / 2
-        ax.axhline(y=y_sep, color='black', linewidth=2, alpha=0.4, zorder=8)
+        ax.axhline(y=y_sep, color='black', linewidth=1, alpha=0.4, zorder=8)
 
     # ─── Axis Config ──────────────────────────────────────
     ax.set_xlim(0, total_duration)

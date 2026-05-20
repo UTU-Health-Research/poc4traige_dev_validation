@@ -49,7 +49,7 @@ def main():
     dev_data_raw = convert_binary_data(raw)
 
     print(f"\nDev. Data shape:       {dev_data_raw.shape}")
-    signals = extract_signals(dev_data_raw, cut_starting_samples=5000, cut_ending_samples=11000)
+    signals = extract_signals(dev_data_raw, cut_starting_samples=1000, cut_ending_samples=0)
     signals_clean = remove_dc_offset(signals, exclude=['body_temperature'])
     preprocessed_signals, spike_masks = preprocess_signals(signals_clean)
 
@@ -60,8 +60,8 @@ def main():
         bitt_path=args['bitt_path'], # reference data (ECG)
         bpc_path=args['bpc_path'], # reference data (Respiration)
         target_fs=250,
-        cut_starting_samples=5000,
-        cut_ending_samples=11000
+        cut_starting_samples=1000,
+        cut_ending_samples=0
     )
 
     # DC offset removal for reference signals
