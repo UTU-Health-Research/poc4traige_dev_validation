@@ -319,10 +319,27 @@ def plot_imu_signals(preprocessed, imu_name="ribs", fs=250,
 # ═══════════════════════════════════════════════════════════════
 
 def plot_temperature(preprocessed, signal_name="body_temperature",
-                      fs=250, output_dir="outputs/plots",
+                      reference_temp=None, fs=250,
+                      output_dir="outputs/plots",
                       show=True, save=True):
     """
-    Plot body temperature with clinical threshold bands.
+    Plot measured body temperature against a single reference
+    temperature acquired with a digital thermometer.
+
+    Parameters
+    ----------
+    preprocessed : dict
+        Preprocessed signals dictionary.
+    signal_name : str
+        Key for the temperature signal.
+    reference_temp : float or None
+        Single reference temperature value (°C) from a digital
+        thermometer.  Plotted as a horizontal dashed line.
+    fs : int
+        Sampling frequency.
+    output_dir : str
+    show : bool
+    save : bool
     """
 
     if save:
@@ -335,29 +352,30 @@ def plot_temperature(preprocessed, signal_name="body_temperature",
     sig = np.array(preprocessed[signal_name], dtype=np.float64).flatten()
     t = _time_axis(sig, fs)
 
-    fig, ax = plt.subplots(figsize=(14, 5))
+    # ── figure sized for a single column in a two-column layout ──
+    fig, ax = plt.subplots(figsize=(7, 3))
 
-    ax.plot(t, sig, color='steelblue', linewidth=0.8, label='Temperature')
+    # Measured temperature
+    ax.plot(t, sig, color='steelblue', linewidth=2,
+            label='Measured Temperature')
 
-    # Clinical bands
-    ax.axhline(y=37.5, color='orange', linestyle='--', alpha=0.7, label='Fever (37.5°C)')
-    ax.axhline(y=38.5, color='red', linestyle='--', alpha=0.7, label='High Fever (38.5°C)')
-    ax.axhline(y=35.0, color='blue', linestyle='--', alpha=0.7, label='Hypothermia (35.0°C)')
+    # Reference temperature (horizontal line)
+    if reference_temp is not None:
+        ax.axhline(y=reference_temp, color='crimson', linestyle='--',
+                    linewidth=2, label=f'Reference ({reference_temp:.1f} °C)')
 
-    # Normal range shading
-    ax.axhspan(36.1, 37.2, color='green', alpha=0.05, label='Normal Range')
-
-    ax.set_title(f"Body Temperature — {signal_name}", fontsize=13, fontweight='bold')
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Temperature (°C)")
-    ax.legend(loc='upper right', fontsize=8)
+    # ax.set_title("Body Temperature", fontsize=10, fontweight='bold')
+    ax.set_xlabel("Time (s)", fontsize=10)
+    ax.set_ylabel("Temperature (°C)", fontsize=10)
+    ax.tick_params(axis='both', labelsize=10)
+    ax.legend(fontsize=10, loc='best')
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
 
     if save:
         filepath = os.path.join(output_dir, f"temperature_{signal_name}.png")
-        fig.savefig(filepath, dpi=150, bbox_inches='tight')
+        fig.savefig(filepath, dpi=700, bbox_inches='tight')
         print(f"  [SAVED] {filepath}")
 
     if show:
@@ -547,6 +565,7 @@ def plot_spike_detection(raw_signals, spike_masks, preprocessed,
 ECG_SIGNALS = ["lead1", "lead2", "c1", "c2", "c3", "c4", "c5"]
 
 def visualize_all(raw_signals, preprocessed, fiducials, features,
+                   reference_temp,
                    spike_masks=None, fs=250,
                    output_dir="outputs/plots",
                    show=False, save=True):
@@ -563,6 +582,8 @@ def visualize_all(raw_signals, preprocessed, fiducials, features,
         Detected fiducial points.
     features : dict
         Extracted features.
+    reference_temp : float
+        Reference temperature for comparison.
     spike_masks : dict, optional
         Spike masks from IMU preprocessing.
     fs : int
@@ -630,6 +651,7 @@ def visualize_all(raw_signals, preprocessed, fiducials, features,
     print("\n[5/7] Temperature plot")
     plot_temperature(
         preprocessed, fs=fs,
+        reference_temp=reference_temp,
         output_dir=output_dir, show=show, save=save
     )
 
