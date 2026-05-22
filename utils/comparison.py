@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from datetime import datetime
-from scipy.stats import pearsonr, spearmanr
+from scipy.stats import pearsonr, spearmanr, kurtosis, skew  
 from itertools import combinations
 
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd, msptd, find_peaks
@@ -300,6 +300,11 @@ def extract_segment_ecg_features(segment, fs=250):
             features['rmssd'] = float('nan')
             features['pnn50'] = float('nan')
             features['pnn20'] = float('nan')
+
+            features['signal_energy']   = float(np.sum(sig ** 2))
+            features['signal_kurtosis'] = float(kurtosis(sig, fisher=True,
+                                                                bias=False))
+            features['signal_skewness'] = float(skew(sig, bias=False))
             return features
 
         features['peak_method'] = method
@@ -375,6 +380,16 @@ def extract_segment_ecg_features(segment, fs=250):
         features['signal_std'] = float(np.std(sig))
         features['signal_rms'] = float(np.sqrt(np.mean(sig ** 2)))
 
+        # ── Signal quality features ──────────────────────────────────
+        # Energy: sum of squared samples (reflects signal power × length).
+        # Kurtosis: Fisher definition (normal = 0); high values indicate
+        #   impulsive noise or sharp R-peaks relative to the baseline.
+        # Skewness: asymmetry of amplitude distribution.
+        features['signal_energy']   = float(np.sum(sig ** 2))
+        features['signal_kurtosis'] = float(kurtosis(sig, fisher=True,
+                                                            bias=False))
+        features['signal_skewness'] = float(skew(sig, bias=False))
+
         return features
 
     except Exception as e:
@@ -393,6 +408,9 @@ def extract_segment_ecg_features(segment, fs=250):
                 'rmssd': float('nan'),
                 'pnn50': float('nan'),
                 'pnn20': float('nan'),
+                'signal_energy':   float(np.sum(sig ** 2)),
+                'signal_kurtosis': float(kurtosis(sig, fisher=True, bias=False)),
+                'signal_skewness': float(skew(sig, bias=False)),
             }
         except Exception:
             return None
@@ -680,7 +698,51 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
         if len(ref_df) > 0 and 'peak_method' in ref_df.columns:
             methods = ref_df['peak_method'].value_counts().to_dict()
             print(f"    Ref peak methods: {methods}")
+    
+    # ── Weighted-average signal quality across all segments ──────
+    # Weight = per-segment energy (higher-energy segments contribute more).
+    # Stored as single-row summary DataFrames and as scalar attributes on
+    # the paired DataFrame so they land in the CSV automatically.
 
+    def _weighted_avg(df, value_col, weight_col='signal_energy'):
+        """Energy-weighted mean; returns NaN if data are missing."""
+        if df is None or len(df) == 0:
+            return float('nan')
+        if value_col not in df.columns or weight_col not in df.columns:
+            return float('nan')
+        v = pd.to_numeric(df[value_col], errors='coerce')
+        w = pd.to_numeric(df[weight_col], errors='coerce')
+        mask = v.notna() & w.notna() & (w > 0)
+        if mask.sum() == 0:
+            return float('nan')
+        return float(np.average(v[mask], weights=w[mask]))
+
+    dev_wt_kurt  = _weighted_avg(dev_df,  'signal_kurtosis')
+    dev_wt_skew  = _weighted_avg(dev_df,  'signal_skewness')
+    ref_wt_kurt  = _weighted_avg(ref_df,  'signal_kurtosis')
+    ref_wt_skew  = _weighted_avg(ref_df,  'signal_skewness')
+
+    # Attach as extra summary columns to paired_df so a single CSV row
+    # carries the whole-signal weighted averages alongside segment data.
+    # A NaN-filled column is used so row count stays the same.
+    if len(paired_df) > 0:
+        paired_df['dev_weighted_kurtosis'] = float('nan')
+        paired_df['dev_weighted_skewness'] = float('nan')
+        paired_df['ref_weighted_kurtosis'] = float('nan')
+        paired_df['ref_weighted_skewness'] = float('nan')
+
+        # Write weighted values only in the first row (clearly labelled).
+        # All other rows stay NaN — avoids misleading repeated values.
+        paired_df.loc[0, 'dev_weighted_kurtosis'] = dev_wt_kurt
+        paired_df.loc[0, 'dev_weighted_skewness'] = dev_wt_skew
+        paired_df.loc[0, 'ref_weighted_kurtosis'] = ref_wt_kurt
+        paired_df.loc[0, 'ref_weighted_skewness'] = ref_wt_skew
+
+    print(f"    Weighted kurtosis — Dev: {dev_wt_kurt:.4f}  "
+        f"Ref: {ref_wt_kurt:.4f}")
+    print(f"    Weighted skewness — Dev: {dev_wt_skew:.4f}  "
+        f"Ref: {ref_wt_skew:.4f}")
+    
     return dev_df, ref_df, paired_df
 
 
@@ -1288,6 +1350,25 @@ def _export_segment_report(comparison_results, output_dir):
                     f.write(f"  {feat:<25} {dev_mean:>10.3f} "
                             f"{ref_mean:>10.3f} {mean_diff:>10.3f} "
                             f"{mean_pct:>9.1f}% {r_str:>10}\n")
+            # ── Weighted signal quality summary ─────────────────────────
+            if len(paired_df) > 0:
+                wq_cols = [
+                    ('dev_weighted_kurtosis', 'Dev weighted kurtosis'),
+                    ('dev_weighted_skewness', 'Dev weighted skewness'),
+                    ('ref_weighted_kurtosis', 'Ref weighted kurtosis'),
+                    ('ref_weighted_skewness', 'Ref weighted skewness'),
+                ]
+                f.write(f"\n  ENERGY-WEIGHTED SIGNAL QUALITY\n")
+                f.write(f"  {'-' * 40}\n")
+                for col, label in wq_cols:
+                    if col in paired_df.columns:
+                        val = pd.to_numeric(
+                            paired_df[col], errors='coerce'
+                        ).dropna()
+                        val_str = f"{val.iloc[0]:.4f}" if len(val) > 0 else "N/A"
+                        f.write(f"  {label:<30} {val_str}\n")
+                f.write("\n")        
+                
 
         # Summary of peak methods used
         f.write(f"\n\n{'=' * 60}\n")

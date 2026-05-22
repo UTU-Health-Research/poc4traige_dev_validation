@@ -666,13 +666,13 @@ def plot_12lead_ecg_multi_window(preprocessed, fs=250,
         max_start = total_sec - window_duration
         start_times = np.linspace(0, max_start, n_windows)
 
-    print(f"\n  [12-LEAD ECG] Generating {len(start_times)} paper plots")
-    print(f"  Signal duration: {total_sec:.1f}s")
+    # print(f"\n  [12-LEAD ECG] Generating {len(start_times)} paper plots")
+    # print(f"  Signal duration: {total_sec:.1f}s")
 
     for i, start_sec in enumerate(start_times):
         start_rounded = round(start_sec, 1)
-        print(f"\n  Window {i + 1}/{len(start_times)}: "
-              f"{start_rounded}s – {start_rounded + window_duration:.1f}s")
+        # print(f"\n  Window {i + 1}/{len(start_times)}: "
+        #       f"{start_rounded}s – {start_rounded + window_duration:.1f}s")
 
         # Full page with rhythm strip
         plot_12lead_full_page(
@@ -683,7 +683,7 @@ def plot_12lead_ecg_multi_window(preprocessed, fs=250,
         )
 
     # Continuous rhythm strip
-    print("\n  Generating Lead-II rhythm strip")
+    # print("\n  Generating Lead-II rhythm strip")
     plot_12lead_ecg_continuous(
         preprocessed, fs=fs,
         strip_duration=min(total_sec, 30.0),
@@ -851,8 +851,8 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
 
             all_segments[(row, col)] = sig[col_start:col_end]
 
-            print(f"  [OK] {label}: {col_end} - {col_start} samples "
-                  f"({(col_end - col_start) / fs:.2f}s)")
+            # print(f"  [OK] {label}: {col_end} - {col_start} samples "
+            #       f"({(col_end - col_start) / fs:.2f}s)")
 
     if len(all_segments) == 0:
         print("[WARNING] No signal data for 12-lead plot")
