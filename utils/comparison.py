@@ -828,23 +828,23 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
 
     # Panel 1: Device signal 1
     axes[0].plot(t_dev_1, dev_sig_1, color='steelblue', linewidth=2)
-    axes[0].set_title(f"Device: {dev_signal_1}", fontweight='bold', fontsize=10)
-    axes[0].set_ylabel("Amplitude", fontsize=10)
-    axes[0].tick_params(axis='both', labelsize=10)
+    axes[0].set_title(f"Dev: {dev_signal_1} (IP)", fontweight='bold', fontsize=14)
+    axes[0].set_ylabel("Amplitude", fontsize=14)
+    axes[0].tick_params(axis='both', labelsize=14)
     axes[0].grid(True, alpha=0.3)
 
     # Panel 2: Device signal 2
     axes[1].plot(t_dev_2, dev_sig_2, color='mediumseagreen', linewidth=2)
-    axes[1].set_title(f"Device: {dev_signal_2}", fontweight='bold', fontsize=10)
-    axes[1].set_ylabel("Amplitude", fontsize=10)
-    axes[1].tick_params(axis='both', labelsize=10)
+    axes[1].set_title(f"Dev: {dev_signal_2} (Gyr)", fontweight='bold', fontsize=14)
+    axes[1].set_ylabel("Amplitude", fontsize=14)
+    axes[1].tick_params(axis='both', labelsize=14)
     axes[1].grid(True, alpha=0.3)
 
     # Panel 3: Reference signal
     axes[2].plot(t_ref, ref_sig, color='coral', linewidth=2)
-    axes[2].set_title(f"Reference: {ref_signal}", fontweight='bold', fontsize=10)
-    axes[2].set_ylabel("Amplitude", fontsize=10)
-    axes[2].tick_params(axis='both', labelsize=10)
+    axes[2].set_title(f"Ref: {ref_signal} (RR)", fontweight='bold', fontsize=14)
+    axes[2].set_ylabel("Amplitude", fontsize=14)
+    axes[2].tick_params(axis='both', labelsize=14)
     axes[2].grid(True, alpha=0.3)
 
     # Panel 4: Normalized overlay
@@ -859,16 +859,16 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
     t_common = np.arange(min_len) / fs
 
     axes[3].plot(t_common, dev_norm_1[:min_len], color='steelblue',
-                linewidth=2, alpha=0.7, label=f'Device: {dev_signal_1}')
+                linewidth=2, alpha=0.7, label=f'IP')
     axes[3].plot(t_common, dev_norm_2[:min_len], color='mediumseagreen',
-                linewidth=2, alpha=0.7, label=f'Device: {dev_signal_2}')
+                linewidth=2, alpha=0.7, label=f'Gyr')
     axes[3].plot(t_common, ref_norm[:min_len],   color='coral',
-                linewidth=2, alpha=0.7, label=f'Reference: {ref_signal}')
-    axes[3].set_title("Normalized Signal Overlay", fontweight='bold', fontsize=10)
-    axes[3].set_xlabel("Time (s)", fontsize=10)
-    axes[3].set_ylabel("Normalized Amplitude", fontsize=10)
-    axes[3].tick_params(axis='both', labelsize=10)
-    axes[3].legend(loc='upper right', fontsize=10, framealpha=0.8)
+                linewidth=2, alpha=0.7, label=f'RR')
+    axes[3].set_title("Normalized Signal Overlay", fontweight='bold', fontsize=14)
+    axes[3].set_xlabel("Time (s)", fontsize=14)
+    axes[3].set_ylabel("Normalized Amplitude", fontsize=14)
+    axes[3].tick_params(axis='both', labelsize=14)
+    axes[3].legend(loc='upper right', fontsize=14, framealpha=0.8)
     axes[3].grid(True, alpha=0.3)
 
     if time_window is not None:

@@ -364,11 +364,11 @@ def plot_temperature(preprocessed, signal_name="body_temperature",
         ax.axhline(y=reference_temp, color='crimson', linestyle='--',
                     linewidth=2, label=f'Reference ({reference_temp:.1f} °C)')
 
-    # ax.set_title("Body Temperature", fontsize=10, fontweight='bold')
-    ax.set_xlabel("Time (s)", fontsize=10)
-    ax.set_ylabel("Temperature (°C)", fontsize=10)
-    ax.tick_params(axis='both', labelsize=10)
-    ax.legend(fontsize=10, loc='best')
+    # ax.set_title("Body Temperature", fontsize=14, fontweight='bold')
+    ax.set_xlabel("Time (s)", fontsize=14)
+    ax.set_ylabel("Temperature (°C)", fontsize=14)
+    ax.tick_params(axis='both', labelsize=14)
+    ax.legend(fontsize=14, loc='best')
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
