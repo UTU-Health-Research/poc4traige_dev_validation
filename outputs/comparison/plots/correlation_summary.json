@@ -1,23 +1,23 @@
 {
     "lead1_vs_ref_lead1": {
-        "pearson_r": 0.968557648865186,
-        "spearman_r": 0.9410200672793299,
-        "r_squared": 0.9380774091309269,
-        "peak_cross_corr": 0.9685576488651015,
+        "pearson_r": 0.07313224507906158,
+        "spearman_r": 0.08201620535188296,
+        "r_squared": 0.005072193993613694,
+        "peak_cross_corr": 0.07313224507905551,
         "peak_lag_sec": 0.0
     },
     "lead2_vs_ref_lead2": {
-        "pearson_r": 0.9786118682651699,
-        "spearman_r": 0.9676768580651636,
-        "r_squared": 0.9575866264860635,
-        "peak_cross_corr": 0.9786118682650627,
+        "pearson_r": 0.08551503835687199,
+        "spearman_r": 0.13384359793332665,
+        "r_squared": 0.006956923272044779,
+        "peak_cross_corr": 0.08551503835686654,
         "peak_lag_sec": 0.0
     },
     "impedance_pneumography_vs_ref_respiration": {
-        "pearson_r": 0.9205228724804972,
-        "spearman_r": 0.9363317538115495,
-        "r_squared": 0.84736232912153,
-        "peak_cross_corr": 0.9205228724804836,
-        "peak_lag_sec": 0.0
+        "pearson_r": 0.8570363934094811,
+        "spearman_r": 0.9658844364438989,
+        "r_squared": 0.7345113796283311,
+        "peak_cross_corr": 0.8570865085107058,
+        "peak_lag_sec": -0.008
     }
 }

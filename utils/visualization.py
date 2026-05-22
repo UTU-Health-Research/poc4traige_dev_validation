@@ -578,7 +578,7 @@ def compute_derived_leads(preprocessed, fs=250):
     derived['avl'] = lead1 - lead2 / 2.0
     derived['avf'] = lead2 - lead1 / 2.0
 
-    print(f"  [OK] Derived leads: Lead-III, aVR, aVL, aVF ({min_len} samples)")
+    # print(f"  [OK] Derived leads: Lead-III, aVR, aVL, aVF ({min_len} samples)")
 
     return derived
 
@@ -666,13 +666,13 @@ def plot_12lead_ecg_multi_window(preprocessed, fs=250,
         max_start = total_sec - window_duration
         start_times = np.linspace(0, max_start, n_windows)
 
-    print(f"\n  [12-LEAD ECG] Generating {len(start_times)} paper plots")
-    print(f"  Signal duration: {total_sec:.1f}s")
+    # print(f"\n  [12-LEAD ECG] Generating {len(start_times)} paper plots")
+    # print(f"  Signal duration: {total_sec:.1f}s")
 
     for i, start_sec in enumerate(start_times):
         start_rounded = round(start_sec, 1)
-        print(f"\n  Window {i + 1}/{len(start_times)}: "
-              f"{start_rounded}s – {start_rounded + window_duration:.1f}s")
+        # print(f"\n  Window {i + 1}/{len(start_times)}: "
+        #       f"{start_rounded}s – {start_rounded + window_duration:.1f}s")
 
         # Full page with rhythm strip
         plot_12lead_full_page(
@@ -683,13 +683,13 @@ def plot_12lead_ecg_multi_window(preprocessed, fs=250,
         )
 
     # Continuous rhythm strip
-    print("\n  Generating Lead-II rhythm strip")
-    plot_12lead_ecg_continuous(
-        preprocessed, fs=fs,
-        strip_duration=min(total_sec, 30.0),
-        output_dir=output_dir,
-        show=show, save=save
-    )
+    # print("\n  Generating Lead-II rhythm strip")
+    # plot_12lead_ecg_continuous(
+    #     preprocessed, fs=fs,
+    #     strip_duration=min(total_sec, 30.0),
+    #     output_dir=output_dir,
+    #     show=show, save=save
+    # )
 
 
 def plot_12lead_ecg_continuous(preprocessed, fs=250,
@@ -851,8 +851,8 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
 
             all_segments[(row, col)] = sig[col_start:col_end]
 
-            print(f"  [OK] {label}: {col_end} - {col_start} samples "
-                  f"({(col_end - col_start) / fs:.2f}s)")
+            # print(f"  [OK] {label}: {col_end} - {col_start} samples "
+            #       f"({(col_end - col_start) / fs:.2f}s)")
 
     if len(all_segments) == 0:
         print("[WARNING] No signal data for 12-lead plot")
@@ -865,8 +865,8 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
         r_start = start_sample
         r_end = r_start + int(total_duration * fs)
 
-        print(f"  [OK] Rhythm strip: Lead II, {total_duration:.1f}s "
-              f"({r_end} - {r_start} samples)")
+        # print(f"  [OK] Rhythm strip: Lead II, {total_duration:.1f}s "
+        #       f"({r_end} - {r_start} samples)")
 
         if r_end <= len(sig):
             rhythm_sig = sig[r_start:r_end]
@@ -908,7 +908,7 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
                 if label is not None:
                     ax.text(col_offset + 0.05,
                             row_centers[row] + row_height * 0.40,
-                            label, fontsize=9, fontweight='bold',
+                            label, fontsize=25, fontweight='bold',
                             color='black', va='top', ha='left', zorder=15)
                 continue
 
@@ -922,7 +922,7 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
             # Lead label
             ax.text(col_offset + 0.05,
                     row_centers[row] + row_height * 0.40,
-                    label, fontsize=14, fontweight='bold',
+                    label, fontsize=25, fontweight='bold',
                     color='black', va='top', ha='left', zorder=15)
 
     # ─── Rhythm Strip (Row 4) ─────────────────────────────
@@ -932,7 +932,7 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
                 color='black', linewidth=2, zorder=10)
 
         ax.text(0.05, row_centers[3] + row_height * 0.40,
-                'II (rhythm)', fontsize=14, fontweight='bold',
+                'II (rhythm)', fontsize=25, fontweight='bold',
                 color='black', va='top', ha='left', zorder=15)
 
     # ─── Column Separators ────────────────────────────────
@@ -961,13 +961,14 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
     # ─── Info Bar ─────────────────────────────────────────
     info = (f"Speed: {paper_speed} mm/s  |  "
             f"Gain: {gain} mm/mV  |  "
-            f"Fs: {fs} Hz  |  "
-            f"Window: {start_sec:.1f}s – {start_sec + total_duration:.1f}s")
+            f"Fs: {fs} Hz  |  ")
+            # f"Window: {start_sec:.1f}s – {start_sec + total_duration:.1f}s")
 
     fig.text(0.5, 0.005, info, ha='center', va='bottom',
-             fontsize=14, color='#666666', fontweight='bold', fontfamily='monospace')
+             fontsize=25, color='#666666', fontweight='bold', fontfamily='monospace')
 
-    plt.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.03)
+    # This is a bit of a hack to get the info bar to fit without cutting off the plot area
+    plt.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.06)
 
     if save:
         filepath = os.path.join(output_dir,
