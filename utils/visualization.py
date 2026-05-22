@@ -865,8 +865,8 @@ def plot_12lead_full_page(preprocessed, fs=250, start_sec=0,
         r_start = start_sample
         r_end = r_start + int(total_duration * fs)
 
-        print(f"  [OK] Rhythm strip: Lead II, {total_duration:.1f}s "
-              f"({r_end} - {r_start} samples)")
+        # print(f"  [OK] Rhythm strip: Lead II, {total_duration:.1f}s "
+        #       f"({r_end} - {r_start} samples)")
 
         if r_end <= len(sig):
             rhythm_sig = sig[r_start:r_end]

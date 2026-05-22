@@ -108,6 +108,7 @@ def extract_ecg_features(signal, fs=250, signal_name="ecg"):
         rr_intervals = np.diff(r_peaks_clean) / fs  # in seconds
         rr_intervals_ms = rr_intervals * 1000        # in milliseconds
 
+        print(f"  [{signal_name}] RR intervals computed: {len(rr_intervals)}")
         # Heart rate
         hr = 60.0 / rr_intervals
         features[f"{signal_name}_mean_hr"]   = np.mean(hr)
