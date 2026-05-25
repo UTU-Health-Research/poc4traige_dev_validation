@@ -364,7 +364,7 @@ def plot_temperature(preprocessed, signal_name="body_temperature",
         ax.axhline(y=reference_temp, color='crimson', linestyle='--',
                     linewidth=2, label=f'Reference ({reference_temp:.1f} °C)')
 
-    # ax.set_title("Body Temperature", fontsize=14, fontweight='bold')
+    ax.set_title("Body Temperature (Armpit)", fontsize=14, fontweight='bold')
     ax.set_xlabel("Time (s)", fontsize=14)
     ax.set_ylabel("Temperature (°C)", fontsize=14)
     ax.tick_params(axis='both', labelsize=14)
