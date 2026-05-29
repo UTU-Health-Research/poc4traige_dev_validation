@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from datetime import datetime
-from scipy.stats import pearsonr, spearmanr, kurtosis, skew  
+from scipy.stats import pearsonr, spearmanr, kurtosis, skew
 from itertools import combinations
 
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd, msptd, find_peaks
@@ -50,137 +50,129 @@ RESP_SIGNAL_PAIRS = {
 
 RESP_MODALITY_SOURCES = {
     "impedance_pneumography": None,
-    "pca_acc_ribs": ["accx_ribs_imu", "accy_ribs_imu", "accz_ribs_imu"],
-    "pca_gyr_ribs": ["gyrx_ribs_imu", "gyry_ribs_imu", "gyrz_ribs_imu"],
+    "pca_acc_ribs":  ["accx_ribs_imu",  "accy_ribs_imu",  "accz_ribs_imu"],
+    "pca_gyr_ribs":  ["gyrx_ribs_imu",  "gyry_ribs_imu",  "gyrz_ribs_imu"],
     "pca_acc_chest": ["accx_chest_imu", "accy_chest_imu", "accz_chest_imu"],
     "pca_gyr_chest": ["gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu"],
 }
 
 
+# ═══════════════════════════════════════════════════════════════
+#  IMU PCA HELPERS
+# ═══════════════════════════════════════════════════════════════
+
 def compute_pca_signal(preprocessed_signals, axis_keys):
     """
     Compute the first principal component from 3 IMU axes.
+
     PC1 captures the axis of maximum respiratory variance,
-    avoiding the signal dilution caused by noisy axes in RMS.
+    avoiding signal dilution caused by noisy axes in simple RMS.
 
     Parameters
     ----------
     preprocessed_signals : dict
-        All preprocessed signals.
     axis_keys : list of str
-        Three keys, e.g. ['accx_ribs_imu', 'accy_ribs_imu', 'accz_ribs_imu'].
 
     Returns
     -------
     np.ndarray or None
-        PC1 signal, or None if any axis is missing.
     """
     arrays = []
     for key in axis_keys:
         if key not in preprocessed_signals:
             return None
-        arrays.append(np.array(preprocessed_signals[key], dtype=np.float64).flatten())
+        arrays.append(
+            np.array(preprocessed_signals[key], dtype=np.float64).flatten()
+        )
 
     min_len = min(len(a) for a in arrays)
-    arrays = [a[:min_len] for a in arrays]
+    arrays  = [a[:min_len] for a in arrays]
 
-    # Stack into (N, 3) matrix and zero-mean each axis
-    X = np.column_stack(arrays)
+    X  = np.column_stack(arrays)
     X -= X.mean(axis=0)
 
-    # SVD-based PCA — no sklearn dependency needed
     _, _, Vt = np.linalg.svd(X, full_matrices=False)
-    pc1 = X @ Vt[0]  # Project onto first principal component
-
-    return pc1
+    return X @ Vt[0]
 
 
 def prepare_resp_modality_signals(preprocessed_signals, fs=250):
     """
-    Prepare all respiratory modality signals: direct impedance pneumography
-    and bandpass-filtered RMS signals from IMU axes.
-
-    Parameters
-    ----------
-    preprocessed_signals : dict
-        All preprocessed device signals.
-    fs : int
-        Sampling frequency.
+    Prepare all respiratory modality signals.
 
     Returns
     -------
-    modality_signals : dict
-        {modality_name: np.ndarray} for each available modality.
+    modality_signals : dict  {name: np.ndarray}
     """
     modality_signals = {}
 
-    for modality_name, axis_keys in RESP_MODALITY_SOURCES.items():
+    for name, axis_keys in RESP_MODALITY_SOURCES.items():
         if axis_keys is None:
-            # Direct signal (impedance pneumography)
-            if modality_name in preprocessed_signals:
-                modality_signals[modality_name] = np.array(
-                    preprocessed_signals[modality_name], dtype=np.float64
+            if name in preprocessed_signals:
+                modality_signals[name] = np.array(
+                    preprocessed_signals[name], dtype=np.float64
                 ).flatten()
         else:
-            # Compute RMS from axes, then bandpass to respiratory band
-            modality_signals[modality_name] = compute_pca_signal(preprocessed_signals, axis_keys)
+            sig = compute_pca_signal(preprocessed_signals, axis_keys)
+            if sig is not None:
+                modality_signals[name] = sig
 
     return modality_signals
 
 
 # ═══════════════════════════════════════════════════════════════
-#  1. ROBUST SEGMENT-LEVEL FEATURE EXTRACTION
+#  1. R-PEAK DETECTION & FILTERING
 # ═══════════════════════════════════════════════════════════════
 
 def _detect_r_peaks_robust(sig, fs):
     """
-    Attempt R-peak detection with multiple fallback methods.
+    R-peak detection with ordered fallback chain.
 
-    Tries in order:
-        1. ecg_modified_pan_tompkins
-        2. ampd
-        3. msptd
+    Order:
+        1. ecg_modified_pan_tompkins  — gold standard for clean ECG
+        2. ampd                       — scale-space, good for noisy ECG
+        3. msptd                      — multi-scale, handles low amplitude
+        4. simple threshold           — last resort
+
+    FIX vs original: Method 2 was mistakenly calling msptd instead of ampd.
 
     Returns
     -------
-    np.ndarray
-        Detected R-peak indices, or empty array if all methods fail.
-    str
-        Name of the method that succeeded.
+    peaks  : np.ndarray  (indices)
+    method : str
     """
-    # Method 1: Modified Pan-Tompkins
+    # ── Method 1: Modified Pan-Tompkins ───────────────────
     try:
-        peaks = ecg_modified_pan_tompkins(sig, fs)
-        peaks = np.array(peaks, dtype=int)
+        peaks = np.array(ecg_modified_pan_tompkins(sig, fs), dtype=int)
         peaks = peaks[(peaks >= 0) & (peaks < len(sig))]
         if len(peaks) >= 2:
             return peaks, "pan_tompkins"
     except Exception:
         pass
 
-    # Method 2: AMPD
+    # ── Method 2: AMPD (was incorrectly msptd in original) ─
     try:
-        peaks = ampd(sig, fs)
-        peaks = np.array(peaks, dtype=int)
+        peaks = np.array(ampd(sig, fs), dtype=int)
         peaks = peaks[(peaks >= 0) & (peaks < len(sig))]
         if len(peaks) >= 2:
             return peaks, "ampd"
     except Exception:
         pass
 
-    # Method 3: MSPTD
+    # ── Method 3: MSPTD ───────────────────────────────────
     try:
-        peaks = msptd(sig, fs)
-        peaks = np.array(peaks, dtype=int)
+        result = msptd(sig, fs)
+        # msptd returns (peaks, troughs) — take first element
+        peaks = np.array(result[0] if isinstance(result, tuple) else result,
+                         dtype=int)
         peaks = peaks[(peaks >= 0) & (peaks < len(sig))]
         if len(peaks) >= 2:
             return peaks, "msptd"
     except Exception:
         pass
 
-    # Method 4: Simple threshold-based fallback
+    # ── Method 4: Simple threshold ────────────────────────
     try:
-        peaks = _simple_peak_detect(sig, fs, min_hr=40, max_hr=200)
+        peaks = _simple_peak_detect(sig, fs)
         if len(peaks) >= 2:
             return peaks, "simple_threshold"
     except Exception:
@@ -190,20 +182,12 @@ def _detect_r_peaks_robust(sig, fs):
 
 
 def _simple_peak_detect(sig, fs, min_hr=40, max_hr=200):
-    """
-    Simple threshold-based R-peak detection as last resort.
-
-    Uses adaptive threshold at 0.5 * std above mean, with minimum
-    distance constraint from expected HR range.
-    """
-
-    min_distance = int(fs * 60.0 / max_hr)
+    """Adaptive-threshold R-peak detection as last resort."""
+    min_distance   = int(fs * 60.0 / max_hr)
     height_threshold = np.mean(sig) + 0.5 * np.std(sig)
 
-    peaks, _ = find_peaks(sig, height=height_threshold,
-                          distance=min_distance)
+    peaks, _ = find_peaks(sig, height=height_threshold, distance=min_distance)
 
-    # Filter by maximum expected interval
     if len(peaks) > 1:
         max_interval = int(fs * 60.0 / min_hr)
         valid = [peaks[0]]
@@ -217,533 +201,772 @@ def _simple_peak_detect(sig, fs, min_hr=40, max_hr=200):
 
 def _filter_peaks_gentle(peaks, fs, hr_min=30, hr_max=220):
     """
-    Gentle peak filtering that preserves as many peaks as possible.
+    Remove only physiologically impossible intervals.
 
-    Only removes peaks that produce physiologically impossible HR values.
-    Does NOT use aggressive SDSD or median kernel filtering.
-
-    Parameters
-    ----------
-    peaks : np.ndarray
-        Peak indices.
-    fs : int
-        Sampling frequency.
-    hr_min : int
-        Minimum plausible heart rate (bpm).
-    hr_max : int
-        Maximum plausible heart rate (bpm).
-
-    Returns
-    -------
-    np.ndarray
-        Filtered peak indices.
+    Preserves beats after a long pause (the beat itself is real,
+    the gap may be an ectopic event or artefact on the previous beat).
     """
     if len(peaks) < 2:
         return peaks
 
-    peaks = np.sort(peaks)
+    peaks       = np.sort(peaks)
     min_interval = fs * 60.0 / hr_max
-    max_interval = fs * 60.0 / hr_min
 
     filtered = [peaks[0]]
-    for i in range(1, len(peaks)):
-        interval = peaks[i] - filtered[-1]
-        if interval >= min_interval:
-            if interval <= max_interval:
-                filtered.append(peaks[i])
-            else:
-                # Large gap — still keep the peak (next beat after pause)
-                filtered.append(peaks[i])
+    for p in peaks[1:]:
+        if (p - filtered[-1]) >= min_interval:
+            filtered.append(p)
 
     return np.array(filtered, dtype=int)
 
 
+def _get_clean_r_peaks(seg, fs):
+    """
+    Full R-peak pipeline for a single segment:
+        detect → gentle filter → vitalwave filter (if enough beats).
+
+    Centralises the logic that was duplicated across three functions
+    in the original code.
+
+    Returns
+    -------
+    r_peaks : np.ndarray
+    method  : str
+    """
+    r_peaks, method = _detect_r_peaks_robust(seg, fs)
+
+    if len(r_peaks) < 2:
+        return r_peaks, method
+
+    r_peaks = _filter_peaks_gentle(r_peaks, fs)
+
+    if len(r_peaks) >= 4:
+        try:
+            r_vw = np.array(
+                filter_hr_peaks(peaks=r_peaks, fs=fs,
+                                hr_min=30, hr_max=220,
+                                kernel_size=3, sdsd_max=0.5),
+                dtype=int
+            )
+            if len(r_vw) >= 2:
+                r_peaks = r_vw
+        except Exception:
+            pass
+
+    return r_peaks, method
+
+
+# ═══════════════════════════════════════════════════════════════
+#  2. ECG SEGMENT-LEVEL METRICS
+# ═══════════════════════════════════════════════════════════════
+
+def compute_r_peak_timing_error(dev_peaks, ref_peaks, fs,
+                                tolerance_ms=150):
+    """
+    Greedy nearest-neighbour R-peak matching → timing error statistics.
+
+    Each reference peak is consumed at most once, preventing
+    double-counting in arrhythmic or low-HR segments.
+
+    Returns
+    -------
+    dict with keys:
+        timing_errors_ms, mae_ms, me_ms, std_ms, rmse_ms,
+        sensitivity, ppv, f1, n_matched, n_missed, n_extra
+    """
+    tol_samples = int(tolerance_ms / 1000.0 * fs)
+    dev_peaks   = np.sort(np.array(dev_peaks, dtype=int))
+    ref_peaks   = np.sort(np.array(ref_peaks, dtype=int))
+
+    _nan = float('nan')
+
+    if len(dev_peaks) == 0 or len(ref_peaks) == 0:
+        return dict(timing_errors_ms=np.array([]),
+                    mae_ms=_nan, me_ms=_nan, std_ms=_nan, rmse_ms=_nan,
+                    sensitivity=_nan, ppv=_nan, f1=_nan,
+                    n_matched=0, n_missed=len(ref_peaks),
+                    n_extra=len(dev_peaks))
+
+    used_ref  = np.zeros(len(ref_peaks), dtype=bool)
+    errors_ms = []
+
+    for dp in dev_peaks:
+        diffs = np.abs(ref_peaks - dp).astype(float)
+        diffs[used_ref] = np.iinfo(np.int64).max
+        idx = int(np.argmin(diffs))
+        if diffs[idx] <= tol_samples:
+            errors_ms.append((dp - ref_peaks[idx]) / fs * 1000.0)
+            used_ref[idx] = True
+
+    errors_ms = np.array(errors_ms)
+    n_matched = len(errors_ms)
+    n_missed  = int((~used_ref).sum())
+    n_extra   = len(dev_peaks) - n_matched
+    tp, fn, fp = n_matched, n_missed, max(n_extra, 0)
+
+    sensitivity = tp / max(tp + fn, 1)
+    ppv         = tp / max(tp + fp, 1)
+    f1          = 2 * sensitivity * ppv / max(sensitivity + ppv, 1e-10)
+
+    return dict(
+        timing_errors_ms = errors_ms,
+        mae_ms           = float(np.mean(np.abs(errors_ms))) if n_matched else _nan,
+        me_ms            = float(np.mean(errors_ms))         if n_matched else _nan,
+        std_ms           = float(np.std(errors_ms))          if n_matched else _nan,
+        rmse_ms          = float(np.sqrt(np.mean(errors_ms ** 2))) if n_matched else _nan,
+        sensitivity      = float(sensitivity),
+        ppv              = float(ppv),
+        f1               = float(f1),
+        n_matched        = n_matched,
+        n_missed         = n_missed,
+        n_extra          = n_extra,
+    )
+
+
+def compute_ecg_snr(sig, fs, r_peaks,
+                    qrs_half_width_ms=50,
+                    noise_guard_ms=100):
+    """
+    ECG SNR: QRS power / isoelectric baseline power.
+
+    Signal power  = mean squared amplitude inside ±qrs_half_width_ms
+                    windows centred on each R-peak.
+    Noise power   = mean squared amplitude in samples at least
+                    noise_guard_ms away from every R-peak.
+
+    Both windows are symmetric and non-overlapping by construction.
+
+    Returns
+    -------
+    dict: snr_db, signal_power, noise_power
+    """
+    _nan = float('nan')
+
+    if len(r_peaks) < 2:
+        return dict(snr_db=_nan, signal_power=_nan, noise_power=_nan)
+
+    hw    = int(qrs_half_width_ms / 1000.0 * fs)
+    guard = int(noise_guard_ms    / 1000.0 * fs)
+    N     = len(sig)
+
+    qrs_mask   = np.zeros(N, dtype=bool)
+    noise_mask = np.ones(N,  dtype=bool)
+
+    for rp in r_peaks:
+        qrs_mask  [max(0, rp - hw)   : min(N, rp + hw + 1)]    = True
+        noise_mask[max(0, rp - guard) : min(N, rp + guard + 1)] = False
+
+    noise_mask &= ~qrs_mask
+
+    if not qrs_mask.any() or not noise_mask.any():
+        return dict(snr_db=_nan, signal_power=_nan, noise_power=_nan)
+
+    sig_p   = float(np.mean(sig[qrs_mask]   ** 2))
+    noise_p = float(np.mean(sig[noise_mask] ** 2))
+
+    if noise_p < 1e-20:
+        return dict(snr_db=_nan, signal_power=sig_p, noise_power=noise_p)
+
+    return dict(
+        snr_db       = float(10 * np.log10(sig_p / noise_p)),
+        signal_power = sig_p,
+        noise_power  = noise_p,
+    )
+
+
+def compute_rr_rolling_std(sig, fs, r_peaks, window_beats=5):
+    """
+    Beat-anchored rolling standard deviation of RR intervals.
+
+    Unlike a fixed-time rolling window, this anchors computation to
+    actual R-peak positions, making it sensitive to genuine HRV
+    changes rather than signal amplitude fluctuations.
+
+    Algorithm
+    ---------
+    For each consecutive window of `window_beats` RR intervals
+    (i.e. window_beats+1 consecutive R-peaks), compute the std of
+    those RR values. The result is attributed to the centre beat of
+    the window.
+
+    This directly quantifies *local* HRV and is far more informative
+    for arrhythmia detection than a time-domain rolling std of the
+    raw ECG waveform.
+
+    Parameters
+    ----------
+    sig       : np.ndarray  (not used for computation, kept for API
+                             consistency with other compute_ functions)
+    fs        : int
+    r_peaks   : np.ndarray  R-peak indices (already filtered)
+    window_beats : int      Number of RR intervals per window (default 5)
+
+    Returns
+    -------
+    dict
+        rr_rolling_std_mean  : mean of the rolling-std series
+        rr_rolling_std_max   : maximum
+        rr_rolling_std_min   : minimum
+        rr_rolling_std_cv    : CV = std(rolling_std) / mean(rolling_std)
+        n_windows            : number of windows computed
+    """
+    _nan = float('nan')
+
+    if len(r_peaks) < window_beats + 1:
+        return dict(rr_rolling_std_mean=_nan, rr_rolling_std_max=_nan,
+                    rr_rolling_std_min=_nan, rr_rolling_std_cv=_nan,
+                    n_windows=0)
+
+    rr_ms     = np.diff(np.sort(r_peaks)) / fs * 1000.0
+    # Physiological sanity: keep only RRs within 30–220 bpm
+    valid_mask = (rr_ms >= 60000 / 220) & (rr_ms <= 60000 / 30)
+    rr_ms      = rr_ms[valid_mask]
+
+    if len(rr_ms) < window_beats:
+        return dict(rr_rolling_std_mean=_nan, rr_rolling_std_max=_nan,
+                    rr_rolling_std_min=_nan, rr_rolling_std_cv=_nan,
+                    n_windows=0)
+
+    rolling_stds = [
+        float(np.std(rr_ms[i: i + window_beats], ddof=1))
+        for i in range(len(rr_ms) - window_beats + 1)
+    ]
+    rolling_stds = np.array(rolling_stds)
+    mean_rs      = float(np.mean(rolling_stds))
+
+    return dict(
+        rr_rolling_std_mean = mean_rs,
+        rr_rolling_std_max  = float(np.max(rolling_stds)),
+        rr_rolling_std_min  = float(np.min(rolling_stds)),
+        rr_rolling_std_cv   = float(np.std(rolling_stds) / max(mean_rs, 1e-10)),
+        n_windows           = len(rolling_stds),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  3. ECG SEGMENT FEATURE EXTRACTION
+# ═══════════════════════════════════════════════════════════════
+
 def extract_segment_ecg_features(segment, fs=250):
     """
-    Extract key ECG features from a single segment using robust
-    multi-method peak detection with gentle filtering.
+    Extract all ECG features from one segment.
+
+    Target features:
+        • Heart rate (mean, std, min, max, median)
+        • RMSSD  — computed on RAW consecutive RR pairs (gap-safe)
+        • R-peak sensitivity vs reference (filled by segment_and_extract)
+        • SNR (QRS power / isoelectric noise power)
+        • Beat-anchored RR rolling std (5-beat window)
+        • Full HRV time-domain suite (SDNN, pNN50, pNN20)
+        • Signal quality (kurtosis, skewness, energy)
+
+    RMSSD fix: rr_ms_raw (all consecutive RR intervals from detected
+    peaks) is kept intact. The physiological validity filter is applied
+    as a pair-wise mask on np.diff(rr_ms_raw) so that differences are
+    only included when BOTH adjacent RR intervals pass the filter.
+    This prevents artificial large differences caused by crossing gaps
+    left by filtered-out beats — the root cause of inflated RMSSD
+    in the previous implementation.
 
     Parameters
     ----------
     segment : np.ndarray
-        ECG signal segment.
-    fs : int
-        Sampling frequency.
+    fs      : int
 
     Returns
     -------
     dict or None
-        Features dict, or None if extraction fails.
     """
     sig = np.array(segment, dtype=np.float64).flatten()
 
-    if len(sig) < fs:  # Less than 1 second
+    # Minimum 2 s — need at least 2 beats for one RR interval
+    if len(sig) < 2 * fs:
         return None
 
-    features = {}
+    _nan = float('nan')
 
-    try:
-        # Robust R-peak detection with fallbacks
-        r_peaks, method = _detect_r_peaks_robust(sig, fs)
+    # ── Shared signal-level stats (always computable) ─────────────────────
+    base = dict(
+        signal_mean     = float(np.mean(sig)),
+        signal_std      = float(np.std(sig)),
+        signal_rms      = float(np.sqrt(np.mean(sig ** 2))),
+        signal_energy   = float(np.sum(sig ** 2)),
+        signal_kurtosis = float(kurtosis(sig, fisher=True, bias=False)),
+        signal_skewness = float(skew(sig, bias=False)),
+    )
 
-        if len(r_peaks) < 2:
-            # Even if peak detection fails, extract signal-level features
-            features['n_r_peaks'] = len(r_peaks)
-            features['peak_method'] = method
-            features['signal_mean'] = float(np.mean(sig))
-            features['signal_std'] = float(np.std(sig))
-            features['signal_rms'] = float(np.sqrt(np.mean(sig ** 2)))
-            features['mean_hr'] = float('nan')
-            features['std_hr'] = float('nan')
-            features['mean_rr'] = float('nan')
-            features['sdnn'] = float('nan')
-            features['rmssd'] = float('nan')
-            features['pnn50'] = float('nan')
-            features['pnn20'] = float('nan')
+    # ── R-peak detection (single centralised call) ────────────────────────
+    r_peaks, method = _get_clean_r_peaks(sig, fs)
+    base['peak_method'] = method
+    base['n_r_peaks']   = len(r_peaks)
 
-            features['signal_energy']   = float(np.sum(sig ** 2))
-            features['signal_kurtosis'] = float(kurtosis(sig, fisher=True,
-                                                                bias=False))
-            features['signal_skewness'] = float(skew(sig, bias=False))
-            return features
+    # ── NaN placeholders — overwritten below if peaks are available ───────
+    base.update(dict(
+        mean_hr=_nan, std_hr=_nan, min_hr=_nan,
+        max_hr=_nan,  median_hr=_nan,
+        mean_rr=_nan, std_rr=_nan,  sdnn=_nan,
+        median_rr=_nan, rmssd=_nan,
+        pnn50=_nan, pnn20=_nan,
+        r_amp_mean=_nan, r_amp_std=_nan,
+        snr_db=_nan, signal_power=_nan, noise_power=_nan,
+        rr_rolling_std_mean=_nan, rr_rolling_std_max=_nan,
+        rr_rolling_std_min=_nan,  rr_rolling_std_cv=_nan,
+        rr_rolling_std_n_windows=0,
+        # R-peak sensitivity is filled in segment_and_extract()
+        # where both device and reference peaks are available.
+        # Placeholder keeps the column schema consistent.
+        rp_sensitivity=_nan, rp_ppv=_nan, rp_f1=_nan,
+    ))
 
-        features['peak_method'] = method
+    if len(r_peaks) < 2:
+        return base
 
-        # Gentle filtering — only remove physiologically impossible intervals
-        r_peaks_filt = _filter_peaks_gentle(r_peaks, fs, hr_min=30, hr_max=220)
+    # ── Step 1: ALL consecutive RR intervals from raw peak positions ──────
+    # IMPORTANT: never filter this array before computing RMSSD.
+    # Filtering removes beats and creates gaps; calling np.diff() on the
+    # filtered array then crosses those gaps, producing artificially large
+    # successive differences that inflate RMSSD.
+    rr_ms_raw = np.diff(r_peaks) / fs * 1000.0   # shape: (n_peaks - 1,)
 
-        if len(r_peaks_filt) < 2:
-            r_peaks_filt = r_peaks  # Fall back to unfiltered
+    # ── Step 2: physiological validity mask ───────────────────────────────
+    # Used for HR / mean / SDNN statistics — NOT directly for RMSSD.
+    hr_from_rr  = 60000.0 / np.where(rr_ms_raw > 0, rr_ms_raw, np.inf)
+    valid_mask  = (hr_from_rr >= 30) & (hr_from_rr <= 220)
+    rr_ms_valid = rr_ms_raw[valid_mask]
 
-        # Also try vitalwave filter with relaxed params if we have enough peaks
-        if len(r_peaks_filt) >= 4:
-            try:
-                r_peaks_vw = filter_hr_peaks(
-                    peaks=r_peaks_filt, fs=fs,
-                    hr_min=30, hr_max=220,
-                    kernel_size=3, sdsd_max=0.5
-                )
-                r_peaks_vw = np.array(r_peaks_vw, dtype=int)
-                if len(r_peaks_vw) >= 2:
-                    r_peaks_filt = r_peaks_vw
-            except Exception:
-                pass  # Keep gentle-filtered peaks
+    if len(rr_ms_valid) == 0:
+        return base
 
-        # RR intervals in ms
-        rr = np.diff(r_peaks_filt) / fs * 1000.0
+    # ── 1. Heart rate (from physiologically valid RR intervals only) ──────
+    hr_valid          = 60000.0 / rr_ms_valid
+    base['mean_hr']   = float(np.mean(hr_valid))
+    base['std_hr']    = float(np.std(hr_valid))
+    base['min_hr']    = float(np.min(hr_valid))
+    base['max_hr']    = float(np.max(hr_valid))
+    base['median_hr'] = float(np.median(hr_valid))
 
-        if len(rr) == 0:
-            return None
+    # ── HRV time-domain (valid RR) ────────────────────────────────────────
+    base['mean_rr']   = float(np.mean(rr_ms_valid))
+    base['std_rr']    = float(np.std(rr_ms_valid))
+    base['sdnn']      = float(np.std(rr_ms_valid))
+    base['median_rr'] = float(np.median(rr_ms_valid))
 
-        # Heart rate
-        hr = 60000.0 / rr
-        features['mean_hr'] = float(np.mean(hr))
-        features['std_hr'] = float(np.std(hr))
-        features['min_hr'] = float(np.min(hr))
-        features['max_hr'] = float(np.max(hr))
-        features['median_hr'] = float(np.median(hr))
+    # ── 2. RMSSD — gap-safe computation on raw consecutive pairs ──────────
+    # A successive difference rr[i+1] - rr[i] is included only when
+    # BOTH rr[i] and rr[i+1] pass the physiological validity filter.
+    # This preserves the consecutive-beat requirement without crossing
+    # gaps introduced by filtered-out ectopic or artefact beats.
+    #
+    #   valid_mask  : shape (n_peaks - 1,)   — one flag per RR interval
+    #   both_valid  : shape (n_peaks - 2,)   — True only when both
+    #                                          neighbours are valid
+    #   diff_rr_raw : shape (n_peaks - 2,)   — raw successive differences
+    #   diff_rr     : only pairs where both_valid is True
+    if len(rr_ms_raw) > 1:
+        both_valid  = valid_mask[:-1] & valid_mask[1:]
+        diff_rr_raw = np.diff(rr_ms_raw)
+        diff_rr     = diff_rr_raw[both_valid]
 
-        # HRV time-domain
-        features['mean_rr'] = float(np.mean(rr))
-        features['std_rr'] = float(np.std(rr))
-        features['sdnn'] = float(np.std(rr))
-        features['median_rr'] = float(np.median(rr))
-
-        if len(rr) > 1:
-            diff_rr = np.diff(rr)
-            features['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2)))
-            features['pnn50'] = float(
+        if len(diff_rr) > 0:
+            base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2)))
+            base['pnn50'] = float(
                 100 * np.sum(np.abs(diff_rr) > 50) / len(diff_rr)
             )
-            features['pnn20'] = float(
+            base['pnn20'] = float(
                 100 * np.sum(np.abs(diff_rr) > 20) / len(diff_rr)
             )
         else:
-            features['rmssd'] = 0.0
-            features['pnn50'] = 0.0
-            features['pnn20'] = 0.0
+            base['rmssd'] = 0.0
+            base['pnn50'] = 0.0
+            base['pnn20'] = 0.0
+    else:
+        base['rmssd'] = 0.0
+        base['pnn50'] = 0.0
+        base['pnn20'] = 0.0
 
-        # R-peak amplitude
-        valid_peaks = r_peaks_filt[
-            (r_peaks_filt >= 0) & (r_peaks_filt < len(sig))
-        ]
-        if len(valid_peaks) > 0:
-            r_amps = sig[valid_peaks]
-            features['r_amp_mean'] = float(np.mean(r_amps))
-            features['r_amp_std'] = float(np.std(r_amps))
+    # ── R-peak amplitude ──────────────────────────────────────────────────
+    valid_pk = r_peaks[(r_peaks >= 0) & (r_peaks < len(sig))]
+    if len(valid_pk) > 0:
+        base['r_amp_mean'] = float(np.mean(sig[valid_pk]))
+        base['r_amp_std']  = float(np.std(sig[valid_pk]))
 
-        # Peak count
-        features['n_r_peaks'] = len(r_peaks_filt)
+    # ── 3. SNR (QRS power / isoelectric baseline power) ──────────────────
+    snr = compute_ecg_snr(sig, fs, r_peaks)
+    base['snr_db']       = snr['snr_db']
+    base['signal_power'] = snr['signal_power']
+    base['noise_power']  = snr['noise_power']
 
-        # Signal statistics
-        features['signal_mean'] = float(np.mean(sig))
-        features['signal_std'] = float(np.std(sig))
-        features['signal_rms'] = float(np.sqrt(np.mean(sig ** 2)))
+    # ── 4. Beat-anchored RR rolling std (5-beat sliding window) ──────────
+    rrs = compute_rr_rolling_std(sig, fs, r_peaks, window_beats=5)
+    base['rr_rolling_std_mean']      = rrs['rr_rolling_std_mean']
+    base['rr_rolling_std_max']       = rrs['rr_rolling_std_max']
+    base['rr_rolling_std_min']       = rrs['rr_rolling_std_min']
+    base['rr_rolling_std_cv']        = rrs['rr_rolling_std_cv']
+    base['rr_rolling_std_n_windows'] = rrs['n_windows']
 
-        # ── Signal quality features ──────────────────────────────────
-        # Energy: sum of squared samples (reflects signal power × length).
-        # Kurtosis: Fisher definition (normal = 0); high values indicate
-        #   impulsive noise or sharp R-peaks relative to the baseline.
-        # Skewness: asymmetry of amplitude distribution.
-        features['signal_energy']   = float(np.sum(sig ** 2))
-        features['signal_kurtosis'] = float(kurtosis(sig, fisher=True,
-                                                            bias=False))
-        features['signal_skewness'] = float(skew(sig, bias=False))
+    return base
 
-        return features
 
-    except Exception as e:
-        # Last resort: return signal-level features only
-        try:
-            return {
-                'n_r_peaks': 0,
-                'peak_method': 'failed',
-                'signal_mean': float(np.mean(sig)),
-                'signal_std': float(np.std(sig)),
-                'signal_rms': float(np.sqrt(np.mean(sig ** 2))),
-                'mean_hr': float('nan'),
-                'std_hr': float('nan'),
-                'mean_rr': float('nan'),
-                'sdnn': float('nan'),
-                'rmssd': float('nan'),
-                'pnn50': float('nan'),
-                'pnn20': float('nan'),
-                'signal_energy':   float(np.sum(sig ** 2)),
-                'signal_kurtosis': float(kurtosis(sig, fisher=True, bias=False)),
-                'signal_skewness': float(skew(sig, bias=False)),
-            }
-        except Exception:
-            return None
+# ═══════════════════════════════════════════════════════════════
+#  4. RESPIRATION SPECTRAL HELPERS  (shared FFT — no duplication)
+# ═══════════════════════════════════════════════════════════════
 
+def _compute_resp_spectrum(sig, fs):
+    """
+    Compute one-sided power spectrum for the respiratory band.
+
+    Single FFT call — result reused by SPI, spectral RQI, and
+    dominant frequency to avoid the triple-recomputation in the
+    original code.
+
+    Parameters
+    ----------
+    sig : np.ndarray  (zero-mean recommended but not required)
+    fs  : int
+
+    Returns
+    -------
+    freqs     : np.ndarray  full one-sided frequency axis (Hz)
+    power     : np.ndarray  power at each frequency bin
+    resp_mask : np.ndarray  bool mask for [0.1, 0.8] Hz band
+    p_total   : float       total power across all bins
+    p_band    : float       total power in respiratory band
+    """
+    n      = len(sig)
+    freqs  = np.fft.rfftfreq(n, d=1.0 / fs)
+    power  = np.abs(np.fft.rfft(sig - np.mean(sig))) ** 2
+    resp_mask = (freqs >= 0.1) & (freqs <= 0.8)
+    p_total   = float(np.sum(power))
+    p_band    = float(np.sum(power[resp_mask]))
+
+    return freqs, power, resp_mask, p_total, p_band
+
+
+def _signal_purity_index(freqs, power, resp_mask, p_total):
+    """
+    Signal Purity Index (SPI) = P_respiratory_band / P_total.
+
+    Range [0, 1]. Values near 1 indicate a spectrally clean
+    respiratory signal with minimal out-of-band noise/motion.
+
+    Parameters obtained from _compute_resp_spectrum() — no FFT
+    recomputation needed.
+    """
+    if p_total < 1e-12:
+        return float('nan')
+    return float(np.sum(power[resp_mask]) / p_total)
+
+
+def _spectral_rqi(freqs, power, resp_mask, p_band):
+    """
+    Spectral Respiration Quality Index:
+        RQI = P_dominant_peak_neighbourhood / P_respiratory_band
+
+    A value near 1 means energy is concentrated at one frequency
+    (clean, regular breathing). Low values indicate multiple
+    competing frequencies or noise.
+
+    Dominant frequency uses parabolic interpolation for sub-bin
+    resolution (bin width = 1/window_sec Hz).
+
+    FIX vs original: denominator guard now uses p_band directly
+    (passed in) instead of recomputing, and interpolation uses a
+    tighter validity check to prevent out-of-band drift.
+
+    Returns
+    -------
+    spectral_rqi  : float
+    dominant_freq : float  (Hz)
+    """
+    _nan = float('nan')
+
+    if p_band < 1e-12:
+        return _nan, _nan
+
+    band_idx     = np.where(resp_mask)[0]
+    peak_in_band = int(np.argmax(power[band_idx]))
+    peak_global  = band_idx[peak_in_band]
+
+    # Parabolic interpolation for sub-bin frequency resolution
+    if 0 < peak_global < len(power) - 1:
+        alpha, beta, gamma = (power[peak_global - 1],
+                              power[peak_global],
+                              power[peak_global + 1])
+        denom = alpha - 2.0 * beta + gamma
+        correction = (0.5 * (alpha - gamma) / denom) if abs(denom) > 1e-12 else 0.0
+        # Clamp correction to ±0.5 bins to prevent runaway
+        correction    = float(np.clip(correction, -0.5, 0.5))
+        bin_width     = freqs[1] - freqs[0]
+        dominant_freq = float(
+            np.clip(freqs[peak_global] + correction * bin_width, 0.1, 0.8)
+        )
+    else:
+        dominant_freq = float(freqs[peak_global])
+
+    # ±0.05 Hz neighbourhood around dominant peak
+    peak_region = (
+        (freqs >= dominant_freq - 0.05) &
+        (freqs <= dominant_freq + 0.05) &
+        resp_mask
+    )
+    p_peak       = float(np.sum(power[peak_region]))
+    spectral_rqi = float(p_peak / p_band)
+
+    return spectral_rqi, dominant_freq
+
+
+def _autocorrelation_rqi(sig, fs):
+    """
+    Autocorrelation RQI = R(tau*) / R(0).
+
+    Quantifies breathing periodicity. tau* is the lag of the
+    highest autocorrelation peak within the physiologically
+    plausible breathing period range [1.25s, 10s].
+
+    FIX vs original: search window upper bound now capped at
+    min(n-1, 10*fs) AND min(n//2, ...) to prevent searching
+    beyond half the segment length — otherwise the AC estimate
+    is unreliable for short segments.
+
+    Returns
+    -------
+    ac_rqi              : float  [0, 1]
+    dominant_period_sec : float  (s)
+    """
+    _nan = float('nan')
+    n    = len(sig)
+
+    if n < 2 * fs:
+        return _nan, _nan
+
+    s      = sig - np.mean(sig)
+    ac     = np.correlate(s, s, mode='full')[n - 1:]  # lags >= 0
+    r0     = ac[0]
+
+    if r0 < 1e-12:
+        return _nan, _nan
+
+    ac_norm = ac / r0
+
+    lag_min = max(1, int(1.25 * fs))
+    # Cap at half segment length for reliable AC estimation
+    lag_max = min(n // 2, int(10.0 * fs))
+
+    if lag_min >= lag_max:
+        return _nan, _nan
+
+    best_lag = lag_min + int(np.argmax(ac_norm[lag_min:lag_max]))
+    ac_rqi   = float(np.clip(ac_norm[best_lag], 0.0, 1.0))
+    dominant_period_sec = float(best_lag / fs)
+
+    return ac_rqi, dominant_period_sec
+
+
+# ═══════════════════════════════════════════════════════════════
+#  5. RESPIRATION SEGMENT FEATURE EXTRACTION
+# ═══════════════════════════════════════════════════════════════
 
 def extract_segment_resp_features(segment, fs=250):
     """
-    Extract key respiration features from a single segment using
-    multi-method peak detection.
+    Extract all respiration features from one segment.
+
+    Target features:
+        • Respiration rate (mean, std, min, max, median)   [NEW explicit]
+        • Dominant period (from autocorrelation)           [NEW explicit]
+        • Signal Purity Index (SPI)                        [existing, optimised]
+        • Spectral RQI                                     [existing, optimised]
+        • AC RQI                                           [existing, optimised]
+        • BBI statistics (mean, std, CV, RMSSD)            [existing]
+        • Peak amplitude statistics                         [existing]
+        • Signal statistics                                 [existing]
+
+    Optimisation: single FFT call shared between SPI, spectral RQI,
+    and dominant frequency (triple-recompute eliminated).
 
     Parameters
     ----------
     segment : np.ndarray
-        Respiration signal segment.
-    fs : int
-        Sampling frequency.
+    fs      : int
 
     Returns
     -------
     dict or None
-        Features dict, or None if extraction fails.
+    """
+    sig = np.array(segment, dtype=np.float64).flatten()
+
+    # Need at least 2 s for meaningful FFT and AC
+    if len(sig) < 2 * fs:
+        return None
+
+    _nan = float('nan')
+
+    # ── Signal-level stats (always computable) ────────────
+    base = dict(
+        signal_mean   = float(np.mean(sig)),
+        signal_std    = float(np.std(sig)),
+        signal_rms    = float(np.sqrt(np.mean(sig ** 2))),
+        signal_energy = float(np.sum(sig ** 2)),
+    )
+
+    # ── 1. Respiration rate via peak detection ────────────
+    peaks  = np.array([], dtype=int)
+    method = "none"
+
+    # Try AMPD first (better for smooth respiratory waveforms)
+    try:
+        p = np.array(ampd(sig, fs), dtype=int)
+        p = p[(p >= 0) & (p < len(sig))]
+        if len(p) >= 2:
+            peaks, method = p, "ampd"
+    except Exception:
+        pass
+
+    # Fallback: MSPTD
+    if len(peaks) < 2:
+        try:
+            result = msptd(sig, fs)
+            p = np.array(
+                result[0] if isinstance(result, tuple) else result,
+                dtype=int
+            )
+            p = p[(p >= 0) & (p < len(sig))]
+            if len(p) >= 2:
+                peaks, method = p, "msptd"
+        except Exception:
+            pass
+
+    # Fallback: simple threshold
+    if len(peaks) < 2:
+        try:
+            min_dist = int(fs * 1.0)
+            height   = np.mean(sig) + 0.3 * np.std(sig)
+            p, _     = find_peaks(sig, height=height, distance=min_dist)
+            if len(p) >= 2:
+                peaks, method = p.astype(int), "simple_threshold"
+        except Exception:
+            pass
+
+    base['peak_method'] = method
+    base['n_breaths']   = len(peaks)
+
+    # ── Placeholder defaults ──────────────────────────────
+    resp_defaults = dict(
+        resp_rate_mean=_nan,  resp_rate_std=_nan,
+        resp_rate_min=_nan,   resp_rate_max=_nan,
+        resp_rate_median=_nan,
+        bbi_mean=_nan, bbi_std=_nan, bbi_cv=_nan, bbi_rmssd=_nan,
+        peak_amp_mean=_nan, peak_amp_std=_nan,
+        spi=_nan, spectral_rqi=_nan, dominant_freq_hz=_nan,
+        ac_rqi=_nan, dominant_period_sec=_nan,
+    )
+    base.update(resp_defaults)
+
+    # ── Spectral features (shared FFT) ───────────────────
+    # Computed regardless of peak detection success because
+    # frequency-domain quality is independent of the peak finder.
+    if len(sig) >= 2 * fs:
+        try:
+            freqs, power, resp_mask, p_total, p_band = \
+                _compute_resp_spectrum(sig, fs)
+
+            # 3. SPI
+            base['spi'] = _signal_purity_index(
+                freqs, power, resp_mask, p_total
+            )
+
+            # 4. Spectral RQI + dominant frequency
+            srqi, dom_freq = _spectral_rqi(
+                freqs, power, resp_mask, p_band
+            )
+            base['spectral_rqi']    = srqi
+            base['dominant_freq_hz'] = dom_freq   # Hz; ×60 = breaths/min
+
+        except Exception:
+            pass  # leave NaN defaults
+
+    # ── AC RQI + dominant period ──────────────────────────
+    try:
+        ac_rqi, dom_period = _autocorrelation_rqi(sig, fs)
+        base['ac_rqi']             = ac_rqi
+        # 2. Dominant period
+        base['dominant_period_sec'] = dom_period  # s; 1/period = freq in Hz
+    except Exception:
+        pass
+
+    # ── Rate / BBI features (only if peaks were found) ────
+    if len(peaks) < 2:
+        return base
+
+    bbi      = np.diff(peaks) / fs                         # seconds
+    bbi_valid = bbi[(bbi > 0.5) & (bbi < 20.0)]            # 3–120 brpm
+    if len(bbi_valid) == 0:
+        bbi_valid = bbi                                      # use all if filter empties
+
+    resp_rate = 60.0 / bbi_valid
+
+    # 1. Respiration rate
+    base['resp_rate_mean']   = float(np.mean(resp_rate))
+    base['resp_rate_std']    = float(np.std(resp_rate))
+    base['resp_rate_min']    = float(np.min(resp_rate))
+    base['resp_rate_max']    = float(np.max(resp_rate))
+    base['resp_rate_median'] = float(np.median(resp_rate))
+
+    # BBI
+    base['bbi_mean'] = float(np.mean(bbi_valid))
+    base['bbi_std']  = float(np.std(bbi_valid))
+    base['bbi_cv']   = float(
+        np.std(bbi_valid) / max(np.mean(bbi_valid), 1e-8)
+    )
+
+    if len(bbi_valid) > 1:
+        diff_bbi        = np.diff(bbi_valid)
+        base['bbi_rmssd'] = float(np.sqrt(np.mean(diff_bbi ** 2)))
+
+    # Peak amplitude
+    valid_pk = peaks[(peaks >= 0) & (peaks < len(sig))]
+    if len(valid_pk) > 0:
+        base['peak_amp_mean'] = float(np.mean(sig[valid_pk]))
+        base['peak_amp_std']  = float(np.std(sig[valid_pk]))
+
+    return base
+
+
+# ═══════════════════════════════════════════════════════════════
+#  6. SINGLE-SIGNAL SEGMENT EXTRACTION (for modality comparison)
+# ═══════════════════════════════════════════════════════════════
+
+def extract_segment_rr_sequence(segment, fs=250):
+    """
+    Extract full beat-to-beat RR sequence from one segment.
+
+    Used by pair_rr_sequences() for beat-level correlation analysis.
+    Uses the centralised _get_clean_r_peaks() to avoid duplication.
+
+    Returns
+    -------
+    dict or None
     """
     sig = np.array(segment, dtype=np.float64).flatten()
 
     if len(sig) < fs:
         return None
 
-    features = {}
+    r_peaks, method = _get_clean_r_peaks(sig, fs)
 
-    try:
-        # Try AMPD first, fallback to MSPTD, then simple
-        peaks = np.array([], dtype=int)
-        method = "none"
+    if len(r_peaks) < 2:
+        return dict(r_peaks=np.array([], dtype=int),
+                    rr_ms=np.array([]), hr_bpm=np.array([]),
+                    n_beats=len(r_peaks), peak_method=method, valid=False)
 
-        try:
-            peaks_ampd = ampd(sig, fs)
-            peaks_ampd = np.array(peaks_ampd, dtype=int)
-            peaks_ampd = peaks_ampd[(peaks_ampd >= 0) & (peaks_ampd < len(sig))]
-            if len(peaks_ampd) >= 2:
-                peaks = peaks_ampd
-                method = "ampd"
-        except Exception:
-            pass
+    rr_ms  = np.diff(r_peaks) / fs * 1000.0
+    hr_bpm = 60000.0 / rr_ms
+    valid  = (hr_bpm >= 30) & (hr_bpm <= 220)
+    rr_ms  = rr_ms[valid]
+    hr_bpm = hr_bpm[valid]
 
-        if len(peaks) < 2:
-            try:
-                peaks_msptd = msptd(sig, fs)
-                peaks_msptd = np.array(peaks_msptd, dtype=int)
-                peaks_msptd = peaks_msptd[
-                    (peaks_msptd >= 0) & (peaks_msptd < len(sig))
-                ]
-                if len(peaks_msptd) >= 2:
-                    peaks = peaks_msptd
-                    method = "msptd"
-            except Exception:
-                pass
-
-        if len(peaks) < 2:
-            try:
-                min_dist = int(fs * 1.0)  # Min 1 second between breaths
-                height_thr = np.mean(sig) + 0.3 * np.std(sig)
-                peaks_simple, _ = find_peaks(sig, height=height_thr,
-                                             distance=min_dist)
-                if len(peaks_simple) >= 2:
-                    peaks = peaks_simple
-                    method = "simple_threshold"
-            except Exception:
-                pass
-
-        features['peak_method'] = method
-
-        if len(peaks) < 2:
-            # Return signal-level features only
-            features['n_breaths'] = len(peaks)
-            features['signal_mean'] = float(np.mean(sig))
-            features['signal_std'] = float(np.std(sig))
-            features['signal_rms'] = float(np.sqrt(np.mean(sig ** 2)))
-            features['resp_rate_mean'] = float('nan')
-            features['bbi_mean'] = float('nan')
-            return features
-
-        # Breath-to-breath intervals
-        bbi = np.diff(peaks) / fs  # seconds
-
-        # Relaxed validity: 0.5s to 20s (3–120 breaths/min)
-        bbi_valid = bbi[(bbi > 0.5) & (bbi < 20.0)]
-
-        if len(bbi_valid) == 0:
-            bbi_valid = bbi  # Use all if filter removes everything
-
-        # Respiratory rate
-        resp_rate = 60.0 / bbi_valid
-        features['resp_rate_mean'] = float(np.mean(resp_rate))
-        features['resp_rate_std'] = float(np.std(resp_rate))
-        features['resp_rate_min'] = float(np.min(resp_rate))
-        features['resp_rate_max'] = float(np.max(resp_rate))
-        features['resp_rate_median'] = float(np.median(resp_rate))
-
-        # BBI features
-        features['bbi_mean'] = float(np.mean(bbi_valid))
-        features['bbi_std'] = float(np.std(bbi_valid))
-        features['bbi_cv'] = float(
-            np.std(bbi_valid) / max(np.mean(bbi_valid), 1e-8)
-        )
-
-        if len(bbi_valid) > 1:
-            diff_bbi = np.diff(bbi_valid)
-            features['bbi_rmssd'] = float(np.sqrt(np.mean(diff_bbi ** 2)))
-        else:
-            features['bbi_rmssd'] = 0.0
-
-        # Peak amplitude
-        valid_peaks = peaks[(peaks >= 0) & (peaks < len(sig))]
-        if len(valid_peaks) > 0:
-            features['peak_amp_mean'] = float(np.mean(sig[valid_peaks]))
-            features['peak_amp_std'] = float(np.std(sig[valid_peaks]))
-
-        # Peak count
-        features['n_breaths'] = len(peaks)
-
-        # Signal statistics
-        features['signal_mean'] = float(np.mean(sig))
-        features['signal_std'] = float(np.std(sig))
-        features['signal_rms'] = float(np.sqrt(np.mean(sig ** 2)))
-
-        return features
-
-    except Exception:
-        try:
-            return {
-                'n_breaths': 0,
-                'peak_method': 'failed',
-                'signal_mean': float(np.mean(sig)),
-                'signal_std': float(np.std(sig)),
-                'signal_rms': float(np.sqrt(np.mean(sig ** 2))),
-                'resp_rate_mean': float('nan'),
-                'bbi_mean': float('nan'),
-            }
-        except Exception:
-            return None
-
-
-# ═══════════════════════════════════════════════════════════════
-#  2. SEGMENTATION ENGINE (FIXED)
-# ═══════════════════════════════════════════════════════════════
-
-def segment_and_extract(dev_signal, ref_signal, fs=250,
-                        window_sec=10, signal_type="ecg"):
-    """
-    Segment device and reference signals, extract features per segment.
-
-    Key fix: segments where only signal-level features could be extracted
-    (peak detection failed) are still kept — they just have NaN for
-    peak-derived features. This maximises paired segment count.
-
-    Parameters
-    ----------
-    dev_signal : np.ndarray
-        Device signal.
-    ref_signal : np.ndarray
-        Reference signal.
-    fs : int
-        Sampling frequency.
-    window_sec : float
-        Segment window size in seconds (default 10, adjustable).
-    signal_type : str
-        "ecg" or "respiration".
-
-    Returns
-    -------
-    dev_df : pd.DataFrame
-    ref_df : pd.DataFrame
-    paired_df : pd.DataFrame
-    """
-    dev_sig = np.array(dev_signal, dtype=np.float64).flatten()
-    ref_sig = np.array(ref_signal, dtype=np.float64).flatten()
-
-    window_samples = int(window_sec * fs)
-
-    min_len = min(len(dev_sig), len(ref_sig))
-    dev_sig = dev_sig[:min_len]
-    ref_sig = ref_sig[:min_len]
-
-    n_segments = min_len // window_samples
-
-    if n_segments == 0:
-        print(f"    [WARNING] Signals too short for {window_sec}s segments "
-              f"(length={min_len} samples = {min_len / fs:.1f}s)")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
-    if signal_type == "ecg":
-        extract_fn = extract_segment_ecg_features
-    else:
-        extract_fn = extract_segment_resp_features
-
-    dev_rows = []
-    ref_rows = []
-    fail_log = {'dev_fail': 0, 'ref_fail': 0}
-
-    for i in range(n_segments):
-        start = i * window_samples
-        end = start + window_samples
-
-        dev_seg = dev_sig[start:end]
-        ref_seg = ref_sig[start:end]
-
-        seg_info = {
-            'segment': i,
-            'start_sec': start / fs,
-            'end_sec': end / fs,
-        }
-
-        dev_feats = extract_fn(dev_seg, fs)
-        ref_feats = extract_fn(ref_seg, fs)
-
-        # Always add segment if extraction returned anything (even partial)
-        if dev_feats is not None:
-            dev_feats.update(seg_info)
-            dev_rows.append(dev_feats)
-        else:
-            fail_log['dev_fail'] += 1
-
-        if ref_feats is not None:
-            ref_feats.update(seg_info)
-            ref_rows.append(ref_feats)
-        else:
-            fail_log['ref_fail'] += 1
-
-    dev_df = pd.DataFrame(dev_rows)
-    ref_df = pd.DataFrame(ref_rows)
-
-    # Pair by segment index
-    if len(dev_df) > 0 and len(ref_df) > 0:
-        common_segments = set(dev_df['segment']) & set(ref_df['segment'])
-        dev_paired = (dev_df[dev_df['segment'].isin(common_segments)]
-                      .sort_values('segment').reset_index(drop=True))
-        ref_paired = (ref_df[ref_df['segment'].isin(common_segments)]
-                      .sort_values('segment').reset_index(drop=True))
-
-        paired_df = pd.DataFrame()
-        paired_df['segment'] = dev_paired['segment'].values
-        paired_df['start_sec'] = dev_paired['start_sec'].values
-        paired_df['end_sec'] = dev_paired['end_sec'].values
-
-        meta_cols = {'segment', 'start_sec', 'end_sec', 'peak_method'}
-        feat_cols = [c for c in dev_paired.columns if c not in meta_cols]
-
-        # Store peak methods used
-        if 'peak_method' in dev_paired.columns:
-            paired_df['dev_peak_method'] = dev_paired['peak_method'].values
-        if 'peak_method' in ref_paired.columns:
-            paired_df['ref_peak_method'] = ref_paired['peak_method'].values
-
-        for col in feat_cols:
-            if col in dev_paired.columns and col in ref_paired.columns:
-                dev_vals = pd.to_numeric(
-                    dev_paired[col], errors='coerce'
-                ).values
-                ref_vals = pd.to_numeric(
-                    ref_paired[col], errors='coerce'
-                ).values
-
-                paired_df[f'dev_{col}'] = dev_vals
-                paired_df[f'ref_{col}'] = ref_vals
-                paired_df[f'diff_{col}'] = dev_vals - ref_vals
-
-                denom = np.where(
-                    np.abs(ref_vals) > 1e-10, np.abs(ref_vals), 1e-10
-                )
-                paired_df[f'pct_diff_{col}'] = (
-                    np.abs(dev_vals - ref_vals) / denom * 100
-                )
-    else:
-        paired_df = pd.DataFrame()
-
-    print(f"    Segments: {n_segments} total | "
-          f"Dev valid: {len(dev_df)} (fail: {fail_log['dev_fail']}) | "
-          f"Ref valid: {len(ref_df)} (fail: {fail_log['ref_fail']}) | "
-          f"Paired: {len(paired_df)}")
-
-    if fail_log['dev_fail'] > 0 or fail_log['ref_fail'] > 0:
-        if len(dev_df) > 0 and 'peak_method' in dev_df.columns:
-            methods = dev_df['peak_method'].value_counts().to_dict()
-            print(f"    Dev peak methods: {methods}")
-        if len(ref_df) > 0 and 'peak_method' in ref_df.columns:
-            methods = ref_df['peak_method'].value_counts().to_dict()
-            print(f"    Ref peak methods: {methods}")
-    
-    # ── Weighted-average signal quality across all segments ──────
-    # Weight = per-segment energy (higher-energy segments contribute more).
-    # Stored as single-row summary DataFrames and as scalar attributes on
-    # the paired DataFrame so they land in the CSV automatically.
-
-    def _weighted_avg(df, value_col, weight_col='signal_energy'):
-        """Energy-weighted mean; returns NaN if data are missing."""
-        if df is None or len(df) == 0:
-            return float('nan')
-        if value_col not in df.columns or weight_col not in df.columns:
-            return float('nan')
-        v = pd.to_numeric(df[value_col], errors='coerce')
-        w = pd.to_numeric(df[weight_col], errors='coerce')
-        mask = v.notna() & w.notna() & (w > 0)
-        if mask.sum() == 0:
-            return float('nan')
-        return float(np.average(v[mask], weights=w[mask]))
-
-    dev_wt_kurt  = _weighted_avg(dev_df,  'signal_kurtosis')
-    dev_wt_skew  = _weighted_avg(dev_df,  'signal_skewness')
-    ref_wt_kurt  = _weighted_avg(ref_df,  'signal_kurtosis')
-    ref_wt_skew  = _weighted_avg(ref_df,  'signal_skewness')
-
-    # Attach as extra summary columns to paired_df so a single CSV row
-    # carries the whole-signal weighted averages alongside segment data.
-    # A NaN-filled column is used so row count stays the same.
-    if len(paired_df) > 0:
-        paired_df['dev_weighted_kurtosis'] = float('nan')
-        paired_df['dev_weighted_skewness'] = float('nan')
-        paired_df['ref_weighted_kurtosis'] = float('nan')
-        paired_df['ref_weighted_skewness'] = float('nan')
-
-        # Write weighted values only in the first row (clearly labelled).
-        # All other rows stay NaN — avoids misleading repeated values.
-        paired_df.loc[0, 'dev_weighted_kurtosis'] = dev_wt_kurt
-        paired_df.loc[0, 'dev_weighted_skewness'] = dev_wt_skew
-        paired_df.loc[0, 'ref_weighted_kurtosis'] = ref_wt_kurt
-        paired_df.loc[0, 'ref_weighted_skewness'] = ref_wt_skew
-
-    print(f"    Weighted kurtosis — Dev: {dev_wt_kurt:.4f}  "
-        f"Ref: {ref_wt_kurt:.4f}")
-    print(f"    Weighted skewness — Dev: {dev_wt_skew:.4f}  "
-        f"Ref: {ref_wt_skew:.4f}")
-    
-    return dev_df, ref_df, paired_df
+    return dict(r_peaks=r_peaks, rr_ms=rr_ms, hr_bpm=hr_bpm,
+                n_beats=len(r_peaks), peak_method=method,
+                valid=len(rr_ms) > 0)
 
 
 def segment_and_extract_single(signal, fs=250, window_sec=10,
@@ -751,105 +974,401 @@ def segment_and_extract_single(signal, fs=250, window_sec=10,
     """
     Segment a single signal and extract features per segment.
 
-    Used for multi-modal comparison where we don't have paired
-    device/reference, just multiple modality signals.
-
-    Parameters
-    ----------
-    signal : np.ndarray
-    fs : int
-    window_sec : float
-    signal_type : str
-
-    Returns
-    -------
-    pd.DataFrame
-        Features per segment.
+    Used for multi-modal comparison (no reference pairing).
     """
-    sig = np.array(signal, dtype=np.float64).flatten()
+    sig            = np.array(signal, dtype=np.float64).flatten()
     window_samples = int(window_sec * fs)
-    n_segments = len(sig) // window_samples
+    n_segments     = len(sig) // window_samples
 
     if n_segments == 0:
         return pd.DataFrame()
 
-    if signal_type == "ecg":
-        extract_fn = extract_segment_ecg_features
-    else:
-        extract_fn = extract_segment_resp_features
+    extract_fn = (extract_segment_ecg_features
+                  if signal_type == "ecg"
+                  else extract_segment_resp_features)
 
     rows = []
     for i in range(n_segments):
         start = i * window_samples
-        end = start + window_samples
-        seg = sig[start:end]
-
-        feats = extract_fn(seg, fs)
+        feats = extract_fn(sig[start: start + window_samples], fs)
         if feats is not None:
-            feats['segment'] = i
-            feats['start_sec'] = start / fs
-            feats['end_sec'] = end / fs
+            feats.update(segment=i,
+                         start_sec=start / fs,
+                         end_sec=(start + window_samples) / fs)
             rows.append(feats)
 
     return pd.DataFrame(rows)
 
 
 # ═══════════════════════════════════════════════════════════════
-#  3. MULTI-MODAL RESPIRATION COMPARISON
+#  7. PAIRED SEGMENTATION ENGINE
+# ═══════════════════════════════════════════════════════════════
+
+def segment_and_extract(dev_signal, ref_signal, fs=250,
+                        window_sec=10, signal_type="ecg",
+                        ac_rqi_min=0.25):
+    """
+    Segment both signals, extract features, and pair by segment index.
+
+    Key behaviours
+    --------------
+    - Segments with failed peak detection are retained (NaN features),
+      maximising paired segment count for signal-level comparisons.
+    - For ECG: R-peak timing errors and sensitivity are computed per
+      paired segment and appended to paired_df.
+    - For respiration: segments below ac_rqi_min on either side are
+      flagged with quality_gate_pass=0 and excluded from paired_df_clean.
+    - Energy-weighted kurtosis/skewness are written to row 0 of
+      paired_df for whole-recording quality assessment.
+
+    Parameters
+    ----------
+    dev_signal  : np.ndarray
+    ref_signal  : np.ndarray
+    fs          : int
+    window_sec  : float
+    signal_type : str   "ecg" or "respiration"
+    ac_rqi_min  : float Minimum AC RQI for quality gate (resp only).
+                        Pass None to disable.
+
+    Returns
+    -------
+    dev_df, ref_df, paired_df : pd.DataFrame
+    """
+    dev_sig = np.array(dev_signal, dtype=np.float64).flatten()
+    ref_sig = np.array(ref_signal, dtype=np.float64).flatten()
+
+    window_samples = int(window_sec * fs)
+    min_len        = min(len(dev_sig), len(ref_sig))
+    dev_sig        = dev_sig[:min_len]
+    ref_sig        = ref_sig[:min_len]
+    n_segments     = min_len // window_samples
+
+    if n_segments == 0:
+        print(f"    [WARNING] Signals too short for {window_sec}s segments "
+              f"(length={min_len} samples = {min_len / fs:.1f}s)")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    extract_fn = (extract_segment_ecg_features
+                  if signal_type == "ecg"
+                  else extract_segment_resp_features)
+
+    dev_rows, ref_rows = [], []
+    fail_log = {'dev_fail': 0, 'ref_fail': 0}
+
+    for i in range(n_segments):
+        start = i * window_samples
+        end   = start + window_samples
+        info  = dict(segment=i, start_sec=start / fs, end_sec=end / fs)
+
+        df = extract_fn(dev_sig[start:end], fs)
+        if df is not None:
+            df.update(info); dev_rows.append(df)
+        else:
+            fail_log['dev_fail'] += 1
+
+        rf = extract_fn(ref_sig[start:end], fs)
+        if rf is not None:
+            rf.update(info); ref_rows.append(rf)
+        else:
+            fail_log['ref_fail'] += 1
+
+    dev_df = pd.DataFrame(dev_rows)
+    ref_df = pd.DataFrame(ref_rows)
+
+    # ── Build paired DataFrame ────────────────────────────
+    if len(dev_df) == 0 or len(ref_df) == 0:
+        return dev_df, ref_df, pd.DataFrame()
+
+    common  = set(dev_df['segment']) & set(ref_df['segment'])
+    dev_p   = (dev_df[dev_df['segment'].isin(common)]
+               .sort_values('segment').reset_index(drop=True))
+    ref_p   = (ref_df[ref_df['segment'].isin(common)]
+               .sort_values('segment').reset_index(drop=True))
+
+    paired_df           = pd.DataFrame()
+    paired_df['segment']   = dev_p['segment'].values
+    paired_df['start_sec'] = dev_p['start_sec'].values
+    paired_df['end_sec']   = dev_p['end_sec'].values
+
+    if 'peak_method' in dev_p.columns:
+        paired_df['dev_peak_method'] = dev_p['peak_method'].values
+    if 'peak_method' in ref_p.columns:
+        paired_df['ref_peak_method'] = ref_p['peak_method'].values
+
+    meta_cols = {'segment', 'start_sec', 'end_sec', 'peak_method'}
+    feat_cols = [c for c in dev_p.columns if c not in meta_cols]
+
+    for col in feat_cols:
+        if col not in ref_p.columns:
+            continue
+        dv = pd.to_numeric(dev_p[col], errors='coerce').values
+        rv = pd.to_numeric(ref_p[col], errors='coerce').values
+
+        paired_df[f'dev_{col}'] = dv
+        paired_df[f'ref_{col}'] = rv
+        paired_df[f'diff_{col}'] = dv - rv
+
+        denom = np.where(np.abs(rv) > 1e-10, np.abs(rv), 1e-10)
+        paired_df[f'pct_diff_{col}'] = np.abs(dv - rv) / denom * 100
+
+    # ── ECG: per-segment R-peak timing errors + sensitivity ─
+    if signal_type == "ecg" and len(paired_df) > 0:
+        te_rows = []
+        for _, row in paired_df.iterrows():
+            idx   = int(row['segment'])
+            start = idx * window_samples
+            end   = start + window_samples
+
+            dp, _ = _get_clean_r_peaks(dev_sig[start:end], fs)
+            rp, _ = _get_clean_r_peaks(ref_sig[start:end], fs)
+            te    = compute_r_peak_timing_error(dp, rp, fs)
+
+            te_rows.append(dict(
+                rp_mae_ms      = te['mae_ms'],
+                rp_me_ms       = te['me_ms'],
+                rp_std_ms      = te['std_ms'],
+                rp_rmse_ms     = te['rmse_ms'],
+                # 3. R-peak sensitivity (TP / (TP + FN)) per segment
+                rp_sensitivity = te['sensitivity'],
+                rp_ppv         = te['ppv'],
+                rp_f1          = te['f1'],
+                rp_n_matched   = te['n_matched'],
+                rp_n_missed    = te['n_missed'],
+                rp_n_extra     = te['n_extra'],
+            ))
+
+        te_df = pd.DataFrame(te_rows)
+        for col in te_df.columns:
+            paired_df[col] = te_df[col].values
+
+    # ── Respiration: AC RQI quality gate ──────────────────
+    if (signal_type == "respiration"
+            and ac_rqi_min is not None
+            and len(paired_df) > 0):
+
+        dev_ac = pd.to_numeric(
+            paired_df.get('dev_ac_rqi',
+                          pd.Series([float('nan')] * len(paired_df))),
+            errors='coerce'
+        )
+        ref_ac = pd.to_numeric(
+            paired_df.get('ref_ac_rqi',
+                          pd.Series([float('nan')] * len(paired_df))),
+            errors='coerce'
+        )
+
+        paired_df['quality_gate_pass'] = (
+            (dev_ac >= ac_rqi_min) & (ref_ac >= ac_rqi_min)
+        ).astype(int)
+
+        n_before   = len(paired_df)
+        n_excluded = int((paired_df['quality_gate_pass'] == 0).sum())
+
+        if n_excluded > 0:
+            print(f"    [QUALITY GATE] ac_rqi_min={ac_rqi_min}: "
+                  f"excluded {n_excluded}/{n_before} segments")
+            paired_df_clean = (paired_df[paired_df['quality_gate_pass'] == 1]
+                               .reset_index(drop=True))
+            print(f"    [QUALITY GATE] {len(paired_df_clean)} segments remain")
+        else:
+            paired_df_clean = paired_df.copy()
+            print(f"    [QUALITY GATE] All {n_before} segments pass")
+
+        paired_df.attrs['paired_df_clean'] = paired_df_clean
+
+    # ── Energy-weighted signal quality summary ─────────────
+    def _weighted_avg(df, value_col, weight_col='signal_energy'):
+        if df is None or len(df) == 0:
+            return float('nan')
+        if value_col not in df.columns or weight_col not in df.columns:
+            return float('nan')
+        v = pd.to_numeric(df[value_col], errors='coerce')
+        w = pd.to_numeric(df[weight_col], errors='coerce')
+        mask = v.notna() & w.notna() & (w > 0)
+        if not mask.any():
+            return float('nan')
+        return float(np.average(v[mask], weights=w[mask]))
+
+    dev_wt_kurt = _weighted_avg(dev_df, 'signal_kurtosis')
+    dev_wt_skew = _weighted_avg(dev_df, 'signal_skewness')
+    ref_wt_kurt = _weighted_avg(ref_df, 'signal_kurtosis')
+    ref_wt_skew = _weighted_avg(ref_df, 'signal_skewness')
+
+    if len(paired_df) > 0:
+        for col, val in [('dev_weighted_kurtosis', dev_wt_kurt),
+                         ('dev_weighted_skewness', dev_wt_skew),
+                         ('ref_weighted_kurtosis', ref_wt_kurt),
+                         ('ref_weighted_skewness', ref_wt_skew)]:
+            paired_df[col] = float('nan')
+            paired_df.loc[0, col] = val
+
+    print(f"    Segments: {n_segments} total | "
+          f"Dev: {len(dev_df)} (fail: {fail_log['dev_fail']}) | "
+          f"Ref: {len(ref_df)} (fail: {fail_log['ref_fail']}) | "
+          f"Paired: {len(paired_df)}")
+    print(f"    Weighted kurtosis — Dev: {dev_wt_kurt:.4f}  "
+          f"Ref: {ref_wt_kurt:.4f}")
+    print(f"    Weighted skewness — Dev: {dev_wt_skew:.4f}  "
+          f"Ref: {ref_wt_skew:.4f}")
+
+    return dev_df, ref_df, paired_df
+
+
+# ═══════════════════════════════════════════════════════════════
+#  8. BEAT-LEVEL RR PAIRING
+# ═══════════════════════════════════════════════════════════════
+
+def pair_rr_sequences(dev_signal, ref_signal, fs=250,
+                      window_sec=10, timing_tolerance_ms=150):
+    """
+    Extract and pair beat-to-beat RR intervals across all segments.
+
+    Uses _get_clean_r_peaks() centrally — no local duplication.
+
+    Returns
+    -------
+    paired_beats : pd.DataFrame
+    summary      : dict
+    """
+    dev_sig = np.array(dev_signal, dtype=np.float64).flatten()
+    ref_sig = np.array(ref_signal, dtype=np.float64).flatten()
+
+    window_samples    = int(window_sec * fs)
+    tol_samples       = int(timing_tolerance_ms / 1000.0 * fs)
+    min_len           = min(len(dev_sig), len(ref_sig))
+    dev_sig           = dev_sig[:min_len]
+    ref_sig           = ref_sig[:min_len]
+    n_segments        = min_len // window_samples
+
+    rows = []
+
+    for i in range(n_segments):
+        start = i * window_samples
+        end   = start + window_samples
+
+        dev_res = extract_segment_rr_sequence(dev_sig[start:end], fs)
+        ref_res = extract_segment_rr_sequence(ref_sig[start:end], fs)
+
+        if (dev_res is None or ref_res is None
+                or not dev_res['valid'] or not ref_res['valid']):
+            continue
+
+        dev_pk = dev_res['r_peaks']
+        ref_pk = ref_res['r_peaks']
+
+        used_ref = np.zeros(len(ref_pk), dtype=bool)
+        beat_idx = 0
+
+        for dp_i, dp in enumerate(dev_pk):
+            diffs              = np.abs(ref_pk - dp).astype(float)
+            diffs[used_ref]    = np.inf
+            nearest            = int(np.argmin(diffs))
+
+            if diffs[nearest] > tol_samples:
+                continue
+
+            used_ref[nearest] = True
+
+            if dp_i == 0 or nearest == 0:
+                continue
+
+            dev_rr = (dev_pk[dp_i] - dev_pk[dp_i - 1]) / fs * 1000.0
+            ref_rr = (ref_pk[nearest] - ref_pk[nearest - 1]) / fs * 1000.0
+
+            if not (136 < dev_rr < 2000 and 136 < ref_rr < 2000):
+                continue
+
+            rows.append(dict(
+                segment         = i,
+                beat_idx        = beat_idx,
+                dev_rr_ms       = dev_rr,
+                ref_rr_ms       = ref_rr,
+                diff_rr_ms      = dev_rr - ref_rr,
+                dev_hr_bpm      = 60000.0 / dev_rr,
+                ref_hr_bpm      = 60000.0 / ref_rr,
+                timing_error_ms = (dp - ref_pk[nearest]) / fs * 1000.0,
+            ))
+            beat_idx += 1
+
+    paired_beats = pd.DataFrame(rows)
+
+    if len(paired_beats) == 0:
+        return paired_beats, {}
+
+    dv   = paired_beats['dev_rr_ms'].values
+    rv   = paired_beats['ref_rr_ms'].values
+    diff = paired_beats['diff_rr_ms'].values
+    te   = paired_beats['timing_error_ms'].values
+
+    try:
+        r_p, p_p   = pearsonr(dv, rv)
+        r_sp, p_sp = spearmanr(dv, rv)
+    except Exception:
+        r_p = r_sp = p_p = p_sp = float('nan')
+
+    summary = dict(
+        n_matched_beats = len(paired_beats),
+        n_segments      = n_segments,
+        pearson_r       = float(r_p),
+        pearson_p       = float(p_p),
+        spearman_r      = float(r_sp),
+        spearman_p      = float(p_sp),
+        mean_rr_dev_ms  = float(np.mean(dv)),
+        mean_rr_ref_ms  = float(np.mean(rv)),
+        bias_ms         = float(np.mean(diff)),
+        std_diff_ms     = float(np.std(diff)),
+        loa_upper_ms    = float(np.mean(diff) + 1.96 * np.std(diff)),
+        loa_lower_ms    = float(np.mean(diff) - 1.96 * np.std(diff)),
+        mae_rr_ms       = float(np.mean(np.abs(diff))),
+        rmse_rr_ms      = float(np.sqrt(np.mean(diff ** 2))),
+        timing_mae_ms   = float(np.mean(np.abs(te))),
+        timing_bias_ms  = float(np.mean(te)),
+    )
+
+    return paired_beats, summary
+
+
+# ═══════════════════════════════════════════════════════════════
+#  9. MULTI-MODAL RESPIRATION COMPARISON
 # ═══════════════════════════════════════════════════════════════
 
 def compare_resp_modalities(dev_preprocessed, fs=250, window_sec=10,
                             output_dir="outputs/comparison"):
     """
-    Compare respiration derived from impedance pneumography, RMS
-    accelerometer, and RMS gyroscope (ribs + chest).
+    Compare impedance pneumography, PCA-ACC, and PCA-GYR (ribs + chest).
 
-    Performs pairwise comparison of all available modalities.
-
-    Parameters
-    ----------
-    dev_preprocessed : dict
-        All preprocessed device signals.
-    fs : int
-        Sampling frequency.
-    window_sec : float
-        Segment window size in seconds.
-    output_dir : str
-
-    Returns
-    -------
-    modality_results : dict
-        Contains per-modality DataFrames and pairwise comparisons.
+    Uses resp_window_sec = max(30, window_sec) for reliable
+    frequency-domain metrics (Δf ≤ 0.033 Hz).
     """
-    tables_dir = os.path.join(output_dir, "tables", "resp_modality")
+    tables_dir  = os.path.join(output_dir, "tables", "resp_modality")
     reports_dir = os.path.join(output_dir, "reports")
-    plots_dir = os.path.join(output_dir, "plots", "resp_modality")
-    _ensure_dir(tables_dir)
-    _ensure_dir(reports_dir)
-    _ensure_dir(plots_dir)
+    plots_dir   = os.path.join(output_dir, "plots",  "resp_modality")
+    _ensure_dir(tables_dir); _ensure_dir(reports_dir); _ensure_dir(plots_dir)
 
     print("\n" + "=" * 60)
     print(f"[RESP MODALITY] Multi-Modal Respiration Comparison "
           f"({window_sec}s windows)")
     print("=" * 60)
 
-    # Prepare all modality signals
     modality_signals = prepare_resp_modality_signals(dev_preprocessed, fs)
-
-    available = list(modality_signals.keys())
+    available        = list(modality_signals.keys())
     print(f"  Available modalities: {available}")
 
     if len(available) < 2:
         print("  [SKIP] Need at least 2 modalities for comparison")
         return {}
 
-    # Extract features per modality
+    resp_window_sec = max(30, window_sec)
+    if resp_window_sec != window_sec:
+        print(f"  [INFO] Modality window: {window_sec}s → {resp_window_sec}s")
+
     modality_dfs = {}
     for name in available:
         print(f"\n  Extracting features: {name}")
         df = segment_and_extract_single(
             modality_signals[name], fs=fs,
-            window_sec=window_sec, signal_type="respiration"
+            window_sec=resp_window_sec, signal_type="respiration"
         )
         modality_dfs[name] = df
         print(f"    Valid segments: {len(df)}")
@@ -859,131 +1378,104 @@ def compare_resp_modalities(dev_preprocessed, fs=250, window_sec=10,
             df.to_csv(path, index=False)
             print(f"    [TABLE] {path}")
 
-    # Pairwise comparisons
     pairwise_results = {}
+    meta_cols = {'segment', 'start_sec', 'end_sec', 'peak_method'}
 
     for mod_a, mod_b in combinations(available, 2):
         pair_name = f"{mod_a}_vs_{mod_b}"
         print(f"\n  Pairwise: {pair_name}")
 
-        df_a = modality_dfs[mod_a]
-        df_b = modality_dfs[mod_b]
+        df_a, df_b = modality_dfs[mod_a], modality_dfs[mod_b]
 
         if len(df_a) == 0 or len(df_b) == 0:
-            print(f"    [SKIP] Empty DataFrame(s)")
-            continue
+            print("    [SKIP] Empty DataFrame(s)"); continue
 
-        # Find common segments
         common = set(df_a['segment']) & set(df_b['segment'])
-        if len(common) == 0:
-            print(f"    [SKIP] No common segments")
-            continue
+        if not common:
+            print("    [SKIP] No common segments"); continue
 
-        a_paired = (df_a[df_a['segment'].isin(common)]
-                    .sort_values('segment').reset_index(drop=True))
-        b_paired = (df_b[df_b['segment'].isin(common)]
-                    .sort_values('segment').reset_index(drop=True))
+        a_p = (df_a[df_a['segment'].isin(common)]
+               .sort_values('segment').reset_index(drop=True))
+        b_p = (df_b[df_b['segment'].isin(common)]
+               .sort_values('segment').reset_index(drop=True))
 
-        # Build paired DataFrame
-        paired_df = pd.DataFrame()
-        paired_df['segment'] = a_paired['segment'].values
-        paired_df['start_sec'] = a_paired['start_sec'].values
-        paired_df['end_sec'] = a_paired['end_sec'].values
+        paired_df = pd.DataFrame({
+            'segment':   a_p['segment'].values,
+            'start_sec': a_p['start_sec'].values,
+            'end_sec':   a_p['end_sec'].values,
+        })
 
-        meta_cols = {'segment', 'start_sec', 'end_sec', 'peak_method'}
-        feat_cols = [c for c in a_paired.columns if c not in meta_cols]
+        for col in [c for c in a_p.columns if c not in meta_cols]:
+            if col not in b_p.columns:
+                continue
+            av = pd.to_numeric(a_p[col], errors='coerce').values
+            bv = pd.to_numeric(b_p[col], errors='coerce').values
+            paired_df[f'{mod_a}_{col}'] = av
+            paired_df[f'{mod_b}_{col}'] = bv
+            paired_df[f'diff_{col}']    = av - bv
+            denom = np.where(np.abs(bv) > 1e-10, np.abs(bv), 1e-10)
+            paired_df[f'pct_diff_{col}'] = np.abs(av - bv) / denom * 100
 
-        for col in feat_cols:
-            if col in a_paired.columns and col in b_paired.columns:
-                a_vals = pd.to_numeric(
-                    a_paired[col], errors='coerce'
-                ).values
-                b_vals = pd.to_numeric(
-                    b_paired[col], errors='coerce'
-                ).values
-
-                paired_df[f'{mod_a}_{col}'] = a_vals
-                paired_df[f'{mod_b}_{col}'] = b_vals
-                paired_df[f'diff_{col}'] = a_vals - b_vals
-
-                denom = np.where(
-                    np.abs(b_vals) > 1e-10, np.abs(b_vals), 1e-10
-                )
-                paired_df[f'pct_diff_{col}'] = (
-                    np.abs(a_vals - b_vals) / denom * 100
-                )
-
-        pairwise_results[pair_name] = {
-            'mod_a': mod_a,
-            'mod_b': mod_b,
-            'paired_df': paired_df,
-            'n_paired': len(paired_df),
-        }
-
+        pairwise_results[pair_name] = dict(
+            mod_a=mod_a, mod_b=mod_b,
+            paired_df=paired_df, n_paired=len(paired_df),
+        )
         print(f"    Paired segments: {len(paired_df)}")
 
-        # Export paired table
         path = os.path.join(tables_dir, f"{pair_name}_paired.csv")
         paired_df.to_csv(path, index=False)
         print(f"    [TABLE] {path}")
 
-    # Generate plots
     _plot_resp_modality_comparison(
         modality_dfs, pairwise_results, modality_signals,
         fs=fs, window_sec=window_sec, output_dir=plots_dir
     )
-
-    # Generate report
     _export_resp_modality_report(
         modality_dfs, pairwise_results,
         window_sec=window_sec, output_dir=reports_dir
     )
 
-    return {
-        'modality_signals': {k: v for k, v in modality_signals.items()},
-        'modality_dfs': modality_dfs,
-        'pairwise_results': pairwise_results,
-    }
+    return dict(modality_signals=dict(modality_signals),
+                modality_dfs=modality_dfs,
+                pairwise_results=pairwise_results)
 
 
 def _plot_resp_modality_comparison(modality_dfs, pairwise_results,
-                                    modality_signals, fs=250,
-                                    window_sec=10, output_dir="."):
-    """Generate comparison plots for respiratory modalities."""
-
+                                   modality_signals, fs=250,
+                                   window_sec=10, output_dir="."):
+    """Generate signal overlay plots for respiratory modalities."""
     _ensure_dir(output_dir)
     available = [k for k, v in modality_dfs.items() if len(v) > 0]
-
     if len(available) < 2:
         return
 
-    # ── Plot 1: Signal overlay (first 30s) ──
+    colors = plt.cm.tab10(np.linspace(0, 1, len(modality_signals)))
+
+    # ── Stacked subplot overlay ───────────────────────────
     fig, axes = plt.subplots(len(modality_signals), 1,
                              figsize=(16, 3 * len(modality_signals)),
                              sharex=True)
     if len(modality_signals) == 1:
         axes = [axes]
 
-    colors = plt.cm.tab10(np.linspace(0, 1, len(modality_signals)))
-
     for idx, (name, sig) in enumerate(modality_signals.items()):
-        t = np.arange(len(sig)) / fs
+        t        = np.arange(len(sig)) / fs
         norm_sig = min_max_normalize(sig, min_val=-1.0, max_val=1.0)
         axes[idx].plot(t, norm_sig, color=colors[idx], linewidth=0.6)
         axes[idx].set_title(name, fontsize=10, fontweight='bold')
-        axes[idx].set_ylabel("Normalized")
+        axes[idx].set_ylabel("Normalised")
         axes[idx].grid(True, alpha=0.3)
         axes[idx].set_xlim(0, min(30, len(sig) / fs))
 
     axes[-1].set_xlabel("Time (s)")
-    fig.suptitle("Respiratory Modality Signals (Normalized, first 30s)",
+    fig.suptitle("Respiratory Modality Signals (Normalised, first 30s)",
                  fontsize=13, fontweight='bold')
     plt.tight_layout()
     fig.savefig(os.path.join(output_dir, "modality_signals_overlay.png"),
                 dpi=150, bbox_inches='tight')
     plt.close(fig)
 
-    # ── Plot 2: Normalized overlay on single axes ──
+    # ── Combined single-axis overlay ──────────────────────
     fig, ax = plt.subplots(figsize=(16, 5))
     min_len = min(len(s) for s in modality_signals.values())
     t = np.arange(min(min_len, 30 * fs)) / fs
@@ -993,17 +1485,16 @@ def _plot_resp_modality_comparison(modality_dfs, pairwise_results,
         ax.plot(t, norm_sig, color=colors[idx], linewidth=0.6,
                 alpha=0.7, label=name)
 
-    ax.set_title("All Respiratory Modalities — Normalized Overlay (first 30s)",
+    ax.set_title("All Respiratory Modalities — Normalised Overlay (first 30s)",
                  fontweight='bold')
     ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Normalized Amplitude [-1, 1]")
+    ax.set_ylabel("Normalised Amplitude [-1, 1]")
     ax.legend(loc='upper right', fontsize=8)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     fig.savefig(os.path.join(output_dir, "modality_overlay_combined.png"),
                 dpi=150, bbox_inches='tight')
     plt.close(fig)
-    
 
     print(f"  [PLOTS] Saved to {output_dir}")
 
@@ -1011,12 +1502,9 @@ def _plot_resp_modality_comparison(modality_dfs, pairwise_results,
 def _export_resp_modality_report(modality_dfs, pairwise_results,
                                   window_sec=10, output_dir="."):
     """Export text report for respiratory modality comparison."""
-
     _ensure_dir(output_dir)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(
-        output_dir, f"resp_modality_report_{timestamp}.txt"
-    )
+    ts       = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(output_dir, f"resp_modality_report_{ts}.txt")
 
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write("=" * 70 + "\n")
@@ -1025,71 +1513,66 @@ def _export_resp_modality_report(modality_dfs, pairwise_results,
         f.write(f"Window size: {window_sec}s\n")
         f.write("=" * 70 + "\n\n")
 
-        # Per-modality summary
-        f.write("PER-MODALITY SUMMARY\n")
-        f.write("-" * 50 + "\n\n")
-
+        f.write("PER-MODALITY SUMMARY\n" + "-" * 50 + "\n\n")
         for name, df in modality_dfs.items():
             f.write(f"  {name}:\n")
             f.write(f"    Valid segments: {len(df)}\n")
-
             if len(df) > 0 and 'resp_rate_mean' in df.columns:
                 rr = df['resp_rate_mean'].dropna()
                 if len(rr) > 0:
                     f.write(f"    Resp rate: {rr.mean():.2f} ± "
                             f"{rr.std():.2f} bpm "
                             f"[{rr.min():.1f} – {rr.max():.1f}]\n")
-
-            if len(df) > 0 and 'peak_method' in df.columns:
-                methods = df['peak_method'].value_counts().to_dict()
-                f.write(f"    Peak methods: {methods}\n")
+            if len(df) > 0 and 'spi' in df.columns:
+                spi = df['spi'].dropna()
+                if len(spi) > 0:
+                    f.write(f"    SPI: {spi.mean():.3f} ± {spi.std():.3f}\n")
+            if len(df) > 0 and 'spectral_rqi' in df.columns:
+                srqi = df['spectral_rqi'].dropna()
+                if len(srqi) > 0:
+                    f.write(f"    Spectral RQI: "
+                            f"{srqi.mean():.3f} ± {srqi.std():.3f}\n")
+            if len(df) > 0 and 'dominant_period_sec' in df.columns:
+                dp = df['dominant_period_sec'].dropna()
+                if len(dp) > 0:
+                    f.write(f"    Dominant period: "
+                            f"{dp.mean():.2f} ± {dp.std():.2f} s "
+                            f"({60 / dp.mean():.1f} brpm)\n")
             f.write("\n")
 
-        # Pairwise comparisons
-        f.write("\nPAIRWISE COMPARISONS\n")
-        f.write("-" * 50 + "\n\n")
-
+        f.write("\nPAIRWISE COMPARISONS\n" + "-" * 50 + "\n\n")
         for pair_name, result in pairwise_results.items():
             paired_df = result['paired_df']
-            mod_a = result['mod_a']
-            mod_b = result['mod_b']
-
+            mod_a, mod_b = result['mod_a'], result['mod_b']
             f.write(f"  {pair_name}\n")
             f.write(f"    Paired segments: {len(paired_df)}\n")
 
             col_a = f'{mod_a}_resp_rate_mean'
             col_b = f'{mod_b}_resp_rate_mean'
-
-            if (col_a in paired_df.columns and
-                    col_b in paired_df.columns and len(paired_df) > 0):
+            if col_a in paired_df and col_b in paired_df and len(paired_df) > 0:
                 va = paired_df[col_a].dropna()
                 vb = paired_df[col_b].dropna()
-                common_idx = va.index.intersection(vb.index)
-
-                if len(common_idx) >= 2:
-                    va = va.loc[common_idx].values
-                    vb = vb.loc[common_idx].values
-
+                idx = va.index.intersection(vb.index)
+                if len(idx) >= 2:
+                    va, vb = va.loc[idx].values, vb.loc[idx].values
                     diff = va - vb
                     try:
                         r, p = pearsonr(va, vb)
                     except Exception:
                         r, p = float('nan'), float('nan')
-
                     f.write(f"    Resp rate mean diff: "
                             f"{np.mean(diff):.2f} ± {np.std(diff):.2f}\n")
                     f.write(f"    Pearson r: {r:.4f} (p={p:.3e})\n")
                     f.write(f"    Bland-Altman bias: {np.mean(diff):.2f}\n")
-                    f.write(f"    LOA: [{np.mean(diff) - 1.96 * np.std(diff):.2f},"
-                            f" {np.mean(diff) + 1.96 * np.std(diff):.2f}]\n")
-
+                    f.write(f"    LOA: [{np.mean(diff) - 1.96*np.std(diff):.2f},"
+                            f" {np.mean(diff) + 1.96*np.std(diff):.2f}]\n")
             f.write("\n")
 
     print(f"  [REPORT] {filepath}")
 
 
 # ═══════════════════════════════════════════════════════════════
-#  4. MASTER COMPARISON FUNCTION
+#  10. MASTER COMPARISON FUNCTION
 # ═══════════════════════════════════════════════════════════════
 
 def compare_features(dev_preprocessed, ref_preprocessed,
@@ -1097,31 +1580,18 @@ def compare_features(dev_preprocessed, ref_preprocessed,
                      fs=250, window_sec=10,
                      output_dir="outputs/comparison"):
     """
-    Master comparison: segment-based feature comparison between device
-    and reference, plus multi-modal respiration comparison.
+    Master comparison: segment-based device vs. reference validation.
 
-    Parameters
-    ----------
-    dev_preprocessed : dict
-        Device preprocessed signals.
-    ref_preprocessed : dict
-        Reference preprocessed signals.
-    dev_features : dict, optional
-        Global device features (for reference).
-    ref_features : dict, optional
-        Global reference features.
-    fs : int
-    window_sec : float
-        Segment window size in seconds (default 10, adjustable).
-    output_dir : str
-
-    Returns
-    -------
-    comparison_results : dict
+    Steps
+    -----
+    1. ECG segment comparison (both leads)
+    2. Respiration vs. reference (30 s windows)
+    3. Multi-modal respiration comparison
+    4. Export tables, reports, and plots
+    5. Beat-level RR pairing tables
     """
-    _ensure_dir(os.path.join(output_dir, "reports"))
-    _ensure_dir(os.path.join(output_dir, "tables"))
-    _ensure_dir(os.path.join(output_dir, "plots"))
+    for sub in ("reports", "tables", "plots"):
+        _ensure_dir(os.path.join(output_dir, sub))
 
     comparison_results = {}
 
@@ -1129,14 +1599,12 @@ def compare_features(dev_preprocessed, ref_preprocessed,
     print(f"[COMPARISON] Segment-Based Comparison ({window_sec}s windows)")
     print("=" * 60)
 
-    # ─── ECG Comparisons ──────────────────────────────────
+    # ── 1. ECG ────────────────────────────────────────────
     print("\n[1/3] ECG Segment Comparison")
     print("-" * 40)
-
     for dev_name, ref_name in ECG_SIGNAL_PAIRS.items():
         if dev_name not in dev_preprocessed or ref_name not in ref_preprocessed:
-            print(f"  [SKIP] {dev_name} or {ref_name} not found")
-            continue
+            print(f"  [SKIP] {dev_name} or {ref_name} not found"); continue
 
         pair_name = f"{dev_name}_vs_{ref_name}"
         print(f"\n  Pair: {pair_name}")
@@ -1144,28 +1612,26 @@ def compare_features(dev_preprocessed, ref_preprocessed,
         dev_df, ref_df, paired_df = segment_and_extract(
             dev_preprocessed[dev_name],
             ref_preprocessed[ref_name],
-            fs=fs, window_sec=window_sec,
-            signal_type="ecg"
+            fs=fs, window_sec=window_sec, signal_type="ecg"
+        )
+        comparison_results[pair_name] = dict(
+            signal_type='ECG', dev_name=dev_name, ref_name=ref_name,
+            window_sec=window_sec,
+            dev_df=dev_df, ref_df=ref_df, paired_df=paired_df,
         )
 
-        comparison_results[pair_name] = {
-            'signal_type': 'ECG',
-            'dev_name': dev_name,
-            'ref_name': ref_name,
-            'window_sec': window_sec,
-            'dev_df': dev_df,
-            'ref_df': ref_df,
-            'paired_df': paired_df,
-        }
-
-    # ─── Respiration Reference Comparisons ────────────────
+    # ── 2. Respiration vs. reference ──────────────────────
     print("\n[2/3] Respiration Segment Comparison (vs Reference)")
     print("-" * 40)
 
+    resp_window_sec = max(30, window_sec)
+    if resp_window_sec != window_sec:
+        print(f"  [INFO] Respiration window: "
+              f"{window_sec}s → {resp_window_sec}s")
+
     for dev_name, ref_name in RESP_SIGNAL_PAIRS.items():
         if dev_name not in dev_preprocessed or ref_name not in ref_preprocessed:
-            print(f"  [SKIP] {dev_name} or {ref_name} not found")
-            continue
+            print(f"  [SKIP] {dev_name} or {ref_name} not found"); continue
 
         pair_name = f"{dev_name}_vs_{ref_name}"
         print(f"\n  Pair: {pair_name}")
@@ -1173,86 +1639,116 @@ def compare_features(dev_preprocessed, ref_preprocessed,
         dev_df, ref_df, paired_df = segment_and_extract(
             dev_preprocessed[dev_name],
             ref_preprocessed[ref_name],
-            fs=fs, window_sec=window_sec,
-            signal_type="respiration"
+            fs=fs, window_sec=resp_window_sec, signal_type="respiration"
+        )
+        comparison_results[pair_name] = dict(
+            signal_type='Respiration', dev_name=dev_name, ref_name=ref_name,
+            window_sec=window_sec,
+            dev_df=dev_df, ref_df=ref_df, paired_df=paired_df,
         )
 
-        comparison_results[pair_name] = {
-            'signal_type': 'Respiration',
-            'dev_name': dev_name,
-            'ref_name': ref_name,
-            'window_sec': window_sec,
-            'dev_df': dev_df,
-            'ref_df': ref_df,
-            'paired_df': paired_df,
-        }
-
-    # ─── Multi-Modal Respiration Comparison ───────────────
+    # ── 3. Multi-modal respiration ─────────────────────────
     print("\n[3/3] Multi-Modal Respiration Comparison")
     print("-" * 40)
-
     modality_results = compare_resp_modalities(
         dev_preprocessed, fs=fs, window_sec=window_sec,
         output_dir=output_dir
     )
-
     if modality_results:
         comparison_results['resp_modality'] = modality_results
 
-    # ─── Export ────────────────────────────────────
+    # ── Export ────────────────────────────────────────────
     _export_segment_tables(comparison_results, output_dir)
     _export_segment_report(comparison_results, output_dir)
+
+    plot_lead_correlation(
+        dev_preprocessed, ref_preprocessed, comparison_results,
+        fs=fs, output_dir=os.path.join(output_dir, "plots"),
+        show=False, save=True
+    )
+
+    # ── Beat-level RR tables ──────────────────────────────
+    rr_dir = os.path.join(output_dir, "tables", "beat_rr")
+    _ensure_dir(rr_dir)
+
+    for dev_name, ref_name in ECG_SIGNAL_PAIRS.items():
+        if (dev_name not in dev_preprocessed or
+                ref_name not in ref_preprocessed):
+            continue
+
+        paired_beats, rr_summary = pair_rr_sequences(
+            dev_preprocessed[dev_name],
+            ref_preprocessed[ref_name],
+            fs=fs, window_sec=window_sec
+        )
+        label = f"{dev_name}_vs_{ref_name}"
+
+        if len(paired_beats) > 0:
+            bt_path = os.path.join(rr_dir, f"{label}_beat_rr.csv")
+            paired_beats.to_csv(bt_path, index=False)
+            print(f"  [TABLE] {bt_path}")
+
+        if rr_summary:
+            sm_path = os.path.join(rr_dir, f"{label}_rr_summary.json")
+            with open(sm_path, 'w', encoding='utf-8') as fj:
+                json.dump(
+                    {k: _make_serializable(v) for k, v in rr_summary.items()},
+                    fj, indent=4
+                )
+            print(f"  [JSON]  {sm_path}")
 
     return comparison_results
 
 
 # ═══════════════════════════════════════════════════════════════
-#  5. SEGMENT EXPORT FUNCTIONS
+#  11. EXPORT FUNCTIONS
 # ═══════════════════════════════════════════════════════════════
 
 def _export_segment_tables(comparison_results, output_dir):
-    """Export segment-level feature tables."""
-
+    """Export segment-level feature tables (full + quality-gated clean)."""
     tables_dir = os.path.join(output_dir, "tables")
     _ensure_dir(tables_dir)
 
     for pair_name, result in comparison_results.items():
-        # Skip modality results (exported separately)
         if pair_name == 'resp_modality':
             continue
 
-        dev_df = result['dev_df']
-        ref_df = result['ref_df']
+        dev_df    = result['dev_df']
+        ref_df    = result['ref_df']
         paired_df = result['paired_df']
 
         if len(dev_df) > 0:
-            path = os.path.join(tables_dir,
-                                f"{pair_name}_device_segments.csv")
-            dev_df.to_csv(path, index=False)
-            print(f"  [TABLE] {path}")
+            p = os.path.join(tables_dir, f"{pair_name}_device_segments.csv")
+            dev_df.to_csv(p, index=False); print(f"  [TABLE] {p}")
 
         if len(ref_df) > 0:
-            path = os.path.join(tables_dir,
-                                f"{pair_name}_reference_segments.csv")
-            ref_df.to_csv(path, index=False)
-            print(f"  [TABLE] {path}")
+            p = os.path.join(tables_dir,
+                             f"{pair_name}_reference_segments.csv")
+            ref_df.to_csv(p, index=False); print(f"  [TABLE] {p}")
 
         if len(paired_df) > 0:
-            path = os.path.join(tables_dir,
-                                f"{pair_name}_paired_comparison.csv")
-            paired_df.to_csv(path, index=False)
-            print(f"  [TABLE] {path}")
+            p = os.path.join(tables_dir,
+                             f"{pair_name}_paired_comparison.csv")
+            paired_df.to_csv(p, index=False); print(f"  [TABLE] {p}")
+
+            if 'paired_df_clean' in paired_df.attrs:
+                clean = paired_df.attrs['paired_df_clean']
+                if len(clean) > 0:
+                    cp = os.path.join(
+                        tables_dir,
+                        f"{pair_name}_paired_comparison_clean.csv"
+                    )
+                    clean.to_csv(cp, index=False)
+                    print(f"  [TABLE] {cp} ({len(clean)} quality-gated)")
 
 
 def _export_segment_report(comparison_results, output_dir):
     """Export human-readable segment comparison report."""
-
     reports_dir = os.path.join(output_dir, "reports")
     _ensure_dir(reports_dir)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(
-        reports_dir, f"segment_comparison_report_{timestamp}.txt"
-    )
+    ts       = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(reports_dir,
+                            f"segment_comparison_report_{ts}.txt")
 
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write("=" * 70 + "\n")
@@ -1265,7 +1761,6 @@ def _export_segment_report(comparison_results, output_dir):
                 continue
 
             paired_df = result['paired_df']
-
             f.write(f"\n{'=' * 60}\n")
             f.write(f"  PAIR: {pair_name}\n")
             f.write(f"  Type: {result['signal_type']}\n")
@@ -1277,100 +1772,105 @@ def _export_segment_report(comparison_results, output_dir):
                 f.write("  No paired segments available.\n")
                 continue
 
-            # Get feature names from dev_ columns
-            dev_cols = [c.replace('dev_', '') for c in paired_df.columns
+            dev_cols = [c.replace('dev_', '', 1)
+                        for c in paired_df.columns
                         if c.startswith('dev_')]
 
-            f.write(f"  {'Feature':<25} {'Dev Mean':>10} {'Ref Mean':>10} "
-                    f"{'Mean Diff':>10} {'Mean %Diff':>10} "
+            f.write(f"  {'Feature':<30} {'Dev Mean':>10} {'Ref Mean':>10} "
+                    f"{'Mean Diff':>10} {'Mean %Diff':>11} "
                     f"{'Pearson r':>10}\n")
-            f.write(f"  {'-' * 77}\n")
+            f.write(f"  {'-' * 82}\n")
 
             for feat in dev_cols:
-                dev_col = f'dev_{feat}'
-                ref_col = f'ref_{feat}'
-                diff_col = f'diff_{feat}'
-                pct_col = f'pct_diff_{feat}'
+                dc = f'dev_{feat}'
+                rc = f'ref_{feat}'
+                if dc not in paired_df.columns or rc not in paired_df.columns:
+                    continue
 
-                if (dev_col in paired_df.columns and
-                        ref_col in paired_df.columns):
+                dv = pd.to_numeric(paired_df[dc], errors='coerce')
+                rv = pd.to_numeric(paired_df[rc], errors='coerce')
+                ok = dv.notna() & rv.notna()
 
-                    dev_vals = pd.to_numeric(
-                        paired_df[dev_col], errors='coerce'
-                    )
-                    ref_vals = pd.to_numeric(
-                        paired_df[ref_col], errors='coerce'
-                    )
+                if not ok.any():
+                    f.write(f"  {feat:<30} {'N/A':>10} {'N/A':>10} "
+                            f"{'N/A':>10} {'N/A':>11} {'N/A':>10}\n")
+                    continue
 
-                    # Use only non-NaN pairs
-                    valid = dev_vals.notna() & ref_vals.notna()
+                dm   = dv[ok].mean()
+                rm   = rv[ok].mean()
+                diff = dm - rm
+                pct  = (pd.to_numeric(
+                    paired_df.get(f'pct_diff_{feat}',
+                                  pd.Series()), errors='coerce'
+                ).mean())
 
-                    if valid.sum() == 0:
-                        f.write(f"  {feat:<25} {'N/A':>10} {'N/A':>10} "
-                                f"{'N/A':>10} {'N/A':>10} {'N/A':>10}\n")
-                        continue
+                r_str = 'N/A'
+                if ok.sum() >= 2:
+                    try:
+                        r, _ = pearsonr(dv[ok], rv[ok])
+                        r_str = f"{r:.4f}"
+                    except Exception:
+                        pass
 
-                    dev_mean = dev_vals[valid].mean()
-                    ref_mean = ref_vals[valid].mean()
+                f.write(f"  {feat:<30} {dm:>10.3f} {rm:>10.3f} "
+                        f"{diff:>10.3f} {pct:>10.1f}% {r_str:>10}\n")
 
-                    if diff_col in paired_df.columns:
-                        mean_diff = pd.to_numeric(
-                            paired_df.loc[valid, diff_col],
-                            errors='coerce'
-                        ).mean()
-                    else:
-                        mean_diff = dev_mean - ref_mean
-
-                    if pct_col in paired_df.columns:
-                        mean_pct = pd.to_numeric(
-                            paired_df.loc[valid, pct_col],
-                            errors='coerce'
-                        ).mean()
-                    else:
-                        mean_pct = 0
-
-                    if valid.sum() >= 3:
-                        try:
-                            r, _ = pearsonr(
-                                dev_vals[valid], ref_vals[valid]
-                            )
-                        except Exception:
-                            r = float('nan')
-                    elif valid.sum() == 2:
-                        try:
-                            r, _ = pearsonr(
-                                dev_vals[valid], ref_vals[valid]
-                            )
-                        except Exception:
-                            r = float('nan')
-                    else:
-                        r = float('nan')
-
-                    r_str = f"{r:.4f}" if not np.isnan(r) else "N/A"
-                    f.write(f"  {feat:<25} {dev_mean:>10.3f} "
-                            f"{ref_mean:>10.3f} {mean_diff:>10.3f} "
-                            f"{mean_pct:>9.1f}% {r_str:>10}\n")
-            # ── Weighted signal quality summary ─────────────────────────
-            if len(paired_df) > 0:
-                wq_cols = [
-                    ('dev_weighted_kurtosis', 'Dev weighted kurtosis'),
-                    ('dev_weighted_skewness', 'Dev weighted skewness'),
-                    ('ref_weighted_kurtosis', 'Ref weighted kurtosis'),
-                    ('ref_weighted_skewness', 'Ref weighted skewness'),
-                ]
-                f.write(f"\n  ENERGY-WEIGHTED SIGNAL QUALITY\n")
-                f.write(f"  {'-' * 40}\n")
-                for col, label in wq_cols:
-                    if col in paired_df.columns:
+            # ── ECG-specific: R-peak detection quality summary ──
+            if result['signal_type'] == 'ECG':
+                rp_cols = ['rp_sensitivity', 'rp_ppv', 'rp_f1',
+                           'rp_mae_ms', 'rp_rmse_ms']
+                available_rp = [c for c in rp_cols
+                                if c in paired_df.columns]
+                if available_rp:
+                    f.write(f"\n  R-PEAK DETECTION QUALITY (mean across segments)\n")
+                    f.write(f"  {'-' * 45}\n")
+                    for col in available_rp:
                         val = pd.to_numeric(
                             paired_df[col], errors='coerce'
-                        ).dropna()
-                        val_str = f"{val.iloc[0]:.4f}" if len(val) > 0 else "N/A"
-                        f.write(f"  {label:<30} {val_str}\n")
-                f.write("\n")        
-                
+                        ).mean()
+                        f.write(f"  {col:<25} {val:>10.4f}\n")
+                    f.write("\n")
 
-        # Summary of peak methods used
+            # ── Respiration-specific: quality index summary ──────
+            if result['signal_type'] == 'Respiration':
+                rqi_cols = ['dev_spi', 'ref_spi',
+                            'dev_spectral_rqi', 'ref_spectral_rqi',
+                            'dev_ac_rqi', 'ref_ac_rqi',
+                            'dev_dominant_period_sec',
+                            'ref_dominant_period_sec',
+                            'dev_dominant_freq_hz',
+                            'ref_dominant_freq_hz']
+                available_rqi = [c for c in rqi_cols
+                                 if c in paired_df.columns]
+                if available_rqi:
+                    f.write(f"\n  RESPIRATORY SIGNAL QUALITY INDICES\n")
+                    f.write(f"  {'-' * 45}\n")
+                    for col in available_rqi:
+                        val = pd.to_numeric(
+                            paired_df[col], errors='coerce'
+                        ).mean()
+                        f.write(f"  {col:<35} {val:>10.4f}\n")
+                    f.write("\n")
+
+            # ── Weighted signal quality ──────────────────────────
+            wq_cols = [
+                ('dev_weighted_kurtosis', 'Dev weighted kurtosis'),
+                ('dev_weighted_skewness', 'Dev weighted skewness'),
+                ('ref_weighted_kurtosis', 'Ref weighted kurtosis'),
+                ('ref_weighted_skewness', 'Ref weighted skewness'),
+            ]
+            f.write(f"  ENERGY-WEIGHTED SIGNAL QUALITY\n")
+            f.write(f"  {'-' * 40}\n")
+            for col, label in wq_cols:
+                if col in paired_df.columns:
+                    val = pd.to_numeric(
+                        paired_df[col], errors='coerce'
+                    ).dropna()
+                    v_str = f"{val.iloc[0]:.4f}" if len(val) > 0 else "N/A"
+                    f.write(f"  {label:<30} {v_str}\n")
+            f.write("\n")
+
+        # ── Peak method summary ──────────────────────────────────
         f.write(f"\n\n{'=' * 60}\n")
         f.write("  PEAK DETECTION METHOD SUMMARY\n")
         f.write(f"{'=' * 60}\n\n")
@@ -1378,23 +1878,21 @@ def _export_segment_report(comparison_results, output_dir):
         for pair_name, result in comparison_results.items():
             if pair_name == 'resp_modality':
                 continue
-
             paired_df = result['paired_df']
             if len(paired_df) > 0:
                 f.write(f"  {pair_name}:\n")
-                if 'dev_peak_method' in paired_df.columns:
-                    methods = paired_df['dev_peak_method'].value_counts()
-                    f.write(f"    Device:    {methods.to_dict()}\n")
-                if 'ref_peak_method' in paired_df.columns:
-                    methods = paired_df['ref_peak_method'].value_counts()
-                    f.write(f"    Reference: {methods.to_dict()}\n")
+                for col, label in [('dev_peak_method', 'Device'),
+                                   ('ref_peak_method', 'Reference')]:
+                    if col in paired_df.columns:
+                        m = paired_df[col].value_counts().to_dict()
+                        f.write(f"    {label}: {m}\n")
                 f.write("\n")
 
     print(f"  [REPORT] {filepath}")
 
 
 # ═══════════════════════════════════════════════════════════════
-#  6. SIGNAL-LEVEL PLOTS (Overlay, Correlation)
+#  12. SIGNAL-LEVEL PLOTS  (unchanged API, kept for compatibility)
 # ═══════════════════════════════════════════════════════════════
 
 def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
@@ -1403,7 +1901,6 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
                         output_dir="outputs/comparison/plots",
                         show=False, save=True):
     """Overlay device and reference signals."""
-
     if save:
         _ensure_dir(output_dir)
 
@@ -1423,7 +1920,7 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
 
     dev_norm = min_max_normalize(dev_sig, min_val=-1.0, max_val=1.0)
     ref_norm = min_max_normalize(ref_sig, min_val=-1.0, max_val=1.0)
-    min_len = min(len(dev_norm), len(ref_norm))
+    min_len  = min(len(dev_norm), len(ref_norm))
     t_common = np.arange(min_len) / fs
 
     fig, axes = plt.subplots(3, 1, figsize=(16, 10))
@@ -1432,41 +1929,35 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
 
     axes[0].plot(t_dev, dev_sig, color='steelblue', linewidth=0.5)
     axes[0].set_title(f"Device: {dev_signal}")
-    axes[0].set_ylabel("Amplitude")
-    axes[0].grid(True, alpha=0.3)
+    axes[0].set_ylabel("Amplitude"); axes[0].grid(True, alpha=0.3)
 
     axes[1].plot(t_ref, ref_sig, color='coral', linewidth=0.5)
     axes[1].set_title(f"Reference: {ref_signal}")
-    axes[1].set_ylabel("Amplitude")
-    axes[1].grid(True, alpha=0.3)
+    axes[1].set_ylabel("Amplitude"); axes[1].grid(True, alpha=0.3)
 
     axes[2].plot(t_common, dev_norm[:min_len], color='steelblue',
-                 linewidth=0.5, alpha=0.7,
-                 label='Device (min-max normalized)')
+                 linewidth=0.5, alpha=0.7, label='Device')
     axes[2].plot(t_common, ref_norm[:min_len], color='coral',
-                 linewidth=0.5, alpha=0.7,
-                 label='Reference (min-max normalized)')
-    axes[2].set_title("Min-Max Normalized Overlay [-1, 1]")
-    axes[2].set_xlabel("Time (s)")
-    axes[2].set_ylabel("Normalized Amplitude")
-    axes[2].legend(loc='upper right')
-    axes[2].grid(True, alpha=0.3)
+                 linewidth=0.5, alpha=0.7, label='Reference')
+    axes[2].set_title("Min-Max Normalised Overlay [-1, 1]")
+    axes[2].set_xlabel("Time (s)"); axes[2].set_ylabel("Normalised")
+    axes[2].legend(loc='upper right'); axes[2].grid(True, alpha=0.3)
 
-    if time_window is not None:
+    if time_window:
         for ax in axes:
             ax.set_xlim(time_window)
 
     plt.tight_layout()
 
     if save:
-        suffix = (f"_{time_window[0]}s_{time_window[1]}s"
-                  if time_window else "")
-        filepath = os.path.join(
+        suf  = (f"_{time_window[0]}s_{time_window[1]}s"
+                if time_window else "")
+        path = os.path.join(
             output_dir,
-            f"overlay_{dev_signal}_vs_{ref_signal}{suffix}.png"
+            f"overlay_{dev_signal}_vs_{ref_signal}{suf}.png"
         )
-        fig.savefig(filepath, dpi=150, bbox_inches='tight')
-        print(f"  [PLOT] {filepath}")
+        fig.savefig(path, dpi=150, bbox_inches='tight')
+        print(f"  [PLOT] {path}")
 
     if show:
         plt.show()
@@ -1475,12 +1966,10 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
 
 
 def plot_correlation_analysis(dev_preprocessed, ref_preprocessed,
-                              dev_signal, ref_signal,
-                              fs=250,
+                              dev_signal, ref_signal, fs=250,
                               output_dir="outputs/comparison/plots",
                               show=False, save=True):
-    """Correlation analysis between device and reference signals."""
-
+    """Scatter, cross-correlation, and rolling Pearson r."""
     if save:
         _ensure_dir(output_dir)
 
@@ -1488,193 +1977,362 @@ def plot_correlation_analysis(dev_preprocessed, ref_preprocessed,
             ref_signal not in ref_preprocessed):
         return None
 
-    dev_sig = np.array(
-        dev_preprocessed[dev_signal], dtype=np.float64
-    ).flatten()
-    ref_sig = np.array(
-        ref_preprocessed[ref_signal], dtype=np.float64
-    ).flatten()
-
+    dev_sig  = np.array(dev_preprocessed[dev_signal],
+                        dtype=np.float64).flatten()
+    ref_sig  = np.array(ref_preprocessed[ref_signal],
+                        dtype=np.float64).flatten()
     dev_norm = min_max_normalize(dev_sig, min_val=-1.0, max_val=1.0)
     ref_norm = min_max_normalize(ref_sig, min_val=-1.0, max_val=1.0)
-
-    min_len = min(len(dev_norm), len(ref_norm))
+    min_len  = min(len(dev_norm), len(ref_norm))
     dev_trim = dev_norm[:min_len]
     ref_trim = ref_norm[:min_len]
-    t = np.arange(min_len) / fs
 
     fig = plt.figure(figsize=(18, 14))
-    gs = gridspec.GridSpec(3, 2, hspace=0.35, wspace=0.3)
+    gs  = gridspec.GridSpec(3, 2, hspace=0.35, wspace=0.3)
 
-    # Panel 1: Scatter + Regression
-    ax1 = fig.add_subplot(gs[0, 0])
-    step = max(1, min_len // 5000)
-    dev_ds = dev_trim[::step]
-    ref_ds = ref_trim[::step]
-
-    ax1.scatter(ref_ds, dev_ds, c='steelblue', s=3, alpha=0.3)
-    coeffs = np.polyfit(ref_ds, dev_ds, 1)
-    x_line = np.linspace(ref_ds.min(), ref_ds.max(), 100)
-    y_line = np.polyval(coeffs, x_line)
-    ax1.plot(x_line, y_line, 'r-', linewidth=2,
-             label=f'y = {coeffs[0]:.3f}x + {coeffs[1]:.3f}')
+    # Panel 1: Scatter + regression
+    ax1   = fig.add_subplot(gs[0, 0])
+    step  = max(1, min_len // 5000)
+    dds, rds = dev_trim[::step], ref_trim[::step]
+    ax1.scatter(rds, dds, c='steelblue', s=3, alpha=0.3)
+    coeffs = np.polyfit(rds, dds, 1)
+    xl     = np.linspace(rds.min(), rds.max(), 100)
+    ax1.plot(xl, np.polyval(coeffs, xl), 'r-', linewidth=2,
+             label=f'y={coeffs[0]:.3f}x+{coeffs[1]:.3f}')
     ax1.plot([-1.1, 1.1], [-1.1, 1.1], 'k--', alpha=0.3, label='Identity')
 
-    r_pearson, p_pearson = pearsonr(dev_trim, ref_trim)
-    r_spearman, p_spearman = spearmanr(dev_trim, ref_trim)
+    r_p, p_p   = pearsonr(dev_trim, ref_trim)
+    r_sp, p_sp = spearmanr(dev_trim, ref_trim)
 
-    ax1.set_title(f"Scatter: r={r_pearson:.4f}", fontweight='bold')
-    ax1.set_xlabel("Reference")
-    ax1.set_ylabel("Device")
-    ax1.legend(fontsize=8)
-    ax1.grid(True, alpha=0.3)
+    ss_res  = np.sum((dev_trim - np.polyval(coeffs, ref_trim)) ** 2)
+    ss_tot  = np.sum((dev_trim - np.mean(dev_trim)) ** 2)
+    r_sq    = 1 - (ss_res / max(ss_tot, 1e-10))
 
-    # Panel 2: Summary
-    ax2 = fig.add_subplot(gs[0, 1])
-    ax2.axis('off')
+    ax1.set_title(f"Scatter: r={r_p:.4f}", fontweight='bold')
+    ax1.set_xlabel("Reference"); ax1.set_ylabel("Device")
+    ax1.legend(fontsize=8); ax1.grid(True, alpha=0.3)
 
-    ss_res = np.sum((dev_trim - np.polyval(coeffs, ref_trim)) ** 2)
-    ss_tot = np.sum((dev_trim - np.mean(dev_trim)) ** 2)
-    r_squared = 1 - (ss_res / max(ss_tot, 1e-10))
-
-    summary_text = (
-        f"CORRELATION SUMMARY\n{'=' * 35}\n\n"
-        f"Pearson r:     {r_pearson:.4f}\n"
-        f"Spearman rho:  {r_spearman:.4f}\n"
-        f"R squared:     {r_squared:.4f}\n"
-        f"Slope:         {coeffs[0]:.4f}\n"
-        f"Intercept:     {coeffs[1]:.4f}\n"
-        f"Duration:      {min_len / fs:.2f} s"
-    )
-    ax2.text(0.1, 0.9, summary_text, transform=ax2.transAxes,
-             fontsize=10, fontfamily='monospace', va='top',
+    # Panel 2: Summary text
+    ax2 = fig.add_subplot(gs[0, 1]); ax2.axis('off')
+    ax2.text(0.1, 0.9,
+             f"CORRELATION SUMMARY\n{'=' * 35}\n\n"
+             f"Pearson r:     {r_p:.4f}\n"
+             f"Spearman rho:  {r_sp:.4f}\n"
+             f"R squared:     {r_sq:.4f}\n"
+             f"Slope:         {coeffs[0]:.4f}\n"
+             f"Intercept:     {coeffs[1]:.4f}\n"
+             f"Duration:      {min_len / fs:.2f} s",
+             transform=ax2.transAxes, fontsize=10,
+             fontfamily='monospace', va='top',
              bbox=dict(boxstyle='round', facecolor='lightyellow',
                        alpha=0.8))
 
     # Panel 3: Cross-correlation
-    ax3 = fig.add_subplot(gs[1, :])
+    ax3     = fig.add_subplot(gs[1, :])
     max_lag = int(5 * fs)
-    dev_c = dev_trim - np.mean(dev_trim)
-    ref_c = ref_trim - np.mean(ref_trim)
-    cc = np.correlate(dev_c, ref_c, mode='full')
-    cc = cc / (np.sqrt(np.sum(dev_c ** 2) * np.sum(ref_c ** 2)) + 1e-10)
-    mid = len(cc) // 2
-    ls = max(0, mid - max_lag)
-    le = min(len(cc), mid + max_lag + 1)
-    lags = (np.arange(ls, le) - mid) / fs
-    cc_sub = cc[ls:le]
-
+    dc      = dev_trim - np.mean(dev_trim)
+    rc      = ref_trim - np.mean(ref_trim)
+    cc      = np.correlate(dc, rc, mode='full')
+    cc     /= (np.sqrt(np.sum(dc ** 2) * np.sum(rc ** 2)) + 1e-10)
+    mid     = len(cc) // 2
+    ls, le  = max(0, mid - max_lag), min(len(cc), mid + max_lag + 1)
+    lags    = (np.arange(ls, le) - mid) / fs
+    cc_sub  = cc[ls:le]
+    pk      = np.argmax(cc_sub)
     ax3.plot(lags, cc_sub, color='steelblue', linewidth=0.8)
-    pk = np.argmax(cc_sub)
     ax3.scatter([lags[pk]], [cc_sub[pk]], c='red', s=80, zorder=5,
                 label=f'Peak: r={cc_sub[pk]:.4f} at {lags[pk]:.3f}s')
     ax3.set_title("Cross-Correlation", fontweight='bold')
-    ax3.set_xlabel("Lag (s)")
-    ax3.set_ylabel("Normalized Correlation")
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
+    ax3.set_xlabel("Lag (s)"); ax3.set_ylabel("Normalised Correlation")
+    ax3.legend(); ax3.grid(True, alpha=0.3)
 
     # Panel 4: Rolling correlation
-    ax4 = fig.add_subplot(gs[2, :])
-    win = 10 * fs
-    step_s = win // 4
-    r_times, r_corrs = [], []
+    ax4     = fig.add_subplot(gs[2, :])
+    win     = 10 * fs
+    step_s  = win // 4
+    rt, rc_ = [], []
     for s in range(0, min_len - win, step_s):
-        e = s + win
-        r, _ = pearsonr(dev_trim[s:e], ref_trim[s:e])
-        r_times.append((s + win // 2) / fs)
-        r_corrs.append(r)
+        rr, _ = pearsonr(dev_trim[s:s + win], ref_trim[s:s + win])
+        rt.append((s + win // 2) / fs); rc_.append(rr)
 
-    if r_corrs:
-        colors_r = [
-            '#2ecc71' if abs(r) >= 0.7
-            else '#f1c40f' if abs(r) >= 0.5
-            else '#e74c3c'
-            for r in r_corrs
-        ]
-        ax4.bar(r_times, r_corrs, width=10 / 4 * 0.8,
-                color=colors_r, alpha=0.7)
-        ax4.axhline(y=0.7, color='green', linestyle='--', alpha=0.5)
+    if rc_:
+        col_map = ['#2ecc71' if abs(r) >= 0.7
+                   else '#f1c40f' if abs(r) >= 0.5
+                   else '#e74c3c' for r in rc_]
+        ax4.bar(rt, rc_, width=10 / 4 * 0.8, color=col_map, alpha=0.7)
+        ax4.axhline(0.7, color='green', linestyle='--', alpha=0.5)
         ax4.set_title("Rolling Pearson (10s windows)", fontweight='bold')
-        ax4.set_xlabel("Time (s)")
-        ax4.set_ylabel("r")
-        ax4.set_ylim(-1.1, 1.1)
-        ax4.grid(True, alpha=0.3)
+        ax4.set_xlabel("Time (s)"); ax4.set_ylabel("r")
+        ax4.set_ylim(-1.1, 1.1); ax4.grid(True, alpha=0.3)
 
     fig.suptitle(f"Correlation: {dev_signal} vs {ref_signal}",
                  fontsize=14, fontweight='bold', y=1.01)
     plt.tight_layout()
 
     if save:
-        filepath = os.path.join(
+        path = os.path.join(
             output_dir,
             f"correlation_{dev_signal}_vs_{ref_signal}.png"
         )
-        fig.savefig(filepath, dpi=150, bbox_inches='tight')
-        print(f"  [PLOT] {filepath}")
+        fig.savefig(path, dpi=150, bbox_inches='tight')
+        print(f"  [PLOT] {path}")
+
     if show:
         plt.show()
     else:
         plt.close(fig)
 
-    return {
-        'pearson_r': r_pearson, 'spearman_r': r_spearman,
-        'r_squared': r_squared, 'peak_cross_corr': cc_sub[pk],
-        'peak_lag_sec': lags[pk],
+    return dict(pearson_r=r_p, spearman_r=r_sp, r_squared=r_sq,
+                peak_cross_corr=float(cc_sub[pk]),
+                peak_lag_sec=float(lags[pk]))
+
+
+def plot_lead_correlation(dev_preprocessed, ref_preprocessed,
+                          comparison_results, fs=250,
+                          output_dir="outputs/comparison/plots",
+                          show=False, save=True):
+    """
+    4-row quality figure per lead:
+        Row 0: normalised waveform overlay (first 30 s)
+        Row 1: beat-level RR scatter + regression
+        Row 2: Bland-Altman on beat-level RR
+        Row 3: SNR per segment (bars) — falls back to timing MAE
+    """
+    if save:
+        _ensure_dir(output_dir)
+
+    lead_pairs = {
+        'Lead I':  ('lead1', 'ref_lead1', 'lead1_vs_ref_lead1'),
+        'Lead II': ('lead2', 'ref_lead2', 'lead2_vs_ref_lead2'),
     }
+    available = {
+        lbl: keys for lbl, keys in lead_pairs.items()
+        if keys[2] in comparison_results
+        and len(comparison_results[keys[2]]['paired_df']) > 0
+    }
+
+    if not available:
+        print("  [SKIP] No paired ECG data for lead correlation plots.")
+        return
+
+    n_leads = len(available)
+    fig     = plt.figure(figsize=(10 * n_leads, 20))
+    gs      = gridspec.GridSpec(4, n_leads, hspace=0.45, wspace=0.35)
+    colors  = {'Lead I': 'steelblue', 'Lead II': 'darkorange'}
+
+    for col_idx, (label, (dev_key, ref_key, pair_key)) in \
+            enumerate(available.items()):
+
+        paired_df = comparison_results[pair_key]['paired_df']
+        color     = colors.get(label, 'steelblue')
+
+        # ── Row 0: waveform overlay ───────────────────────
+        dev_sig  = np.array(dev_preprocessed[dev_key],
+                            dtype=np.float64).flatten()
+        ref_sig  = np.array(ref_preprocessed[ref_key],
+                            dtype=np.float64).flatten()
+        dev_norm = min_max_normalize(dev_sig, min_val=-1.0, max_val=1.0)
+        ref_norm = min_max_normalize(ref_sig, min_val=-1.0, max_val=1.0)
+        ml       = min(len(dev_norm), len(ref_norm), 30 * fs)
+        t        = np.arange(ml) / fs
+
+        ax_wave = fig.add_subplot(gs[0, col_idx])
+        ax_wave.plot(t, ref_norm[:ml], color='grey',
+                     linewidth=0.6, alpha=0.7, label='Reference')
+        ax_wave.plot(t, dev_norm[:ml], color=color,
+                     linewidth=0.6, alpha=0.85, label='Device')
+        ax_wave.set_title(f"{label} — Normalised Overlay (first 30 s)",
+                          fontweight='bold', fontsize=11)
+        ax_wave.set_xlabel("Time (s)")
+        ax_wave.set_ylabel("Normalised amplitude")
+        ax_wave.legend(fontsize=8); ax_wave.grid(True, alpha=0.3)
+
+        # ── Beat-level RR pairing ─────────────────────────
+        pb, rr_sum = pair_rr_sequences(
+            np.array(dev_preprocessed[dev_key], dtype=np.float64).flatten(),
+            np.array(ref_preprocessed[ref_key], dtype=np.float64).flatten(),
+            fs=fs, window_sec=10
+        )
+        print(f"  [{label}] Matched beats: "
+              f"{rr_sum.get('n_matched_beats', 0)} | "
+              f"Pearson r: {rr_sum.get('pearson_r', float('nan')):.4f}")
+
+        # ── Row 1: RR scatter ─────────────────────────────
+        ax_sc = fig.add_subplot(gs[1, col_idx])
+        if len(pb) >= 2:
+            dv, rv = pb['dev_rr_ms'].values, pb['ref_rr_ms'].values
+            step   = max(1, len(dv) // 2000)
+            ax_sc.scatter(rv[::step], dv[::step],
+                          c=color, s=12, alpha=0.45, edgecolors='none')
+            co    = np.polyfit(rv, dv, 1)
+            xl    = np.linspace(rv.min(), rv.max(), 200)
+            ax_sc.plot(xl, np.polyval(co, xl), 'r-', linewidth=1.8,
+                       label=f'y={co[0]:.3f}x+{co[1]:.2f}')
+            lims  = [min(rv.min(), dv.min()) - 10,
+                     max(rv.max(), dv.max()) + 10]
+            ax_sc.plot(lims, lims, 'k--', alpha=0.35, linewidth=1.2)
+            ax_sc.set_title(
+                f"Beat RR — r={rr_sum['pearson_r']:.4f}, "
+                f"ρ={rr_sum['spearman_r']:.4f}\n"
+                f"p={rr_sum['pearson_p']:.2e}  "
+                f"n={rr_sum['n_matched_beats']} beats",
+                fontweight='bold', fontsize=10
+            )
+        else:
+            ax_sc.set_title("Beat RR — insufficient matched beats",
+                            fontweight='bold', fontsize=10)
+        ax_sc.set_xlabel("Reference RR (ms)")
+        ax_sc.set_ylabel("Device RR (ms)")
+        ax_sc.grid(True, alpha=0.3)
+
+        # ── Row 2: Bland-Altman ───────────────────────────
+        ax_ba = fig.add_subplot(gs[2, col_idx])
+        if len(pb) >= 2:
+            dv, rv     = pb['dev_rr_ms'].values, pb['ref_rr_ms'].values
+            diff_vals  = pb['diff_rr_ms'].values
+            means      = (dv + rv) / 2.0
+            bias       = rr_sum['bias_ms']
+            loa_hi     = rr_sum['loa_upper_ms']
+            loa_lo     = rr_sum['loa_lower_ms']
+
+            seg_ids    = pb['segment'].values
+            u_segs     = np.unique(seg_ids)
+            sc_map     = plt.cm.tab20(np.linspace(0, 1, len(u_segs)))
+            sc_dict    = {s: sc_map[i] for i, s in enumerate(u_segs)}
+            pt_colors  = [sc_dict[s] for s in seg_ids]
+
+            ax_ba.scatter(means, diff_vals,
+                          c=pt_colors, s=12, alpha=0.55, edgecolors='none')
+            ax_ba.axhline(bias,   color='red', linewidth=1.8,
+                          label=f'Bias: {bias:.2f} ms')
+            ax_ba.axhline(loa_hi, color='red', linewidth=1.2,
+                          linestyle='--',
+                          label=f'+1.96σ: {loa_hi:.2f} ms')
+            ax_ba.axhline(loa_lo, color='red', linewidth=1.2,
+                          linestyle='--',
+                          label=f'−1.96σ: {loa_lo:.2f} ms')
+            ax_ba.axhline(0, color='black', linewidth=0.8,
+                          linestyle=':', alpha=0.5)
+            try:
+                pb_co = np.polyfit(means, diff_vals, 1)
+                xpb   = np.linspace(means.min(), means.max(), 100)
+                ax_ba.plot(xpb, np.polyval(pb_co, xpb), color='navy',
+                           linewidth=1.2, linestyle='-.',
+                           label=f'Prop. bias: {pb_co[0]:.4f}')
+            except Exception:
+                pass
+            ax_ba.set_title(
+                f"Bland-Altman — Beat RR\n"
+                f"MAE={rr_sum['mae_rr_ms']:.2f} ms  "
+                f"RMSE={rr_sum['rmse_rr_ms']:.2f} ms",
+                fontweight='bold', fontsize=10
+            )
+        else:
+            ax_ba.set_title("Bland-Altman — insufficient data",
+                            fontweight='bold', fontsize=10)
+        ax_ba.set_xlabel("Mean of Device & Reference RR (ms)")
+        ax_ba.set_ylabel("Device − Reference RR (ms)")
+        ax_ba.legend(fontsize=7); ax_ba.grid(True, alpha=0.3)
+
+        # ── Row 3: SNR per segment ────────────────────────
+        ax_snr   = fig.add_subplot(gs[3, col_idx])
+        seg_ids  = paired_df['segment'].values
+        dev_snr  = pd.to_numeric(
+            paired_df.get('dev_snr_db',
+                          pd.Series([float('nan')] * len(paired_df))),
+            errors='coerce'
+        ).values
+        ref_snr  = pd.to_numeric(
+            paired_df.get('ref_snr_db',
+                          pd.Series([float('nan')] * len(paired_df))),
+            errors='coerce'
+        ).values
+
+        if not (np.all(np.isnan(dev_snr)) and np.all(np.isnan(ref_snr))):
+            x, w = np.arange(len(seg_ids)), 0.38
+            ax_snr.bar(x - w / 2, dev_snr, w,
+                       label='Device', color=color, alpha=0.75)
+            ax_snr.bar(x + w / 2, ref_snr, w,
+                       label='Reference', color='grey', alpha=0.75)
+            ax_snr.set_xticks(x[::max(1, len(x) // 10)])
+            ax_snr.set_xticklabels(
+                seg_ids[::max(1, len(x) // 10)], fontsize=7
+            )
+            ax_snr.set_title("SNR per Segment (dB)",
+                             fontweight='bold', fontsize=10)
+            ax_snr.set_xlabel("Segment index")
+            ax_snr.set_ylabel("SNR (dB)")
+            ax_snr.legend(fontsize=8)
+        else:
+            rp_mae = pd.to_numeric(
+                paired_df.get('rp_mae_ms',
+                              pd.Series([float('nan')] * len(paired_df))),
+                errors='coerce'
+            ).values
+            if not np.all(np.isnan(rp_mae)):
+                ax_snr.bar(np.arange(len(seg_ids)), rp_mae,
+                           color=color, alpha=0.75)
+                ax_snr.set_title("R-Peak Timing MAE per Segment (ms)",
+                                 fontweight='bold', fontsize=10)
+                ax_snr.set_xlabel("Segment index")
+                ax_snr.set_ylabel("MAE (ms)")
+            else:
+                ax_snr.set_title("SNR / Timing — no data", fontsize=10)
+        ax_snr.grid(True, alpha=0.3)
+
+    fig.suptitle(
+        "Lead-I & Lead-II — Device vs Reference Quality Assessment",
+        fontsize=14, fontweight='bold', y=1.01
+    )
+
+    if save:
+        path = os.path.join(output_dir, "lead_correlation_quality.png")
+        fig.savefig(path, dpi=150, bbox_inches='tight')
+        print(f"  [PLOT] {path}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 def plot_all_signal_overlays(dev_preprocessed, ref_preprocessed,
                              fs=250,
                              output_dir="outputs/comparison/plots",
                              show=False, save=True):
-    """
-    Generate all signal-level comparison plots:
-    overlay + correlation for all ECG and respiration pairs.
-    """
-
+    """Overlay + correlation plots for all ECG and respiration pairs."""
     all_pairs = {**ECG_SIGNAL_PAIRS, **RESP_SIGNAL_PAIRS}
-    correlation_results = {}
+    corr_results = {}
 
     for dev_signal, ref_signal in all_pairs.items():
         print(f"\n  [SIGNAL PLOTS] {dev_signal} vs {ref_signal}")
-
-        plot_signal_overlay(
-            dev_preprocessed, ref_preprocessed,
-            dev_signal, ref_signal, fs=fs,
-            output_dir=output_dir, show=show, save=save
-        )
-
-        plot_signal_overlay(
-            dev_preprocessed, ref_preprocessed,
-            dev_signal, ref_signal, fs=fs,
-            time_window=(0, 10),
-            output_dir=output_dir, show=show, save=save
-        )
-
+        plot_signal_overlay(dev_preprocessed, ref_preprocessed,
+                            dev_signal, ref_signal, fs=fs,
+                            output_dir=output_dir, show=show, save=save)
+        plot_signal_overlay(dev_preprocessed, ref_preprocessed,
+                            dev_signal, ref_signal, fs=fs,
+                            time_window=(0, 10),
+                            output_dir=output_dir, show=show, save=save)
         corr = plot_correlation_analysis(
             dev_preprocessed, ref_preprocessed,
             dev_signal, ref_signal, fs=fs,
             output_dir=output_dir, show=show, save=save
         )
         if corr:
-            correlation_results[f"{dev_signal}_vs_{ref_signal}"] = corr
+            corr_results[f"{dev_signal}_vs_{ref_signal}"] = corr
 
-    # Export correlation summary
-    if correlation_results and save:
+    if corr_results and save:
         _ensure_dir(output_dir)
-        df = pd.DataFrame([
-            {'pair': k, **v} for k, v in correlation_results.items()
-        ])
-        df.to_csv(os.path.join(output_dir, "correlation_summary.csv"),
-                  index=False)
-
+        pd.DataFrame(
+            [{'pair': k, **v} for k, v in corr_results.items()]
+        ).to_csv(os.path.join(output_dir, "correlation_summary.csv"),
+                 index=False)
         with open(os.path.join(output_dir, "correlation_summary.json"),
-                  'w', encoding='utf-8') as f:
+                  'w', encoding='utf-8') as fj:
             json.dump(
                 {k: {kk: _make_serializable(vv) for kk, vv in v.items()}
-                 for k, v in correlation_results.items()},
-                f, indent=4
+                 for k, v in corr_results.items()},
+                fj, indent=4
             )
 
-    return correlation_results
+    return corr_results
