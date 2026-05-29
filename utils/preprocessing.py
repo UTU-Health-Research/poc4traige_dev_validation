@@ -387,10 +387,12 @@ def align_signals(dev_sig, bit_sig, fs):
     Normalize and align two signals using cross-correlation
     Returns aligned signals of equal length
     """
-    dev_norm = normalize_signal(
-                   np.array(dev_sig, dtype=np.float64).flatten())
-    bit_norm = normalize_signal(
-                   np.array(bit_sig, dtype=np.float64).flatten())
+    # dev_norm = normalize_signal(
+    #                np.array(dev_sig, dtype=np.float64).flatten())
+    # bit_norm = normalize_signal(
+    #                np.array(bit_sig, dtype=np.float64).flatten())
+    dev_norm = np.array(dev_sig, dtype=np.float64).flatten()
+    bit_norm = np.array(bit_sig, dtype=np.float64).flatten()
 
     # ─── Trim to same length ──────────────────────────────────
     min_samples = min(len(dev_norm), len(bit_norm))
