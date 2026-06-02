@@ -1,0 +1,106 @@
+======================================================================
+RESPIRATORY MODALITY COMPARISON REPORT
+Generated: 2026-05-29 19:29:12
+Window size: 10s
+======================================================================
+
+PER-MODALITY SUMMARY
+--------------------------------------------------
+
+  impedance_pneumography:
+    Valid segments: 3
+    Resp rate: 19.10 ± 2.50 bpm [16.2 – 20.8]
+    SPI: 0.964 ± 0.016
+    Spectral RQI: 0.446 ± 0.091
+    Dominant period: 7.85 ± 1.81 s (7.6 brpm)
+
+  pca_acc_ribs:
+    Valid segments: 4
+    Resp rate: 15000.00 ± 0.00 bpm [15000.0 – 15000.0]
+
+  pca_gyr_ribs:
+    Valid segments: 4
+    Resp rate: 15000.00 ± 0.00 bpm [15000.0 – 15000.0]
+
+  pca_acc_chest:
+    Valid segments: 4
+    Resp rate: 15000.00 ± 0.00 bpm [15000.0 – 15000.0]
+
+  pca_gyr_chest:
+    Valid segments: 4
+    Resp rate: 15000.00 ± 0.00 bpm [15000.0 – 15000.0]
+
+
+PAIRWISE COMPARISONS
+--------------------------------------------------
+
+  impedance_pneumography_vs_pca_acc_ribs
+    Paired segments: 3
+    Resp rate mean diff: -14980.90 ± 2.04
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: -14980.90
+    LOA: [-14984.89, -14976.90]
+
+  impedance_pneumography_vs_pca_gyr_ribs
+    Paired segments: 3
+    Resp rate mean diff: -14980.90 ± 2.04
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: -14980.90
+    LOA: [-14984.89, -14976.90]
+
+  impedance_pneumography_vs_pca_acc_chest
+    Paired segments: 3
+    Resp rate mean diff: -14980.90 ± 2.04
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: -14980.90
+    LOA: [-14984.89, -14976.90]
+
+  impedance_pneumography_vs_pca_gyr_chest
+    Paired segments: 3
+    Resp rate mean diff: -14980.90 ± 2.04
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: -14980.90
+    LOA: [-14984.89, -14976.90]
+
+  pca_acc_ribs_vs_pca_gyr_ribs
+    Paired segments: 4
+    Resp rate mean diff: 0.00 ± 0.00
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: 0.00
+    LOA: [0.00, 0.00]
+
+  pca_acc_ribs_vs_pca_acc_chest
+    Paired segments: 4
+    Resp rate mean diff: 0.00 ± 0.00
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: 0.00
+    LOA: [0.00, 0.00]
+
+  pca_acc_ribs_vs_pca_gyr_chest
+    Paired segments: 4
+    Resp rate mean diff: 0.00 ± 0.00
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: 0.00
+    LOA: [0.00, 0.00]
+
+  pca_gyr_ribs_vs_pca_acc_chest
+    Paired segments: 4
+    Resp rate mean diff: 0.00 ± 0.00
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: 0.00
+    LOA: [0.00, 0.00]
+
+  pca_gyr_ribs_vs_pca_gyr_chest
+    Paired segments: 4
+    Resp rate mean diff: 0.00 ± 0.00
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: 0.00
+    LOA: [0.00, 0.00]
+
+  pca_acc_chest_vs_pca_gyr_chest
+    Paired segments: 4
+    Resp rate mean diff: 0.00 ± 0.00
+    Pearson r: nan (p=nan)
+    Bland-Altman bias: 0.00
+    LOA: [0.00, 0.00]
+

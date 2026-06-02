@@ -1,0 +1,200 @@
+======================================================================
+SEGMENT-BASED FEATURE COMPARISON REPORT
+Generated: 2026-05-29 19:37:02
+======================================================================
+
+
+============================================================
+  PAIR: lead1_vs_ref_lead1
+  Type: ECG
+  Window: 10s
+  Paired segments: 11
+============================================================
+
+  Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
+  ----------------------------------------------------------------------------------
+  peak_method                           N/A        N/A        N/A         N/A        N/A
+  signal_mean                        -0.000      0.000     -0.000    99512.0%     0.9474
+  signal_std                          0.185      0.000      0.185   158421.6%     0.9723
+  signal_rms                          0.185      0.000      0.185   158421.5%     0.9723
+  signal_energy                      85.837      0.000     85.837 251309290.9%     0.9732
+  signal_kurtosis                    17.954     11.867      6.087       51.4%     0.9730
+  signal_skewness                     3.407      2.466      0.941       38.2%     0.8802
+  n_r_peaks                          11.818     11.818      0.000        0.0%     1.0000
+  mean_hr                            76.847     76.835      0.012        0.0%     1.0000
+  std_hr                              3.140      3.157     -0.017        1.8%     0.9986
+  min_hr                             71.695     71.592      0.103        0.2%     0.9990
+  max_hr                             82.144     82.204     -0.060        0.2%     0.9993
+  median_hr                          77.062     76.962      0.100        0.2%     0.9988
+  mean_rr                           784.182    784.331     -0.148        0.0%     1.0000
+  std_rr                             32.497     32.696     -0.199        1.7%     0.9989
+  sdnn                               32.497     32.696     -0.199        1.7%     0.9989
+  median_rr                         780.364    781.455     -1.091        0.2%     0.9988
+  rmssd                              36.307     36.266      0.041        2.9%     0.9950
+  pnn50                              18.402     20.239     -1.837        7.6%     0.9598
+  pnn20                              54.656     59.421     -4.766       12.7%     0.8896
+  r_amp_mean                          1.141      0.001      1.140   180539.6%     0.9554
+  r_amp_std                           0.050      0.000      0.050   121006.7%     0.8920
+  snr_db                             15.557     14.255      1.302        8.9%     0.9923
+  signal_power                        0.234      0.000      0.234 271178097.1%     0.9148
+  noise_power                         0.007      0.000      0.007 201967935.4%     0.9913
+  rr_rolling_std_mean                29.956     29.991     -0.034        1.9%     0.9982
+  rr_rolling_std_max                 38.979     38.755      0.224        2.7%     0.9952
+  rr_rolling_std_min                 21.751     22.302     -0.551        5.1%     0.9872
+  rr_rolling_std_cv                   0.203      0.194      0.009        9.2%     0.9656
+  rr_rolling_std_n_windows            6.818      6.818      0.000        0.0%     1.0000
+  rp_sensitivity                        N/A        N/A        N/A         N/A        N/A
+  rp_ppv                                N/A        N/A        N/A         N/A        N/A
+  rp_f1                                 N/A        N/A        N/A         N/A        N/A
+  weighted_kurtosis                  17.885     11.822      6.063        nan%        N/A
+  weighted_skewness                   3.402      2.463      0.939        nan%        N/A
+
+  R-PEAK DETECTION QUALITY (mean across segments)
+  ---------------------------------------------
+  rp_sensitivity                1.0000
+  rp_ppv                        1.0000
+  rp_f1                         1.0000
+  rp_mae_ms                     5.9328
+  rp_rmse_ms                    6.3516
+
+  ENERGY-WEIGHTED SIGNAL QUALITY
+  ----------------------------------------
+  Dev weighted kurtosis          17.8851
+  Dev weighted skewness          3.4019
+  Ref weighted kurtosis          11.8216
+  Ref weighted skewness          2.4630
+
+
+============================================================
+  PAIR: lead2_vs_ref_lead2
+  Type: ECG
+  Window: 10s
+  Paired segments: 11
+============================================================
+
+  Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
+  ----------------------------------------------------------------------------------
+  peak_method                           N/A        N/A        N/A         N/A        N/A
+  signal_mean                         0.000      0.000      0.000    91251.3%     0.8922
+  signal_std                          0.128      0.000      0.128   103508.0%     0.9924
+  signal_rms                          0.128      0.000      0.128   103507.9%     0.9924
+  signal_energy                      41.286      0.000     41.286 107348098.2%     0.9924
+  signal_kurtosis                    13.146     12.855      0.291        2.3%     0.9904
+  signal_skewness                     0.545      0.088      0.457     3824.0%     0.8818
+  n_r_peaks                          11.818     11.818      0.000        0.0%     1.0000
+  mean_hr                            76.848     76.823      0.024        0.0%     1.0000
+  std_hr                              3.142      3.139      0.003        2.3%     0.9965
+  min_hr                             71.604     71.686     -0.083        0.2%     0.9989
+  max_hr                             82.189     82.167      0.022        0.2%     0.9992
+  median_hr                          77.119     77.047      0.072        0.1%     0.9987
+  mean_rr                           784.192    784.427     -0.235        0.0%     1.0000
+  std_rr                             32.518     32.494      0.023        2.1%     0.9968
+  sdnn                               32.518     32.494      0.023        2.1%     0.9968
+  median_rr                         779.818    780.545     -0.727        0.1%     0.9989
+  rmssd                              35.964     35.836      0.128        3.5%     0.9922
+  pnn50                              19.229     19.412     -0.184       18.2%     0.8490
+  pnn20                              53.848     58.411     -4.564        9.6%     0.9325
+  r_amp_mean                          0.663      0.001      0.662   108837.4%     0.9485
+  r_amp_std                           0.020      0.000      0.020   116315.8%     0.8618
+  snr_db                             17.121     17.192     -0.071        0.8%     0.9963
+  signal_power                        0.120      0.000      0.120 107364308.5%     0.9610
+  noise_power                         0.003      0.000      0.003 109227732.6%     0.9974
+  rr_rolling_std_mean                29.907     29.898      0.009        2.4%     0.9953
+  rr_rolling_std_max                 38.794     38.730      0.063        3.0%     0.9935
+  rr_rolling_std_min                 21.444     21.303      0.142        8.0%     0.9765
+  rr_rolling_std_cv                   0.203      0.208     -0.005        9.7%     0.9632
+  rr_rolling_std_n_windows            6.818      6.818      0.000        0.0%     1.0000
+  rp_sensitivity                        N/A        N/A        N/A         N/A        N/A
+  rp_ppv                                N/A        N/A        N/A         N/A        N/A
+  rp_f1                                 N/A        N/A        N/A         N/A        N/A
+  weighted_kurtosis                  13.081     12.784      0.296        nan%        N/A
+  weighted_skewness                   0.541      0.085      0.456        nan%        N/A
+
+  R-PEAK DETECTION QUALITY (mean across segments)
+  ---------------------------------------------
+  rp_sensitivity                1.0000
+  rp_ppv                        1.0000
+  rp_f1                         1.0000
+  rp_mae_ms                     5.3357
+  rp_rmse_ms                    5.8831
+
+  ENERGY-WEIGHTED SIGNAL QUALITY
+  ----------------------------------------
+  Dev weighted kurtosis          13.0805
+  Dev weighted skewness          0.5413
+  Ref weighted kurtosis          12.7841
+  Ref weighted skewness          0.0854
+
+
+============================================================
+  PAIR: impedance_pneumography_vs_ref_respiration
+  Type: Respiration
+  Window: 10s
+  Paired segments: 4
+============================================================
+
+  Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
+  ----------------------------------------------------------------------------------
+  peak_method                           N/A        N/A        N/A         N/A        N/A
+  signal_mean                         0.000     -0.000      0.000      101.0%    -0.7610
+  signal_std                          0.004      0.921     -0.917       99.6%     0.8485
+  signal_rms                          0.004      0.921     -0.917       99.6%     0.8481
+  signal_energy                       0.098   6434.452  -6434.355      100.0%     0.8373
+  n_breaths                          10.250      9.000      1.250       20.9%    -0.8627
+  resp_rate_mean                     23.465     20.768      2.698       17.0%    -0.8127
+  resp_rate_std                       5.246      3.433      1.812       79.5%     0.3345
+  resp_rate_min                      16.111     15.164      0.947       27.1%    -0.4705
+  resp_rate_max                      33.242     26.968      6.275       27.2%    -0.0021
+  resp_rate_median                   22.658     19.985      2.673       16.0%    -0.8729
+  bbi_mean                            2.739      2.997     -0.258       12.7%    -0.9972
+  bbi_std                             0.570      0.526      0.044       51.1%     0.2195
+  bbi_cv                              0.211      0.175      0.036       60.9%     0.2070
+  bbi_rmssd                           0.702      0.864     -0.162       33.2%     0.3457
+  peak_amp_mean                       0.005      1.326     -1.321       99.6%     0.5596
+  peak_amp_std                        0.002      0.451     -0.449       99.5%     0.9712
+  spi                                 0.935      0.978     -0.044        4.4%    -0.6152
+  spectral_rqi                        0.335      0.549     -0.214       39.2%     0.8091
+  dominant_freq_hz                    0.412      0.333      0.078       27.7%    -0.9743
+  ac_rqi                              0.317      0.427     -0.111       53.5%    -0.2678
+  dominant_period_sec                 4.801      4.452      0.349       25.9%     0.6176
+  weighted_kurtosis                     N/A        N/A        N/A         N/A        N/A
+  weighted_skewness                     N/A        N/A        N/A         N/A        N/A
+
+  RESPIRATORY SIGNAL QUALITY INDICES
+  ---------------------------------------------
+  dev_spi                                 0.9346
+  ref_spi                                 0.9783
+  dev_spectral_rqi                        0.3349
+  ref_spectral_rqi                        0.5491
+  dev_ac_rqi                              0.3166
+  ref_ac_rqi                              0.4272
+  dev_dominant_period_sec                 4.8010
+  ref_dominant_period_sec                 4.4520
+  dev_dominant_freq_hz                    0.4117
+  ref_dominant_freq_hz                    0.3333
+
+  ENERGY-WEIGHTED SIGNAL QUALITY
+  ----------------------------------------
+  Dev weighted kurtosis          N/A
+  Dev weighted skewness          N/A
+  Ref weighted kurtosis          N/A
+  Ref weighted skewness          N/A
+
+
+
+============================================================
+  PEAK DETECTION METHOD SUMMARY
+============================================================
+
+  lead1_vs_ref_lead1:
+    Device: {'pan_tompkins': 11}
+    Reference: {'pan_tompkins': 11}
+
+  lead2_vs_ref_lead2:
+    Device: {'pan_tompkins': 11}
+    Reference: {'pan_tompkins': 11}
+
+  impedance_pneumography_vs_ref_respiration:
+    Device: {'ampd': 4}
+    Reference: {'ampd': 4}
+
