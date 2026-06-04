@@ -396,7 +396,7 @@ def align_signals(dev_sig, bit_sig, fs, max_lag_sec=5.0):
     # ─── Cross-correlate ──────────────────────────────────────
     correlation = correlate(dev_norm, bit_norm, mode='full')
     lags        = np.arange(-len(dev_norm)+1, len(dev_norm))
-
+    
     # ─── Constrain lag search to ±max_lag_sec ─────────────────
     max_lag_samples = int(max_lag_sec * fs)
     valid_mask      = np.abs(lags) <= max_lag_samples

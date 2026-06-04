@@ -301,5 +301,6 @@ git stash (temporarily save changes that are not ready to be committed)
 git stash pop (apply stashed changes back to the working directory)
 go to a previous commit: git checkout <commit_hash> (this puts you in a detached HEAD state, be careful when making changes here)
 come back to the latest commit: git checkout main (or the branch you were on)
+create a new branch: git checkout -b new_branch (this creates and switches to a new branch)
 
 '''
