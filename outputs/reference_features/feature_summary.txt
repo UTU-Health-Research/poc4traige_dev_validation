@@ -1,10 +1,6 @@
 ======================================================================
 FEATURE EXTRACTION SUMMARY
-<<<<<<< HEAD
-Generated: 2026-06-04 14:57:27
-=======
-Generated: 2026-06-03 15:52:56
->>>>>>> 0af7f45debd8126668931449cffcd6ead073bb90
+Generated: 2026-06-04 15:07:09
 Total Features: 168
 ======================================================================
 
@@ -12,128 +8,127 @@ Total Features: 168
 ──────────────────────────────────────────────────
   GROUP: REF
 ──────────────────────────────────────────────────
-  ref_lead1_cv_rr                                    : 0.065298
-  ref_lead1_energy                                   : 0.000282
-  ref_lead1_global_ecg_r_peak_indices_max            : 29273.000000
-  ref_lead1_global_ecg_r_peak_indices_mean           : 14979.825397
-  ref_lead1_global_ecg_r_peak_indices_min            : 297.000000
-  ref_lead1_global_ecg_r_peak_indices_std            : 8442.387842
-  ref_lead1_global_heart_rate_max                    : 75.376884
-  ref_lead1_global_heart_rate_mean                   : 64.983136
-  ref_lead1_global_heart_rate_min                    : 55.555556
-  ref_lead1_global_heart_rate_std                    : 4.214967
-  ref_lead1_global_max_heart_rate                    : 75.376884
-  ref_lead1_global_mean_heart_rate                   : 64.983136
-  ref_lead1_global_mean_rr_interval                  : 927.232000
-  ref_lead1_global_min_heart_rate                    : 55.555556
-  ref_lead1_global_nn_xx                             : 125.000000
+  ref_lead1_cv_rr                                    : 0.067708
+  ref_lead1_energy                                   : 0.002896
+  ref_lead1_global_ecg_r_peak_indices_max            : 38028.000000
+  ref_lead1_global_ecg_r_peak_indices_mean           : 19288.972222
+  ref_lead1_global_ecg_r_peak_indices_min            : 104.000000
+  ref_lead1_global_ecg_r_peak_indices_std            : 11097.064353
+  ref_lead1_global_heart_rate_max                    : 89.285714
+  ref_lead1_global_heart_rate_mean                   : 71.135263
+  ref_lead1_global_heart_rate_min                    : 61.983471
+  ref_lead1_global_heart_rate_std                    : 4.985032
+  ref_lead1_global_max_heart_rate                    : 89.285714
+  ref_lead1_global_mean_heart_rate                   : 71.135263
+  ref_lead1_global_mean_rr_interval                  : 847.463687
+  ref_lead1_global_min_heart_rate                    : 61.983471
+  ref_lead1_global_nn_xx                             : 179.000000
   ref_lead1_global_pnn_xx                            : 100.000000
-  ref_lead1_global_root_mean_square_of_successive_differences : 62.591353
-  ref_lead1_global_sdnn                              : 60.546199
-  ref_lead1_global_std_heart_rate                    : 4.214967
-  ref_lead1_iqr                                      : 0.000040
-  ref_lead1_iqr_rr                                   : 84.000000
-  ref_lead1_kurtosis                                 : 17.475877
-  ref_lead1_mav                                      : 0.000047
-  ref_lead1_max                                      : 0.000657
-  ref_lead1_max_hr                                   : 75.376884
-  ref_lead1_mean                                     : 0.000000
-  ref_lead1_mean_hr                                  : 64.983136
-  ref_lead1_mean_hr_filtered                         : 64.983136
-  ref_lead1_mean_rr                                  : 927.232000
-  ref_lead1_meandist                                 : 82.271541
+  ref_lead1_global_root_mean_square_of_successive_differences : 41.993044
+  ref_lead1_global_sdnn                              : 57.380262
+  ref_lead1_global_std_heart_rate                    : 4.985032
+  ref_lead1_iqr                                      : 0.000106
+  ref_lead1_iqr_rr                                   : 76.000000
+  ref_lead1_kurtosis                                 : 14.336424
+  ref_lead1_mav                                      : 0.000129
+  ref_lead1_max                                      : 0.001701
+  ref_lead1_max_hr                                   : 89.285714
+  ref_lead1_mean                                     : -0.000000
+  ref_lead1_mean_hr                                  : 71.135263
+  ref_lead1_mean_hr_filtered                         : 71.135263
+  ref_lead1_mean_rr                                  : 847.463687
+  ref_lead1_meandist                                 : 51.956254
   ref_lead1_median                                   : -0.000002
-  ref_lead1_median_hr                                : 64.935065
-  ref_lead1_median_rr                                : 924.000000
-  ref_lead1_min                                      : -0.000294
-  ref_lead1_min_hr                                   : 55.555556
-  ref_lead1_n_r_peaks_filtered                       : 126
-  ref_lead1_n_r_peaks_raw                            : 126
-  ref_lead1_p25                                      : -0.000032
-  ref_lead1_p5                                       : -0.000101
-  ref_lead1_p75                                      : 0.000009
-  ref_lead1_p95                                      : 0.000123
+  ref_lead1_median_hr                                : 70.754717
+  ref_lead1_median_rr                                : 848.000000
+  ref_lead1_min                                      : -0.001274
+  ref_lead1_min_hr                                   : 61.983471
+  ref_lead1_n_r_peaks_filtered                       : 180
+  ref_lead1_n_r_peaks_raw                            : 180
+  ref_lead1_p25                                      : -0.000062
+  ref_lead1_p5                                       : -0.000246
+  ref_lead1_p75                                      : 0.000043
+  ref_lead1_p95                                      : 0.000266
   ref_lead1_peaks_rejected_pct                       : 0.000000
-  ref_lead1_pnn20                                    : 82.258065
-  ref_lead1_pnn50                                    : 45.967742
-  ref_lead1_r_amp_max                                : 0.000657
-  ref_lead1_r_amp_mean                               : 0.000620
-  ref_lead1_r_amp_median                             : 0.000618
-  ref_lead1_r_amp_min                                : 0.000565
-  ref_lead1_r_amp_std                                : 0.000019
-  ref_lead1_range                                    : 0.000951
-  ref_lead1_range_rr                                 : 284.000000
-  ref_lead1_rms                                      : 0.000098
-  ref_lead1_rmssd                                    : 62.591353
-  ref_lead1_sdnn                                     : 60.546199
-  ref_lead1_skewness                                 : 3.137514
-  ref_lead1_std                                      : 0.000098
-  ref_lead1_std_hr                                   : 4.214967
-  ref_lead1_std_hr_filtered                          : 4.214967
-  ref_lead1_std_rr                                   : 60.546199
+  ref_lead1_pnn20                                    : 61.797753
+  ref_lead1_pnn50                                    : 20.786517
+  ref_lead1_r_amp_max                                : 0.001701
+  ref_lead1_r_amp_mean                               : 0.001548
+  ref_lead1_r_amp_median                             : 0.001561
+  ref_lead1_r_amp_min                                : 0.001291
+  ref_lead1_r_amp_std                                : 0.000079
+  ref_lead1_range                                    : 0.002975
+  ref_lead1_range_rr                                 : 296.000000
+  ref_lead1_rms                                      : 0.000275
+  ref_lead1_rmssd                                    : 41.993044
+  ref_lead1_sdnn                                     : 57.380262
+  ref_lead1_skewness                                 : 1.480239
+  ref_lead1_std                                      : 0.000275
+  ref_lead1_std_hr                                   : 4.985032
+  ref_lead1_std_hr_filtered                          : 4.985032
+  ref_lead1_std_rr                                   : 57.380262
   ref_lead1_var                                      : 0.000000
-  ref_lead1_zcr                                      : 0.075725
-  ref_lead2_cv_rr                                    : 0.065502
-  ref_lead2_energy                                   : 0.000473
-  ref_lead2_global_ecg_r_peak_indices_max            : 29272.000000
-  ref_lead2_global_ecg_r_peak_indices_mean           : 14978.698413
-  ref_lead2_global_ecg_r_peak_indices_min            : 295.000000
-  ref_lead2_global_ecg_r_peak_indices_std            : 8442.390788
-  ref_lead2_global_heart_rate_max                    : 75.376884
-  ref_lead2_global_heart_rate_mean                   : 64.982641
-  ref_lead2_global_heart_rate_min                    : 55.555556
-  ref_lead2_global_heart_rate_std                    : 4.228400
-  ref_lead2_global_max_heart_rate                    : 75.376884
-  ref_lead2_global_mean_heart_rate                   : 64.982641
-  ref_lead2_global_mean_rr_interval                  : 927.264000
-  ref_lead2_global_min_heart_rate                    : 55.555556
-  ref_lead2_global_nn_xx                             : 125.000000
+  ref_lead1_zcr                                      : 0.109783
+  ref_lead2_cv_rr                                    : 0.067815
+  ref_lead2_energy                                   : 0.001419
+  ref_lead2_global_ecg_r_peak_indices_max            : 38027.000000
+  ref_lead2_global_ecg_r_peak_indices_mean           : 19288.677778
+  ref_lead2_global_ecg_r_peak_indices_min            : 103.000000
+  ref_lead2_global_ecg_r_peak_indices_std            : 11097.108250
+  ref_lead2_global_heart_rate_max                    : 89.285714
+  ref_lead2_global_heart_rate_mean                   : 71.136272
+  ref_lead2_global_heart_rate_min                    : 61.728395
+  ref_lead2_global_heart_rate_std                    : 4.992072
+  ref_lead2_global_max_heart_rate                    : 89.285714
+  ref_lead2_global_mean_heart_rate                   : 71.136272
+  ref_lead2_global_mean_rr_interval                  : 847.463687
+  ref_lead2_global_min_heart_rate                    : 61.728395
+  ref_lead2_global_nn_xx                             : 179.000000
   ref_lead2_global_pnn_xx                            : 100.000000
-  ref_lead2_global_root_mean_square_of_successive_differences : 63.013567
-  ref_lead2_global_sdnn                              : 60.737619
-  ref_lead2_global_std_heart_rate                    : 4.228400
-  ref_lead2_iqr                                      : 0.000035
-  ref_lead2_iqr_rr                                   : 84.000000
-  ref_lead2_kurtosis                                 : 17.091272
-  ref_lead2_mav                                      : 0.000052
-  ref_lead2_max                                      : 0.000799
-  ref_lead2_max_hr                                   : 75.376884
-  ref_lead2_mean                                     : 0.000000
-  ref_lead2_mean_hr                                  : 64.982641
-  ref_lead2_mean_hr_filtered                         : 64.982641
-  ref_lead2_mean_rr                                  : 927.264000
-  ref_lead2_meandist                                 : 82.847658
-  ref_lead2_median                                   : 0.000000
-  ref_lead2_median_hr                                : 64.935065
-  ref_lead2_median_rr                                : 924.000000
-  ref_lead2_min                                      : -0.000593
-  ref_lead2_min_hr                                   : 55.555556
-  ref_lead2_n_r_peaks_filtered                       : 126
-  ref_lead2_n_r_peaks_raw                            : 126
-  ref_lead2_p25                                      : -0.000021
-  ref_lead2_p5                                       : -0.000103
-  ref_lead2_p75                                      : 0.000014
-  ref_lead2_p95                                      : 0.000073
+  ref_lead2_global_root_mean_square_of_successive_differences : 42.384012
+  ref_lead2_global_sdnn                              : 57.470542
+  ref_lead2_global_std_heart_rate                    : 4.992072
+  ref_lead2_iqr                                      : 0.000054
+  ref_lead2_iqr_rr                                   : 74.000000
+  ref_lead2_kurtosis                                 : 16.114551
+  ref_lead2_mav                                      : 0.000085
+  ref_lead2_max                                      : 0.001228
+  ref_lead2_max_hr                                   : 89.285714
+  ref_lead2_mean                                     : -0.000000
+  ref_lead2_mean_hr                                  : 71.136272
+  ref_lead2_mean_hr_filtered                         : 71.136272
+  ref_lead2_mean_rr                                  : 847.463687
+  ref_lead2_meandist                                 : 52.288975
+  ref_lead2_median                                   : -0.000001
+  ref_lead2_median_hr                                : 71.090047
+  ref_lead2_median_rr                                : 844.000000
+  ref_lead2_min                                      : -0.000732
+  ref_lead2_min_hr                                   : 61.728395
+  ref_lead2_n_r_peaks_filtered                       : 180
+  ref_lead2_n_r_peaks_raw                            : 180
+  ref_lead2_p25                                      : -0.000042
+  ref_lead2_p5                                       : -0.000217
+  ref_lead2_p75                                      : 0.000013
+  ref_lead2_p95                                      : 0.000184
   ref_lead2_peaks_rejected_pct                       : 0.000000
-  ref_lead2_pnn20                                    : 82.258065
-  ref_lead2_pnn50                                    : 45.967742
-  ref_lead2_r_amp_max                                : 0.000799
-  ref_lead2_r_amp_mean                               : 0.000750
-  ref_lead2_r_amp_median                             : 0.000748
-  ref_lead2_r_amp_min                                : 0.000696
-  ref_lead2_r_amp_std                                : 0.000023
-  ref_lead2_range                                    : 0.001392
-  ref_lead2_range_rr                                 : 284.000000
-  ref_lead2_rms                                      : 0.000127
-  ref_lead2_rmssd                                    : 63.013567
-  ref_lead2_sdnn                                     : 60.737619
-  ref_lead2_skewness                                 : 1.314751
-  ref_lead2_std                                      : 0.000127
-  ref_lead2_std_hr                                   : 4.228400
-  ref_lead2_std_hr_filtered                          : 4.228400
-  ref_lead2_std_rr                                   : 60.737619
+  ref_lead2_pnn20                                    : 61.797753
+  ref_lead2_pnn50                                    : 21.910112
+  ref_lead2_r_amp_max                                : 0.001228
+  ref_lead2_r_amp_mean                               : 0.001142
+  ref_lead2_r_amp_median                             : 0.001141
+  ref_lead2_r_amp_min                                : 0.001060
+  ref_lead2_r_amp_std                                : 0.000036
+  ref_lead2_range                                    : 0.001960
+  ref_lead2_range_rr                                 : 300.000000
+  ref_lead2_rms                                      : 0.000192
+  ref_lead2_rmssd                                    : 42.384012
+  ref_lead2_sdnn                                     : 57.470542
+  ref_lead2_skewness                                 : 2.579040
+  ref_lead2_std                                      : 0.000192
+  ref_lead2_std_hr                                   : 4.992072
+  ref_lead2_std_hr_filtered                          : 4.992072
+  ref_lead2_std_rr                                   : 57.470542
   ref_lead2_var                                      : 0.000000
-<<<<<<< HEAD
   ref_lead2_zcr                                      : 0.073949
   ref_respiration_bbi_cv                             : 0.208932
   ref_respiration_bbi_iqr                            : 0.634000
@@ -181,52 +176,3 @@ Total Features: 168
   ref_respiration_tidal_excursion_std                : 0.125495
   ref_respiration_var                                : 0.071674
   ref_respiration_zcr                                : 0.002646
-=======
-  ref_lead2_zcr                                      : 0.081291
-  ref_respiration_bbi_cv                             : 0.068648
-  ref_respiration_bbi_iqr                            : 0.440000
-  ref_respiration_bbi_mean                           : 4.222519
-  ref_respiration_bbi_meandist                       : 0.401222
-  ref_respiration_bbi_range                          : 1.092000
-  ref_respiration_bbi_rmssd                          : 0.313576
-  ref_respiration_bbi_std                            : 0.289869
-  ref_respiration_energy                             : 183753.604055
-  ref_respiration_envelope_max                       : 4.940250
-  ref_respiration_envelope_mean                      : 3.407517
-  ref_respiration_envelope_std                       : 0.600053
-  ref_respiration_feet_amp_mean                      : -3.964124
-  ref_respiration_feet_amp_std                       : 0.627340
-  ref_respiration_iqr                                : 4.511926
-  ref_respiration_kurtosis                           : -1.260475
-  ref_respiration_mav                                : 2.157416
-  ref_respiration_max                                : 4.009510
-  ref_respiration_mean                               : 0.008322
-  ref_respiration_median                             : 0.399173
-  ref_respiration_min                                : -4.858085
-  ref_respiration_n_feets_msptd                      : 29
-  ref_respiration_n_peaks_ampd                       : 28
-  ref_respiration_n_peaks_msptd                      : 28
-  ref_respiration_p25                                : -2.199596
-  ref_respiration_p5                                 : -4.065702
-  ref_respiration_p75                                : 2.312329
-  ref_respiration_p95                                : 3.143385
-  ref_respiration_peak_amp_max                       : 4.009510
-  ref_respiration_peak_amp_mean                      : 3.088607
-  ref_respiration_peak_amp_min                       : 2.489589
-  ref_respiration_peak_amp_std                       : 0.308164
-  ref_respiration_peak_method                        : msptd
-  ref_respiration_range                              : 8.867595
-  ref_respiration_resp_rate_max                      : 16.611296
-  ref_respiration_resp_rate_mean                     : 14.278675
-  ref_respiration_resp_rate_median                   : 13.940520
-  ref_respiration_resp_rate_min                      : 12.755102
-  ref_respiration_resp_rate_std                      : 1.010146
-  ref_respiration_rms                                : 2.446639
-  ref_respiration_skewness                           : -0.302367
-  ref_respiration_std                                : 2.446625
-  ref_respiration_tidal_excursion_cv                 : 0.113902
-  ref_respiration_tidal_excursion_mean               : 7.101794
-  ref_respiration_tidal_excursion_std                : 0.808909
-  ref_respiration_var                                : 5.985975
-  ref_respiration_zcr                                : 0.001889
->>>>>>> 0af7f45debd8126668931449cffcd6ead073bb90
