@@ -379,18 +379,12 @@ RESP_SIGNAL_PAIRS = {
     "impedance_pneumography": "ref_respiration",
 }
 
-def normalize_signal(sig):
-    return sig / np.max(np.abs(sig))
 
-def align_signals(dev_sig, bit_sig, fs):
+def align_signals(dev_sig, bit_sig, fs, max_lag_sec=5.0):
     """
     Normalize and align two signals using cross-correlation
     Returns aligned signals of equal length
     """
-    # dev_norm = normalize_signal(
-    #                np.array(dev_sig, dtype=np.float64).flatten())
-    # bit_norm = normalize_signal(
-    #                np.array(bit_sig, dtype=np.float64).flatten())
     dev_norm = np.array(dev_sig, dtype=np.float64).flatten()
     bit_norm = np.array(bit_sig, dtype=np.float64).flatten()
 
@@ -402,7 +396,12 @@ def align_signals(dev_sig, bit_sig, fs):
     # ─── Cross-correlate ──────────────────────────────────────
     correlation = correlate(dev_norm, bit_norm, mode='full')
     lags        = np.arange(-len(dev_norm)+1, len(dev_norm))
-    best_lag    = lags[np.argmax(correlation)]
+
+    # ─── Constrain lag search to ±max_lag_sec ─────────────────
+    max_lag_samples = int(max_lag_sec * fs)
+    valid_mask      = np.abs(lags) <= max_lag_samples
+    constrained_corr = np.where(valid_mask, correlation, -np.inf)
+    best_lag         = lags[np.argmax(constrained_corr)]
 
     # ─── Align ────────────────────────────────────────────────
     if best_lag > 0:
