@@ -1,0 +1,453 @@
+======================================================================
+SIGNAL QUALITY ASSESSMENT REPORT
+Generated: 2026-06-05 16:19:16
+======================================================================
+
+Signal                            Score    Quality
+--------------------------------------------------
+lead1                             90.5       good
+lead2                             90.5       good
+c1                                88.5       good
+c2                                90.5       good
+c3                                95.5       good
+c4                                83.0       good
+c5                                81.5       good
+impedance_pneumography            79.0       good
+imu_ribs                          52.3   moderate
+imu_chest                         52.3   moderate
+body_temperature                  46.0   moderate
+
+==================================================
+  lead1
+==================================================
+  signal_name                        : lead1
+  snr_db                             : 14.3276
+  snr_quality                        : good
+  n_r_peaks_raw                      : 180
+  n_r_peaks_filtered                 : 180
+  peak_rejection_rate                : 0.0000
+  peak_consistency                   : good
+  rr_mean_ms                         : 846.5475
+  rr_std_ms                          : 57.3402
+  rr_cv                              : 0.0677
+  rr_regularity                      : very_regular
+  n_impossible_rr                    : 0
+  impossible_rr_pct                  : 0.0000
+  skewness                           : 1.5146
+  skewness_quality                   : moderate
+  kurtosis                           : 1.2924
+  kurtosis_quality                   : good
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 0.8546
+  rms_amplitude                      : 0.1608
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.2074
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0012
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 73.8759
+  seg_quality_std                    : 8.0529
+  seg_quality_min                    : 57.9801
+  seg_quality_max                    : 87.4187
+  seg_n_good                         : 20
+  seg_n_moderate                     : 11
+  seg_n_poor                         : 0
+  seg_total                          : 31
+  overall_score                      : 90.5000
+  overall_quality                    : good
+
+==================================================
+  lead2
+==================================================
+  signal_name                        : lead2
+  snr_db                             : 13.0963
+  snr_quality                        : good
+  n_r_peaks_raw                      : 180
+  n_r_peaks_filtered                 : 180
+  peak_rejection_rate                : 0.0000
+  peak_consistency                   : good
+  rr_mean_ms                         : 846.5922
+  rr_std_ms                          : 57.4861
+  rr_cv                              : 0.0679
+  rr_regularity                      : very_regular
+  n_impossible_rr                    : 0
+  impossible_rr_pct                  : 0.0000
+  skewness                           : 1.8049
+  skewness_quality                   : moderate
+  kurtosis                           : 2.9255
+  kurtosis_quality                   : good
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 0.8017
+  rms_amplitude                      : 0.1284
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.3805
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0011
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 63.7665
+  seg_quality_std                    : 7.9424
+  seg_quality_min                    : 49.6949
+  seg_quality_max                    : 81.4482
+  seg_n_good                         : 7
+  seg_n_moderate                     : 24
+  seg_n_poor                         : 0
+  seg_total                          : 31
+  overall_score                      : 90.5000
+  overall_quality                    : good
+
+==================================================
+  c1
+==================================================
+  signal_name                        : c1
+  snr_db                             : 10.8978
+  snr_quality                        : good
+  n_r_peaks_raw                      : 182
+  n_r_peaks_filtered                 : 182
+  peak_rejection_rate                : 0.0000
+  peak_consistency                   : good
+  rr_mean_ms                         : 847.8232
+  rr_std_ms                          : 58.1707
+  rr_cv                              : 0.0686
+  rr_regularity                      : very_regular
+  n_impossible_rr                    : 0
+  impossible_rr_pct                  : 0.0000
+  skewness                           : -0.4486
+  skewness_quality                   : good
+  kurtosis                           : 14.6001
+  kurtosis_quality                   : poor
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 2.4281
+  rms_amplitude                      : 0.1136
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.4493
+  qrs_band_quality                   : moderate
+  baseline_wander_ratio              : 0.0018
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 59.2395
+  seg_quality_std                    : 12.3176
+  seg_quality_min                    : 7.0388
+  seg_quality_max                    : 75.8970
+  seg_n_good                         : 4
+  seg_n_moderate                     : 26
+  seg_n_poor                         : 1
+  seg_total                          : 31
+  overall_score                      : 88.5000
+  overall_quality                    : good
+
+==================================================
+  c2
+==================================================
+  signal_name                        : c2
+  snr_db                             : 15.5404
+  snr_quality                        : good
+  n_r_peaks_raw                      : 182
+  n_r_peaks_filtered                 : 182
+  peak_rejection_rate                : 0.0000
+  peak_consistency                   : good
+  rr_mean_ms                         : 847.8011
+  rr_std_ms                          : 58.4353
+  rr_cv                              : 0.0689
+  rr_regularity                      : very_regular
+  n_impossible_rr                    : 0
+  impossible_rr_pct                  : 0.0000
+  skewness                           : -0.9582
+  skewness_quality                   : good
+  kurtosis                           : 4.6645
+  kurtosis_quality                   : moderate
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 2.5738
+  rms_amplitude                      : 0.3484
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.3971
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0008
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 73.3232
+  seg_quality_std                    : 5.9934
+  seg_quality_min                    : 58.0793
+  seg_quality_max                    : 81.6605
+  seg_n_good                         : 22
+  seg_n_moderate                     : 9
+  seg_n_poor                         : 0
+  seg_total                          : 31
+  overall_score                      : 90.5000
+  overall_quality                    : good
+
+==================================================
+  c3
+==================================================
+  signal_name                        : c3
+  snr_db                             : 13.9054
+  snr_quality                        : good
+  n_r_peaks_raw                      : 182
+  n_r_peaks_filtered                 : 182
+  peak_rejection_rate                : 0.0000
+  peak_consistency                   : good
+  rr_mean_ms                         : 847.8011
+  rr_std_ms                          : 58.2625
+  rr_cv                              : 0.0687
+  rr_regularity                      : very_regular
+  n_impossible_rr                    : 0
+  impossible_rr_pct                  : 0.0000
+  skewness                           : 0.6313
+  skewness_quality                   : good
+  kurtosis                           : 2.0663
+  kurtosis_quality                   : good
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 4.3674
+  rms_amplitude                      : 0.4224
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.3166
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0011
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 80.3673
+  seg_quality_std                    : 10.7778
+  seg_quality_min                    : 35.8607
+  seg_quality_max                    : 92.2237
+  seg_n_good                         : 28
+  seg_n_moderate                     : 2
+  seg_n_poor                         : 1
+  seg_total                          : 31
+  overall_score                      : 95.5000
+  overall_quality                    : good
+
+==================================================
+  c4
+==================================================
+  signal_name                        : c4
+  snr_db                             : 13.8483
+  snr_quality                        : good
+  n_r_peaks_raw                      : 182
+  n_r_peaks_filtered                 : 182
+  peak_rejection_rate                : 0.0000
+  peak_consistency                   : good
+  rr_mean_ms                         : 847.8232
+  rr_std_ms                          : 58.2619
+  rr_cv                              : 0.0687
+  rr_regularity                      : very_regular
+  n_impossible_rr                    : 0
+  impossible_rr_pct                  : 0.0000
+  skewness                           : 1.0811
+  skewness_quality                   : moderate
+  kurtosis                           : 5.1523
+  kurtosis_quality                   : moderate
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 5.2428
+  rms_amplitude                      : 0.3291
+  amplitude_quality                  : moderate
+  qrs_band_ratio                     : 0.3651
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0012
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 74.2725
+  seg_quality_std                    : 9.7857
+  seg_quality_min                    : 31.4082
+  seg_quality_max                    : 84.0296
+  seg_n_good                         : 20
+  seg_n_moderate                     : 10
+  seg_n_poor                         : 1
+  seg_total                          : 31
+  overall_score                      : 83.0000
+  overall_quality                    : good
+
+==================================================
+  c5
+==================================================
+  signal_name                        : c5
+  snr_db                             : 12.1506
+  snr_quality                        : good
+  n_r_peaks_raw                      : 182
+  n_r_peaks_filtered                 : 182
+  peak_rejection_rate                : 0.0000
+  peak_consistency                   : good
+  rr_mean_ms                         : 847.8232
+  rr_std_ms                          : 58.2634
+  rr_cv                              : 0.0687
+  rr_regularity                      : very_regular
+  n_impossible_rr                    : 0
+  impossible_rr_pct                  : 0.0000
+  skewness                           : 1.3895
+  skewness_quality                   : moderate
+  kurtosis                           : 10.1515
+  kurtosis_quality                   : poor
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 4.0589
+  rms_amplitude                      : 0.2245
+  amplitude_quality                  : good
+  qrs_band_ratio                     : 0.3977
+  qrs_band_quality                   : poor
+  baseline_wander_ratio              : 0.0014
+  baseline_wander_quality            : good
+  seg_quality_mean                   : 60.5597
+  seg_quality_std                    : 9.6857
+  seg_quality_min                    : 15.2175
+  seg_quality_max                    : 71.7001
+  seg_n_good                         : 1
+  seg_n_moderate                     : 29
+  seg_n_poor                         : 1
+  seg_total                          : 31
+  overall_score                      : 81.5000
+  overall_quality                    : good
+
+==================================================
+  impedance_pneumography
+==================================================
+  signal_name                        : impedance_pneumography
+  snr_db                             : 15.1372
+  snr_quality                        : good
+  n_peaks_ampd                       : 1
+  n_peaks_msptd                      : 2
+  peak_method_agreement              : 0.5000
+  peak_agreement_quality             : poor
+  breathing_band_ratio               : 0.8708
+  breathing_band_quality             : good
+  skewness                           : 0.0736
+  skewness_quality                   : good
+  kurtosis                           : -1.5983
+  kurtosis_quality                   : good
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  flatline_quality                   : good
+  peak_to_peak                       : 1.4882
+  rms_amplitude                      : 0.5764
+  overall_score                      : 79.0000
+  overall_quality                    : good
+
+==================================================
+  imu_ribs
+==================================================
+  imu_name                           : ribs
+  ribs_acc_x_skewness                : 0.3329
+  ribs_acc_x_kurtosis                : 52.6879
+  ribs_acc_x_flatline_pct            : 0.0000
+  ribs_acc_x_peak_to_peak            : 14.8686
+  ribs_acc_x_rms                     : 0.7391
+  ribs_acc_x_spike_pct               : 1.2177
+  ribs_acc_x_spike_quality           : moderate
+  ribs_acc_y_skewness                : 1.9113
+  ribs_acc_y_kurtosis                : 33.1712
+  ribs_acc_y_flatline_pct            : 0.0000
+  ribs_acc_y_peak_to_peak            : 12.3486
+  ribs_acc_y_rms                     : 0.6934
+  ribs_acc_y_spike_pct               : 1.4349
+  ribs_acc_y_spike_quality           : moderate
+  ribs_acc_z_skewness                : -0.0388
+  ribs_acc_z_kurtosis                : 5.7294
+  ribs_acc_z_flatline_pct            : 0.0000
+  ribs_acc_z_peak_to_peak            : 5.2654
+  ribs_acc_z_rms                     : 0.4562
+  ribs_acc_z_spike_pct               : 1.2461
+  ribs_acc_z_spike_quality           : moderate
+  ribs_gyr_x_skewness                : 2.4612
+  ribs_gyr_x_kurtosis                : 9.3704
+  ribs_gyr_x_flatline_pct            : 0.0000
+  ribs_gyr_x_peak_to_peak            : 0.0557
+  ribs_gyr_x_rms                     : 0.0068
+  ribs_gyr_x_spike_pct               : 2.5672
+  ribs_gyr_x_spike_quality           : moderate
+  ribs_gyr_y_skewness                : -3.3242
+  ribs_gyr_y_kurtosis                : 11.5451
+  ribs_gyr_y_flatline_pct            : 1.4245
+  ribs_gyr_y_peak_to_peak            : 0.0732
+  ribs_gyr_y_rms                     : 0.0119
+  ribs_gyr_y_spike_pct               : 4.6225
+  ribs_gyr_y_spike_quality           : moderate
+  ribs_gyr_z_skewness                : -2.9635
+  ribs_gyr_z_kurtosis                : 10.3190
+  ribs_gyr_z_flatline_pct            : 0.0000
+  ribs_gyr_z_peak_to_peak            : 0.0686
+  ribs_gyr_z_rms                     : 0.0087
+  ribs_gyr_z_spike_pct               : 3.2678
+  ribs_gyr_z_spike_quality           : moderate
+  ribs_acc_mag_mean                  : 0.5845
+  ribs_acc_mag_std                   : 0.9453
+  ribs_gravity_deviation             : 9.2255
+  ribs_acc_calibration               : poor
+  overall_score                      : 52.2877
+  overall_quality                    : moderate
+
+==================================================
+  imu_chest
+==================================================
+  imu_name                           : chest
+  chest_acc_x_skewness               : -0.9214
+  chest_acc_x_kurtosis               : 13.8571
+  chest_acc_x_flatline_pct           : 0.0000
+  chest_acc_x_peak_to_peak           : 5.3760
+  chest_acc_x_rms                    : 0.3547
+  chest_acc_x_spike_pct              : 1.4452
+  chest_acc_x_spike_quality          : moderate
+  chest_acc_y_skewness               : -1.4615
+  chest_acc_y_kurtosis               : 52.0865
+  chest_acc_y_flatline_pct           : 0.0000
+  chest_acc_y_peak_to_peak           : 24.1826
+  chest_acc_y_rms                    : 1.2047
+  chest_acc_y_spike_pct              : 1.5434
+  chest_acc_y_spike_quality          : moderate
+  chest_acc_z_skewness               : -1.3398
+  chest_acc_z_kurtosis               : 31.2057
+  chest_acc_z_flatline_pct           : 0.0000
+  chest_acc_z_peak_to_peak           : 7.7867
+  chest_acc_z_rms                    : 0.4218
+  chest_acc_z_spike_pct              : 1.6856
+  chest_acc_z_spike_quality          : moderate
+  chest_gyr_x_skewness               : -2.3384
+  chest_gyr_x_kurtosis               : 19.2584
+  chest_gyr_x_flatline_pct           : 0.0000
+  chest_gyr_x_peak_to_peak           : 0.2188
+  chest_gyr_x_rms                    : 0.0173
+  chest_gyr_x_spike_pct              : 2.8490
+  chest_gyr_x_spike_quality          : moderate
+  chest_gyr_y_skewness               : 1.7071
+  chest_gyr_y_kurtosis               : 6.3172
+  chest_gyr_y_flatline_pct           : 0.4111
+  chest_gyr_y_peak_to_peak           : 0.0634
+  chest_gyr_y_rms                    : 0.0070
+  chest_gyr_y_spike_pct              : 2.2751
+  chest_gyr_y_spike_quality          : moderate
+  chest_gyr_z_skewness               : -3.9448
+  chest_gyr_z_kurtosis               : 23.3663
+  chest_gyr_z_flatline_pct           : 0.9385
+  chest_gyr_z_peak_to_peak           : 0.1550
+  chest_gyr_z_rms                    : 0.0143
+  chest_gyr_z_spike_pct              : 2.4535
+  chest_gyr_z_spike_quality          : moderate
+  chest_acc_mag_mean                 : 0.5727
+  chest_acc_mag_std                  : 1.1946
+  chest_gravity_deviation            : 9.2373
+  chest_acc_calibration              : poor
+  overall_score                      : 52.3252
+  overall_quality                    : moderate
+
+==================================================
+  body_temperature
+==================================================
+  signal_name                        : body_temperature
+  mean_temperature                   : 35.6758
+  std_temperature                    : 1.1873
+  min_temperature                    : 30.3984
+  max_temperature                    : 36.2734
+  physiological_range                : good
+  range                              : 5.8750
+  stability                          : unstable
+  n_flatlines                        : 0
+  flatline_pct                       : 0.0000
+  n_sudden_jumps                     : 0
+  jump_pct                           : 0.0000
+  overall_score                      : 46.0000
+  overall_quality                    : moderate

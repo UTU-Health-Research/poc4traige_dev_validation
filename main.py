@@ -207,7 +207,7 @@ def main():
         preprocessed=preprocessed_signals,
         fiducials=dev_fiducials,
         features=dev_features,
-        reference_temp=35.1, # ← set your digital-thermometer reading here
+        reference_temp=35.2, # ← set your digital-thermometer reading here
         spike_masks=spike_masks,
         fs=250,
         output_dir="outputs/plots/device",

@@ -357,18 +357,18 @@ def plot_temperature(preprocessed, signal_name="body_temperature",
 
     # Measured temperature
     ax.plot(t, sig, color='steelblue', linewidth=2,
-            label='Measured Temperature')
+            label='Measured Temperature (Armpit)')
 
     # Reference temperature (horizontal line)
     if reference_temp is not None:
         ax.axhline(y=reference_temp, color='crimson', linestyle='--',
                     linewidth=2, label=f'Reference ({reference_temp:.1f} °C)')
 
-    ax.set_title("Body Temperature (Armpit)", fontsize=14, fontweight='bold')
+    # ax.set_title("Body Temperature (Armpit)", fontsize=14, fontweight='bold')
     ax.set_xlabel("Time (s)", fontsize=14)
     ax.set_ylabel("Temperature (°C)", fontsize=14)
     ax.tick_params(axis='both', labelsize=14)
-    ax.legend(fontsize=14, loc='best')
+    ax.legend(fontsize=14, loc='lower right', framealpha=0.5, frameon=True)
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
