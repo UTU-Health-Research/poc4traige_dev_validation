@@ -416,3 +416,26 @@ def align_signals(dev_sig, bit_sig, fs, max_lag_sec=5.0):
 
     min_len = min(len(dev_aligned), len(bit_aligned))
     return dev_aligned[:min_len], bit_aligned[:min_len], best_lag
+
+def apply_lag(dev_sig, lag, ref_sig=None):
+    dev_sig = np.array(dev_sig, dtype=np.float64).flatten()
+    if lag > 0:
+        dev_al = dev_sig[lag:]
+    elif lag < 0:
+        dev_al = dev_sig[:len(dev_sig) - abs(lag)]
+    else:
+        dev_al = dev_sig
+
+    if ref_sig is not None:
+        ref_sig = np.array(ref_sig, dtype=np.float64).flatten()
+        if lag > 0:
+            ref_al = ref_sig[:len(dev_al)]
+        elif lag < 0:
+            ref_al = ref_sig[abs(lag):]
+        else:
+            ref_al = ref_sig
+
+        min_len = min(len(dev_al), len(ref_al))
+        return dev_al[:min_len], ref_al[:min_len]
+
+    return dev_al, None

@@ -46,6 +46,18 @@ ECG_SIGNAL_PAIRS = {
 
 RESP_SIGNAL_PAIRS = {
     "impedance_pneumography": "ref_respiration",
+    "accx_ribs_imu": "ref_respiration",
+    "accy_ribs_imu": "ref_respiration",
+    "accz_ribs_imu": "ref_respiration",
+    "gyrx_ribs_imu": "ref_respiration",
+    "gyry_ribs_imu": "ref_respiration",
+    "gyrz_ribs_imu": "ref_respiration",
+    "accx_chest_imu": "ref_respiration",
+    "accy_chest_imu": "ref_respiration",
+    "accz_chest_imu": "ref_respiration",
+    "gyrx_chest_imu": "ref_respiration",
+    "gyry_chest_imu": "ref_respiration",
+    "gyrz_chest_imu": "ref_respiration",
 }
 
 RESP_MODALITY_SOURCES = {
@@ -125,56 +137,19 @@ def prepare_resp_modality_signals(preprocessed_signals, fs=250):
 
 def _detect_r_peaks_robust(sig, fs):
     """
-    R-peak detection with ordered fallback chain.
-
-    Order:
-        1. ecg_modified_pan_tompkins  — gold standard for clean ECG
-        2. ampd                       — scale-space, good for noisy ECG
-        3. msptd                      — multi-scale, handles low amplitude
-        4. simple threshold           — last resort
-
-    FIX vs original: Method 2 was mistakenly calling msptd instead of ampd.
+    R-peak detection with ecg_modified_pan_tompkins  — gold standard for clean ECG
 
     Returns
     -------
     peaks  : np.ndarray  (indices)
     method : str
     """
-    # ── Method 1: Modified Pan-Tompkins ───────────────────
+    # ── Method: Modified Pan-Tompkins ───────────────────
     try:
         peaks = np.array(ecg_modified_pan_tompkins(sig, fs), dtype=int)
         peaks = peaks[(peaks >= 0) & (peaks < len(sig))]
         if len(peaks) >= 2:
             return peaks, "pan_tompkins"
-    except Exception:
-        pass
-
-    # ── Method 2: AMPD (was incorrectly msptd in original) ─
-    try:
-        peaks = np.array(ampd(sig, fs), dtype=int)
-        peaks = peaks[(peaks >= 0) & (peaks < len(sig))]
-        if len(peaks) >= 2:
-            return peaks, "ampd"
-    except Exception:
-        pass
-
-    # ── Method 3: MSPTD ───────────────────────────────────
-    try:
-        result = msptd(sig, fs)
-        # msptd returns (peaks, troughs) — take first element
-        peaks = np.array(result[0] if isinstance(result, tuple) else result,
-                         dtype=int)
-        peaks = peaks[(peaks >= 0) & (peaks < len(sig))]
-        if len(peaks) >= 2:
-            return peaks, "msptd"
-    except Exception:
-        pass
-
-    # ── Method 4: Simple threshold ────────────────────────
-    try:
-        peaks = _simple_peak_detect(sig, fs)
-        if len(peaks) >= 2:
-            return peaks, "simple_threshold"
     except Exception:
         pass
 
@@ -224,9 +199,6 @@ def _get_clean_r_peaks(seg, fs):
     """
     Full R-peak pipeline for a single segment:
         detect → gentle filter → vitalwave filter (if enough beats).
-
-    Centralises the logic that was duplicated across three functions
-    in the original code.
 
     Returns
     -------
@@ -454,19 +426,12 @@ def extract_segment_ecg_features(segment, fs=250):
     Target features:
         • Heart rate (mean, std, min, max, median)
         • RMSSD  — computed on RAW consecutive RR pairs (gap-safe)
-        • R-peak sensitivity vs reference (filled by segment_and_extract)
-        • SNR (QRS power / isoelectric noise power)
-        • Beat-anchored RR rolling std (5-beat window)
-        • Full HRV time-domain suite (SDNN, pNN50, pNN20)
-        • Signal quality (kurtosis, skewness, energy)
 
-    RMSSD fix: rr_ms_raw (all consecutive RR intervals from detected
-    peaks) is kept intact. The physiological validity filter is applied
+    RMSSD: The physiological validity filter is applied
     as a pair-wise mask on np.diff(rr_ms_raw) so that differences are
     only included when BOTH adjacent RR intervals pass the filter.
     This prevents artificial large differences caused by crossing gaps
-    left by filtered-out beats — the root cause of inflated RMSSD
-    in the previous implementation.
+    left by filtered-out beats.
 
     Parameters
     ----------
@@ -488,11 +453,6 @@ def extract_segment_ecg_features(segment, fs=250):
     # ── Shared signal-level stats (always computable) ─────────────────────
     base = dict(
         signal_mean     = float(np.mean(sig)),
-        signal_std      = float(np.std(sig)),
-        signal_rms      = float(np.sqrt(np.mean(sig ** 2))),
-        signal_energy   = float(np.sum(sig ** 2)),
-        signal_kurtosis = float(kurtosis(sig, fisher=True, bias=False)),
-        signal_skewness = float(skew(sig, bias=False)),
     )
 
     # ── R-peak detection (single centralised call) ────────────────────────
@@ -502,20 +462,7 @@ def extract_segment_ecg_features(segment, fs=250):
 
     # ── NaN placeholders — overwritten below if peaks are available ───────
     base.update(dict(
-        mean_hr=_nan, std_hr=_nan, min_hr=_nan,
-        max_hr=_nan,  median_hr=_nan,
-        mean_rr=_nan, std_rr=_nan,  sdnn=_nan,
-        median_rr=_nan, rmssd=_nan,
-        pnn50=_nan, pnn20=_nan,
-        r_amp_mean=_nan, r_amp_std=_nan,
-        snr_db=_nan, signal_power=_nan, noise_power=_nan,
-        rr_rolling_std_mean=_nan, rr_rolling_std_max=_nan,
-        rr_rolling_std_min=_nan,  rr_rolling_std_cv=_nan,
-        rr_rolling_std_n_windows=0,
-        # R-peak sensitivity is filled in segment_and_extract()
-        # where both device and reference peaks are available.
-        # Placeholder keeps the column schema consistent.
-        rp_sensitivity=_nan, rp_ppv=_nan, rp_f1=_nan,
+        mean_hr=_nan, rmssd=_nan,
     ))
 
     if len(r_peaks) < 2:
@@ -540,16 +487,6 @@ def extract_segment_ecg_features(segment, fs=250):
     # ── 1. Heart rate (from physiologically valid RR intervals only) ──────
     hr_valid          = 60000.0 / rr_ms_valid
     base['mean_hr']   = float(np.mean(hr_valid))
-    base['std_hr']    = float(np.std(hr_valid))
-    base['min_hr']    = float(np.min(hr_valid))
-    base['max_hr']    = float(np.max(hr_valid))
-    base['median_hr'] = float(np.median(hr_valid))
-
-    # ── HRV time-domain (valid RR) ────────────────────────────────────────
-    base['mean_rr']   = float(np.mean(rr_ms_valid))
-    base['std_rr']    = float(np.std(rr_ms_valid))
-    base['sdnn']      = float(np.std(rr_ms_valid))
-    base['median_rr'] = float(np.median(rr_ms_valid))
 
     # ── 2. RMSSD — gap-safe computation on raw consecutive pairs ──────────
     # A successive difference rr[i+1] - rr[i] is included only when
@@ -569,40 +506,10 @@ def extract_segment_ecg_features(segment, fs=250):
 
         if len(diff_rr) > 0:
             base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2)))
-            base['pnn50'] = float(
-                100 * np.sum(np.abs(diff_rr) > 50) / len(diff_rr)
-            )
-            base['pnn20'] = float(
-                100 * np.sum(np.abs(diff_rr) > 20) / len(diff_rr)
-            )
         else:
             base['rmssd'] = 0.0
-            base['pnn50'] = 0.0
-            base['pnn20'] = 0.0
     else:
         base['rmssd'] = 0.0
-        base['pnn50'] = 0.0
-        base['pnn20'] = 0.0
-
-    # ── R-peak amplitude ──────────────────────────────────────────────────
-    valid_pk = r_peaks[(r_peaks >= 0) & (r_peaks < len(sig))]
-    if len(valid_pk) > 0:
-        base['r_amp_mean'] = float(np.mean(sig[valid_pk]))
-        base['r_amp_std']  = float(np.std(sig[valid_pk]))
-
-    # ── 3. SNR (QRS power / isoelectric baseline power) ──────────────────
-    snr = compute_ecg_snr(sig, fs, r_peaks)
-    base['snr_db']       = snr['snr_db']
-    base['signal_power'] = snr['signal_power']
-    base['noise_power']  = snr['noise_power']
-
-    # ── 4. Beat-anchored RR rolling std (5-beat sliding window) ──────────
-    rrs = compute_rr_rolling_std(sig, fs, r_peaks, window_beats=5)
-    base['rr_rolling_std_mean']      = rrs['rr_rolling_std_mean']
-    base['rr_rolling_std_max']       = rrs['rr_rolling_std_max']
-    base['rr_rolling_std_min']       = rrs['rr_rolling_std_min']
-    base['rr_rolling_std_cv']        = rrs['rr_rolling_std_cv']
-    base['rr_rolling_std_n_windows'] = rrs['n_windows']
 
     return base
 
@@ -614,10 +521,6 @@ def extract_segment_ecg_features(segment, fs=250):
 def _compute_resp_spectrum(sig, fs):
     """
     Compute one-sided power spectrum for the respiratory band.
-
-    Single FFT call — result reused by SPI, spectral RQI, and
-    dominant frequency to avoid the triple-recomputation in the
-    original code.
 
     Parameters
     ----------
@@ -803,16 +706,13 @@ def extract_segment_resp_features(segment, fs=250):
     # ── Signal-level stats (always computable) ────────────
     base = dict(
         signal_mean   = float(np.mean(sig)),
-        signal_std    = float(np.std(sig)),
-        signal_rms    = float(np.sqrt(np.mean(sig ** 2))),
-        signal_energy = float(np.sum(sig ** 2)),
     )
 
     # ── 1. Respiration rate via peak detection ────────────
     peaks  = np.array([], dtype=int)
     method = "none"
 
-    # Try AMPD first (better for smooth respiratory waveforms)
+    # ampd
     try:
         p = np.array(ampd(sig, fs), dtype=int)
         p = p[(p >= 0) & (p < len(sig))]
@@ -821,43 +721,25 @@ def extract_segment_resp_features(segment, fs=250):
     except Exception:
         pass
 
-    # Fallback: MSPTD
-    if len(peaks) < 2:
-        try:
-            result = msptd(sig, fs)
-            p = np.array(
-                result[0] if isinstance(result, tuple) else result,
-                dtype=int
-            )
-            p = p[(p >= 0) & (p < len(sig))]
-            if len(p) >= 2:
-                peaks, method = p, "msptd"
-        except Exception:
-            pass
-
-    # Fallback: simple threshold
-    if len(peaks) < 2:
-        try:
-            min_dist = int(fs * 1.0)
-            height   = np.mean(sig) + 0.3 * np.std(sig)
-            p, _     = find_peaks(sig, height=height, distance=min_dist)
-            if len(p) >= 2:
-                peaks, method = p.astype(int), "simple_threshold"
-        except Exception:
-            pass
+    # # MSPTD
+    # if len(peaks) < 2:
+    #     try:
+    #         result = msptd(sig, fs)
+    #         p = np.array(
+    #             result[0] if isinstance(result, tuple) else result,
+    #             dtype=int
+    #         )
+    #         p = p[(p >= 0) & (p < len(sig))]
+    #         if len(p) >= 2:
+    #             peaks, method = p, "msptd"
+    #     except Exception:
+    #         pass
 
     base['peak_method'] = method
-    base['n_breaths']   = len(peaks)
 
     # ── Placeholder defaults ──────────────────────────────
     resp_defaults = dict(
-        resp_rate_mean=_nan,  resp_rate_std=_nan,
-        resp_rate_min=_nan,   resp_rate_max=_nan,
-        resp_rate_median=_nan,
-        bbi_mean=_nan, bbi_std=_nan, bbi_cv=_nan, bbi_rmssd=_nan,
-        peak_amp_mean=_nan, peak_amp_std=_nan,
-        spi=_nan, spectral_rqi=_nan, dominant_freq_hz=_nan,
-        ac_rqi=_nan, dominant_period_sec=_nan,
+        resp_rate_mean=_nan, spectral_rqi=_nan,
     )
     base.update(resp_defaults)
 
@@ -869,33 +751,19 @@ def extract_segment_resp_features(segment, fs=250):
             freqs, power, resp_mask, p_total, p_band = \
                 _compute_resp_spectrum(sig, fs)
 
-            # 3. SPI
-            base['spi'] = _signal_purity_index(
-                freqs, power, resp_mask, p_total
-            )
+            # # 3. SPI
+            # base['spi'] = _signal_purity_index(
+            #     freqs, power, resp_mask, p_total
+            # )
 
             # 4. Spectral RQI + dominant frequency
             srqi, dom_freq = _spectral_rqi(
                 freqs, power, resp_mask, p_band
             )
             base['spectral_rqi']    = srqi
-            base['dominant_freq_hz'] = dom_freq   # Hz; ×60 = breaths/min
 
         except Exception:
             pass  # leave NaN defaults
-
-    # ── AC RQI + dominant period ──────────────────────────
-    try:
-        ac_rqi, dom_period = _autocorrelation_rqi(sig, fs)
-        base['ac_rqi']             = ac_rqi
-        # 2. Dominant period
-        base['dominant_period_sec'] = dom_period  # s; 1/period = freq in Hz
-    except Exception:
-        pass
-
-    # ── Rate / BBI features (only if peaks were found) ────
-    if len(peaks) < 2:
-        return base
 
     bbi      = np.diff(peaks) / fs                         # seconds
     bbi_valid = bbi[(bbi > 0.5) & (bbi < 20.0)]            # 3–120 brpm
@@ -904,29 +772,8 @@ def extract_segment_resp_features(segment, fs=250):
 
     resp_rate = 60.0 / bbi_valid
 
-    # 1. Respiration rate
+    # Respiration rate
     base['resp_rate_mean']   = float(np.mean(resp_rate))
-    base['resp_rate_std']    = float(np.std(resp_rate))
-    base['resp_rate_min']    = float(np.min(resp_rate))
-    base['resp_rate_max']    = float(np.max(resp_rate))
-    base['resp_rate_median'] = float(np.median(resp_rate))
-
-    # BBI
-    base['bbi_mean'] = float(np.mean(bbi_valid))
-    base['bbi_std']  = float(np.std(bbi_valid))
-    base['bbi_cv']   = float(
-        np.std(bbi_valid) / max(np.mean(bbi_valid), 1e-8)
-    )
-
-    if len(bbi_valid) > 1:
-        diff_bbi        = np.diff(bbi_valid)
-        base['bbi_rmssd'] = float(np.sqrt(np.mean(diff_bbi ** 2)))
-
-    # Peak amplitude
-    valid_pk = peaks[(peaks >= 0) & (peaks < len(sig))]
-    if len(valid_pk) > 0:
-        base['peak_amp_mean'] = float(np.mean(sig[valid_pk]))
-        base['peak_amp_std']  = float(np.std(sig[valid_pk]))
 
     return base
 
@@ -1108,109 +955,6 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
         paired_df[f'dev_{col}'] = dv
         paired_df[f'ref_{col}'] = rv
         paired_df[f'diff_{col}'] = dv - rv
-
-        denom = np.where(np.abs(rv) > 1e-10, np.abs(rv), 1e-10)
-        paired_df[f'pct_diff_{col}'] = np.abs(dv - rv) / denom * 100
-
-    # ── ECG: per-segment R-peak timing errors + sensitivity ─
-    if signal_type == "ecg" and len(paired_df) > 0:
-        te_rows = []
-        for _, row in paired_df.iterrows():
-            idx   = int(row['segment'])
-            start = idx * window_samples
-            end   = start + window_samples
-
-            dp, _ = _get_clean_r_peaks(dev_sig[start:end], fs)
-            rp, _ = _get_clean_r_peaks(ref_sig[start:end], fs)
-            te    = compute_r_peak_timing_error(dp, rp, fs)
-
-            te_rows.append(dict(
-                rp_mae_ms      = te['mae_ms'],
-                rp_me_ms       = te['me_ms'],
-                rp_std_ms      = te['std_ms'],
-                rp_rmse_ms     = te['rmse_ms'],
-                # 3. R-peak sensitivity (TP / (TP + FN)) per segment
-                rp_sensitivity = te['sensitivity'],
-                rp_ppv         = te['ppv'],
-                rp_f1          = te['f1'],
-                rp_n_matched   = te['n_matched'],
-                rp_n_missed    = te['n_missed'],
-                rp_n_extra     = te['n_extra'],
-            ))
-
-        te_df = pd.DataFrame(te_rows)
-        for col in te_df.columns:
-            paired_df[col] = te_df[col].values
-
-    # ── Respiration: AC RQI quality gate ──────────────────
-    if (signal_type == "respiration"
-            and ac_rqi_min is not None
-            and len(paired_df) > 0):
-
-        dev_ac = pd.to_numeric(
-            paired_df.get('dev_ac_rqi',
-                          pd.Series([float('nan')] * len(paired_df))),
-            errors='coerce'
-        )
-        ref_ac = pd.to_numeric(
-            paired_df.get('ref_ac_rqi',
-                          pd.Series([float('nan')] * len(paired_df))),
-            errors='coerce'
-        )
-
-        paired_df['quality_gate_pass'] = (
-            (dev_ac >= ac_rqi_min) & (ref_ac >= ac_rqi_min)
-        ).astype(int)
-
-        n_before   = len(paired_df)
-        n_excluded = int((paired_df['quality_gate_pass'] == 0).sum())
-
-        if n_excluded > 0:
-            print(f"    [QUALITY GATE] ac_rqi_min={ac_rqi_min}: "
-                  f"excluded {n_excluded}/{n_before} segments")
-            paired_df_clean = (paired_df[paired_df['quality_gate_pass'] == 1]
-                               .reset_index(drop=True))
-            print(f"    [QUALITY GATE] {len(paired_df_clean)} segments remain")
-        else:
-            paired_df_clean = paired_df.copy()
-            print(f"    [QUALITY GATE] All {n_before} segments pass")
-
-        paired_df.attrs['paired_df_clean'] = paired_df_clean
-
-    # ── Energy-weighted signal quality summary ─────────────
-    def _weighted_avg(df, value_col, weight_col='signal_energy'):
-        if df is None or len(df) == 0:
-            return float('nan')
-        if value_col not in df.columns or weight_col not in df.columns:
-            return float('nan')
-        v = pd.to_numeric(df[value_col], errors='coerce')
-        w = pd.to_numeric(df[weight_col], errors='coerce')
-        mask = v.notna() & w.notna() & (w > 0)
-        if not mask.any():
-            return float('nan')
-        return float(np.average(v[mask], weights=w[mask]))
-
-    dev_wt_kurt = _weighted_avg(dev_df, 'signal_kurtosis')
-    dev_wt_skew = _weighted_avg(dev_df, 'signal_skewness')
-    ref_wt_kurt = _weighted_avg(ref_df, 'signal_kurtosis')
-    ref_wt_skew = _weighted_avg(ref_df, 'signal_skewness')
-
-    if len(paired_df) > 0:
-        for col, val in [('dev_weighted_kurtosis', dev_wt_kurt),
-                         ('dev_weighted_skewness', dev_wt_skew),
-                         ('ref_weighted_kurtosis', ref_wt_kurt),
-                         ('ref_weighted_skewness', ref_wt_skew)]:
-            paired_df[col] = float('nan')
-            paired_df.loc[0, col] = val
-
-    print(f"    Segments: {n_segments} total | "
-          f"Dev: {len(dev_df)} (fail: {fail_log['dev_fail']}) | "
-          f"Ref: {len(ref_df)} (fail: {fail_log['ref_fail']}) | "
-          f"Paired: {len(paired_df)}")
-    print(f"    Weighted kurtosis — Dev: {dev_wt_kurt:.4f}  "
-          f"Ref: {ref_wt_kurt:.4f}")
-    print(f"    Weighted skewness — Dev: {dev_wt_skew:.4f}  "
-          f"Ref: {ref_wt_skew:.4f}")
 
     return dev_df, ref_df, paired_df
 
@@ -1576,7 +1320,6 @@ def _export_resp_modality_report(modality_dfs, pairwise_results,
 # ═══════════════════════════════════════════════════════════════
 
 def compare_features(dev_preprocessed, ref_preprocessed,
-                     dev_features=None, ref_features=None,
                      fs=250, window_sec=10,
                      output_dir="outputs/comparison"):
     """
@@ -1647,55 +1390,55 @@ def compare_features(dev_preprocessed, ref_preprocessed,
             dev_df=dev_df, ref_df=ref_df, paired_df=paired_df,
         )
 
-    # ── 3. Multi-modal respiration ─────────────────────────
-    print("\n[3/3] Multi-Modal Respiration Comparison")
-    print("-" * 40)
-    modality_results = compare_resp_modalities(
-        dev_preprocessed, fs=fs, window_sec=window_sec,
-        output_dir=output_dir
-    )
-    if modality_results:
-        comparison_results['resp_modality'] = modality_results
+    # # ── 3. Multi-modal respiration ─────────────────────────
+    # print("\n[3/3] Multi-Modal Respiration Comparison")
+    # print("-" * 40)
+    # modality_results = compare_resp_modalities(
+    #     dev_preprocessed, fs=fs, window_sec=window_sec,
+    #     output_dir=output_dir
+    # )
+    # if modality_results:
+    #     comparison_results['resp_modality'] = modality_results
 
     # ── Export ────────────────────────────────────────────
     _export_segment_tables(comparison_results, output_dir)
     _export_segment_report(comparison_results, output_dir)
 
-    plot_lead_correlation(
-        dev_preprocessed, ref_preprocessed, comparison_results,
-        fs=fs, output_dir=os.path.join(output_dir, "plots"),
-        show=False, save=True
-    )
+    # plot_lead_correlation(
+    #     dev_preprocessed, ref_preprocessed, comparison_results,
+    #     fs=fs, output_dir=os.path.join(output_dir, "plots"),
+    #     show=False, save=True
+    # )
 
-    # ── Beat-level RR tables ──────────────────────────────
-    rr_dir = os.path.join(output_dir, "tables", "beat_rr")
-    _ensure_dir(rr_dir)
+    # # ── Beat-level RR tables ──────────────────────────────
+    # rr_dir = os.path.join(output_dir, "tables", "beat_rr")
+    # _ensure_dir(rr_dir)
 
-    for dev_name, ref_name in ECG_SIGNAL_PAIRS.items():
-        if (dev_name not in dev_preprocessed or
-                ref_name not in ref_preprocessed):
-            continue
+    # for dev_name, ref_name in ECG_SIGNAL_PAIRS.items():
+    #     if (dev_name not in dev_preprocessed or
+    #             ref_name not in ref_preprocessed):
+    #         continue
 
-        paired_beats, rr_summary = pair_rr_sequences(
-            dev_preprocessed[dev_name],
-            ref_preprocessed[ref_name],
-            fs=fs, window_sec=window_sec
-        )
-        label = f"{dev_name}_vs_{ref_name}"
+    #     paired_beats, rr_summary = pair_rr_sequences(
+    #         dev_preprocessed[dev_name],
+    #         ref_preprocessed[ref_name],
+    #         fs=fs, window_sec=window_sec
+    #     )
+    #     label = f"{dev_name}_vs_{ref_name}"
 
-        if len(paired_beats) > 0:
-            bt_path = os.path.join(rr_dir, f"{label}_beat_rr.csv")
-            paired_beats.to_csv(bt_path, index=False)
-            print(f"  [TABLE] {bt_path}")
+    #     if len(paired_beats) > 0:
+    #         bt_path = os.path.join(rr_dir, f"{label}_beat_rr.csv")
+    #         paired_beats.to_csv(bt_path, index=False)
+    #         print(f"  [TABLE] {bt_path}")
 
-        if rr_summary:
-            sm_path = os.path.join(rr_dir, f"{label}_rr_summary.json")
-            with open(sm_path, 'w', encoding='utf-8') as fj:
-                json.dump(
-                    {k: _make_serializable(v) for k, v in rr_summary.items()},
-                    fj, indent=4
-                )
-            print(f"  [JSON]  {sm_path}")
+        # if rr_summary:
+        #     sm_path = os.path.join(rr_dir, f"{label}_rr_summary.json")
+        #     with open(sm_path, 'w', encoding='utf-8') as fj:
+        #         json.dump(
+        #             {k: _make_serializable(v) for k, v in rr_summary.items()},
+        #             fj, indent=4
+        #         )
+        #     print(f"  [JSON]  {sm_path}")
 
     return comparison_results
 
@@ -1717,14 +1460,14 @@ def _export_segment_tables(comparison_results, output_dir):
         ref_df    = result['ref_df']
         paired_df = result['paired_df']
 
-        if len(dev_df) > 0:
-            p = os.path.join(tables_dir, f"{pair_name}_device_segments.csv")
-            dev_df.to_csv(p, index=False); print(f"  [TABLE] {p}")
+        # if len(dev_df) > 0:
+        #     p = os.path.join(tables_dir, f"{pair_name}_device_segments.csv")
+        #     dev_df.to_csv(p, index=False); print(f"  [TABLE] {p}")
 
-        if len(ref_df) > 0:
-            p = os.path.join(tables_dir,
-                             f"{pair_name}_reference_segments.csv")
-            ref_df.to_csv(p, index=False); print(f"  [TABLE] {p}")
+        # if len(ref_df) > 0:
+        #     p = os.path.join(tables_dir,
+        #                      f"{pair_name}_reference_segments.csv")
+        #     ref_df.to_csv(p, index=False); print(f"  [TABLE] {p}")
 
         if len(paired_df) > 0:
             p = os.path.join(tables_dir,
