@@ -244,7 +244,7 @@ def compare_features(dev_preprocessed, ref_preprocessed, fs=250, window_sec=10,
         if dev_name not in dev_preprocessed or ref_name not in ref_preprocessed:
             print(f"  [SKIP] {dev_name}"); continue
         key = f"{dev_name}_vs_{ref_name}"
-        if dev_name in ["lead2", "impedance_pneumography", "gyry_ribs_imu", "accz_chest_imu"]:
+        if dev_name in ["lead2", "impedance_pneumography", "gyry_ribs_imu"]:
             dev_df, ref_df, paired_df = segment_and_extract(
                 dev_preprocessed[dev_name], ref_preprocessed[ref_name],
                 fs=fs, window_sec=win, signal_type=sig_type, sig_name=dev_name)
@@ -269,15 +269,13 @@ def compare_features(dev_preprocessed, ref_preprocessed, fs=250, window_sec=10,
 def _export_segment_tables(results, output_dir):
     tables_dir = os.path.join(output_dir, "tables")
     os.makedirs(tables_dir, exist_ok=True)
+    export_keys = {"lead2_vs_ref_lead2", "resp_modality"}  # ONLY export these
     for key, res in results.items():
-        # if key == 'resp_modality':
-        #     continue
-        df = res['paired_df']
-        if not len(df):
+        if key not in export_keys:
+            continue
+        df = res.get('paired_df', pd.DataFrame())
+        if df is None or not len(df):
             continue
         p = os.path.join(tables_dir, f"{key}_paired_comparison.csv")
-        df.to_csv(p, index=False); print(f"  [TABLE] {p}")
-        if 'paired_df_clean' in df.attrs and len(df.attrs['paired_df_clean']):
-            cp = os.path.join(tables_dir, f"{key}_paired_comparison_clean.csv")
-            df.attrs['paired_df_clean'].to_csv(cp, index=False)
-            print(f"  [TABLE] {cp}")
+        df.to_csv(p, index=False)
+        print(f"  [TABLE] {p}")
