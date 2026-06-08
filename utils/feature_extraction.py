@@ -234,7 +234,7 @@ def _aggregate_segment_respiration_rate(results, modalities=RESP_MODALITIES_FOR_
 # ── Master comparison ─────────────────────────────────────────────────────────
 
 def compare_features(dev_preprocessed, ref_preprocessed, fs=250, window_sec=10,
-                     output_dir="outputs/comparison"):
+                     output_dir="outputs/comparison", subject=None, activity=None, configuration=None):
     for sub in ("tables", "plots"):
         os.makedirs(os.path.join(output_dir, sub), exist_ok=True)
     results = {}
@@ -264,7 +264,8 @@ def compare_features(dev_preprocessed, ref_preprocessed, fs=250, window_sec=10,
         "paired_df": resp_fused
     }
 
-    _export_segment_tables(results, output_dir)
+    # _export_segment_tables(results, output_dir)
+    # _export_grand_table(results, output_dir, subject, activity, configuration)
     return results
 
 # ── Export ────────────────────────────────────────────────────────────────────
@@ -282,3 +283,48 @@ def _export_segment_tables(results, output_dir):
         p = os.path.join(tables_dir, f"{key}_paired_comparison.csv")
         df.to_csv(p, index=False)
         print(f"  [TABLE] {p}")
+
+
+def _export_grand_table(results, output_dir, subject, activity, configuration):
+    rows = []
+    for key, res in results.items():
+        df = res.get("paired_df", pd.DataFrame())
+        if df is None or df.empty:
+            continue
+
+        modality = res.get("signal_type", key)  # e.g., "ECG", "RESPIRATION" or "resp_modality"
+        dev_name = res.get("dev_name", None)
+
+        # Pick which metrics to export from each paired_df
+        # Here: any column like dev_<metric> with matching ref_<metric>
+        dev_cols = [c for c in df.columns if c.startswith("dev_")]
+        for dev_c in dev_cols:
+            metric = dev_c.replace("dev_", "")
+            ref_c = f"ref_{metric}"
+            if ref_c not in df.columns:
+                continue
+
+            for _, r in df.iterrows():
+                rows.append({
+                    "subject": subject,
+                    "activity": activity,
+                    "configuration": configuration,
+                    "modality": dev_name if dev_name is not None else key,
+                    "metric": metric,
+                    "device": r[dev_c],
+                    "reference": r[ref_c],
+                    # optional:
+                    "segment": r.get("segment", np.nan),
+                    "start_sec": r.get("start_sec", np.nan),
+                    "end_sec": r.get("end_sec", np.nan),
+                })
+
+    grand = pd.DataFrame(rows)
+
+    # If you want EXACTLY the 7 columns in your screenshot, uncomment:
+    # grand = grand[["subject","activity","configuration","modality","metric","device","reference"]]
+
+    out_path = os.path.join(output_dir, "tables", "grand_features.csv")
+    grand.to_csv(out_path, index=False)
+    print(f"  [TABLE] {out_path}")
+    return grand

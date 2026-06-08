@@ -1,0 +1,17 @@
+dataset_root: "../dataset"
+output_root: "outputs/batch"
+
+fs: 250
+window_sec: 10
+cut_starting_samples: 1000
+cut_ending_samples: 0
+bin_frame_len: 88
+
+# run only these; omit list to run all discovered subjects
+subjects: ["subject_1", "subject_2", "subject_3", "subject_4", "subject_5"]
+
+# each subject has these configurations (folders under subject)
+configurations: ["patch", "wire"]
+
+# activity label will be derived from filename unless you hardcode it here
+# activities: ["laying", "sitting"]  # optional

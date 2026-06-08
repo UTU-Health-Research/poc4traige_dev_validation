@@ -4,6 +4,7 @@ from utils import (
     preprocess_ecg, preprocess_respiration, align_signals, apply_lag,
     read_all_references, compare_features
 )
+from batch_run import run_batch_from_yaml
 
 RESP_DEVICE_ONLY = [
     "accx_ribs_imu", "accy_ribs_imu", "accz_ribs_imu",
@@ -14,6 +15,9 @@ RESP_DEVICE_ONLY = [
 
 def main():
     args = parse_arguments()
+    if args.get("yaml_path"):
+        run_batch_from_yaml(args["yaml_path"])
+        return
 
     # Device signals
     _, raw = read_binary_samples_hex(args['dev_path'], 88)
