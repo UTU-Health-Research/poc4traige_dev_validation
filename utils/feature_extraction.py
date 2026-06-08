@@ -4,6 +4,8 @@ import pandas as pd
 
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd
 from vitalwave.basic_algos import filter_hr_peaks
+from vitalwave.signal_quality import Absolute_Signal_to_noise_Ratio, Shannon_Entropy
+
 
 # ── Signal pair mappings ──────────────────────────────────────────────────────
 
@@ -55,7 +57,7 @@ def extract_segment_ecg_features(segment, fs=250):
     sig = np.asarray(segment, dtype=np.float64).ravel()
     if len(sig) < 2 * fs:
         return None
-    base = dict(mean_hr=float('nan'), rmssd=float('nan'))
+    base = dict(mean_hr=float('nan'), rmssd=float('nan'), snr=float('nan'))
     r_peaks = _get_clean_r_peaks(sig, fs)
     if len(r_peaks) < 2:
         return base
@@ -71,6 +73,7 @@ def extract_segment_ecg_features(segment, fs=250):
         base['rmssd'] = float(np.sqrt(np.mean(diff ** 2))) if len(diff) else 0.0
     else:
         base['rmssd'] = 0.0
+    base['snr'] = float(Absolute_Signal_to_noise_Ratio(sig))
     return base
 
 # ── SPI helpers ───────────────────────────────────────────────────────────────
@@ -269,7 +272,7 @@ def compare_features(dev_preprocessed, ref_preprocessed, fs=250, window_sec=10,
 def _export_segment_tables(results, output_dir):
     tables_dir = os.path.join(output_dir, "tables")
     os.makedirs(tables_dir, exist_ok=True)
-    export_keys = {"lead2_vs_ref_lead2", "resp_modality"}  # ONLY export these
+    export_keys = {"lead2_vs_ref_lead2", "resp_modality", "impedance_pneumography_vs_ref_respiration"}  # ONLY export these
     for key, res in results.items():
         if key not in export_keys:
             continue
