@@ -380,7 +380,7 @@ RESP_SIGNAL_PAIRS = {
 }
 
 
-def align_signals(dev_sig, bit_sig, fs, max_lag_sec=5.0):
+def align_signals(dev_sig, bit_sig, fs, max_lag_sec=10.0):
     """
     Normalize and align two signals using cross-correlation
     Returns aligned signals of equal length

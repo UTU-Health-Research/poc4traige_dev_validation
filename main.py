@@ -14,14 +14,10 @@ from utils import (
     preprocess_respiration, 
     align_signals,
     apply_lag,
-    extract_ecg_features, 
-    extract_respiration_features, 
-    extract_all_features, 
     export_all, 
     visualize_all,
     read_all_references, 
-    compare_features, 
-    plot_all_signal_overlays, 
+    compare_features,  
     assess_all_quality, 
     export_quality_report, 
     plot_quality_dashboard,
@@ -82,63 +78,33 @@ def main():
 
     print(f'\n  Preprocessed reference signals: {list(ref_preprocessed.keys())}')
 
-    aligned_signals = {}
 
-    _, _, ecg_lag = align_signals(
+    ld2_al, ref_ld2_al, ecg_lag = align_signals(
             preprocessed_signals["lead2"],
             ref_preprocessed["ref_lead2"],
             fs=250
         )
     
-    _, _, resp_lag = align_signals(
+    preprocessed_signals["lead2"] = ld2_al
+    ref_preprocessed["ref_lead2"] = ref_ld2_al
+    
+    ip_al, ref_resp_al, resp_lag = align_signals(
             preprocessed_signals["impedance_pneumography"],
             ref_preprocessed["ref_respiration"],
             fs=250
         )
     
-    print(f"ECG master lag  : {ecg_lag} samples")
-    print(f"RESP master lag : {resp_lag} samples")
+    preprocessed_signals["impedance_pneumography"] = ip_al
+    ref_preprocessed["ref_respiration"] = ref_resp_al
 
-    # ─── ECG: align device-reference pairs together ───────────
-    ECG_DEVICE_REF_PAIRS = {
-        "lead1" : "ref_lead1",
-        "lead2" : "ref_lead2",
-    }
-    ECG_DEVICE_ONLY = ["c1", "c2", "c3", "c4", "c5"]
-
-    # Align paired signals together to get matching lengths
-    for dev_key, ref_key in ECG_DEVICE_REF_PAIRS.items():
-        preprocessed_signals[dev_key], ref_preprocessed[ref_key] = apply_lag(
-            preprocessed_signals[dev_key], ecg_lag, ref_sig=ref_preprocessed[ref_key]
-        )
-        print(f"  [ECG] {dev_key}: {len(preprocessed_signals[dev_key])} samples | "
-            f"{ref_key}: {len(ref_preprocessed[ref_key])} samples")
-
-    # Use the paired length as master length for unpaired ECG signals
-    ecg_master_len = len(preprocessed_signals["lead2"])
-    for key in ECG_DEVICE_ONLY:
-        if key in preprocessed_signals:
-            preprocessed_signals[key], _ = apply_lag(preprocessed_signals[key], ecg_lag)
-            preprocessed_signals[key] = preprocessed_signals[key][:ecg_master_len]
-            print(f"  [ECG] {key}: {len(preprocessed_signals[key])} samples")
 
     # ─── RESP: align device-reference pair together ───────────
-    RESP_DEVICE_REF_PAIRS = {
-        "impedance_pneumography" : "ref_respiration"
-    }
     RESP_DEVICE_ONLY = [
         "accx_ribs_imu", "accy_ribs_imu", "accz_ribs_imu",
         "gyrx_ribs_imu", "gyry_ribs_imu", "gyrz_ribs_imu",
         "accx_chest_imu", "accy_chest_imu", "accz_chest_imu",
         "gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu"
     ]
-
-    for dev_key, ref_key in RESP_DEVICE_REF_PAIRS.items():
-        preprocessed_signals[dev_key], ref_preprocessed[ref_key] = apply_lag(
-            preprocessed_signals[dev_key], resp_lag, ref_sig=ref_preprocessed[ref_key]
-        )
-        print(f"  [RESP] {dev_key}: {len(preprocessed_signals[dev_key])} samples | "
-            f"{ref_key}: {len(ref_preprocessed[ref_key])} samples")
 
     # Use the paired length as master length for unpaired RESP signals
     resp_master_len = len(preprocessed_signals["impedance_pneumography"])
@@ -162,47 +128,6 @@ def main():
         window_sec=10,
         output_dir="outputs/comparison"
     )
-
-    # # ═════════════════════════════════════════════════════════
-    # #  SIGNAL-LEVEL COMPARISON PLOTS
-    # # ═════════════════════════════════════════════════════════
-    # print("\n" + "=" * 60)
-    # print("[PIPELINE] Signal-Level Comparison Plots")
-    # print("=" * 60)
-
-    # plot_all_signal_overlays(
-    #     dev_preprocessed=preprocessed_signals,
-    #     ref_preprocessed=ref_preprocessed,
-    #     fs=250,
-    #     output_dir="outputs/comparison/plots",
-    #     show=False, save=True
-    # )
-
-    # # ═════════════════════════════════════════════════════════
-    # #  VISUALIZE
-    # # ═════════════════════════════════════════════════════════
-    # visualize_all(
-    #     raw_signals=signals_clean,
-    #     preprocessed=preprocessed_signals,
-    #     fiducials=dev_fiducials,
-    #     features=dev_features,
-    #     spike_masks=spike_masks,
-    #     fs=250,
-    #     output_dir="outputs/plots/device",
-    #     show=False, save=True
-    # )
-
-    # # ═════════════════════════════════════════════════════════
-    # #  FINAL SUMMARY
-    # # ═════════════════════════════════════════════════════════
-    # print("\n" + "=" * 60)
-    # print("[DONE] Pipeline Complete")
-    # print("=" * 60)
-    # print(f"  Device features:      {len(dev_features)}")
-    # print(f"  Reference features:   {len(ref_features)}")
-    # print(f"  Comparison pairs:     {len(comparison_results)}")
-    # # print(f"  Quality assessments:  {len(dev_quality) + len(ref_quality)} signals")
-
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,6 @@
 ======================================================================
 SEGMENT-BASED FEATURE COMPARISON REPORT
-Generated: 2026-06-06 02:23:18
+Generated: 2026-06-07 23:48:05
 ======================================================================
 
 
@@ -8,16 +8,14 @@ Generated: 2026-06-06 02:23:18
   PAIR: lead1_vs_ref_lead1
   Type: ECG
   Window: 10s
-  Paired segments: 11
+  Paired segments: 15
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
-  peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                         0.000      0.000      0.000        nan%     0.2382
-  n_r_peaks                           8.182      8.364     -0.182        nan%     0.1336
-  mean_hr                            55.836     56.012     -0.175        nan%     0.5911
-  rmssd                              33.531     36.136     -2.605        nan%    -0.1908
+  signal_mean                        -0.000      0.000     -0.000        nan%     0.1356
+  mean_hr                            71.197     71.115      0.083        nan%     0.9997
+  rmssd                              39.794     39.630      0.164        nan%     0.9935
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
 
@@ -26,16 +24,14 @@ Generated: 2026-06-06 02:23:18
   PAIR: lead2_vs_ref_lead2
   Type: ECG
   Window: 10s
-  Paired segments: 11
+  Paired segments: 15
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
-  peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                         0.000      0.000      0.000        nan%     0.2187
-  n_r_peaks                           8.273      8.364     -0.091        nan%     0.3858
-  mean_hr                            55.817     56.001     -0.184        nan%     0.5790
-  rmssd                              33.961     36.534     -2.573        nan%    -0.3118
+  signal_mean                        -0.000      0.000     -0.000        nan%     0.5062
+  mean_hr                            71.205     71.106      0.099        nan%     0.9997
+  rmssd                              40.425     39.738      0.687        nan%     0.9915
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
 
@@ -44,20 +40,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: impedance_pneumography_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                         0.000      0.003     -0.003        nan%     0.8992
-  resp_rate_mean                     15.733     15.019      0.714        nan%     0.5632
-  spectral_rqi                        0.720      0.741     -0.021        nan%     0.9981
+  signal_mean                         0.000      0.008     -0.008        nan%     0.7870
+  resp_rate_mean                     19.209     19.923     -0.713        nan%     0.7631
+  spectral_rqi                        0.447      0.513     -0.066        nan%     0.6755
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.7200
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.4472
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -67,20 +63,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: accx_ribs_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                         0.003      0.003     -0.000        nan%     0.1186
-  resp_rate_mean                     15.902     15.019      0.883        nan%     0.6461
-  spectral_rqi                        0.639      0.741     -0.102        nan%     0.9852
+  signal_mean                        -0.011      0.008     -0.020        nan%     0.9494
+  resp_rate_mean                     31.982     19.923     12.059        nan%     0.4941
+  spectral_rqi                        0.404      0.513     -0.108        nan%    -0.3434
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.6389
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.4044
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -90,20 +86,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: accy_ribs_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                        -0.009      0.003     -0.012        nan%     0.4154
-  resp_rate_mean                     53.452     15.019     38.433        nan%     0.3286
-  spectral_rqi                        0.371      0.741     -0.370        nan%    -0.7197
+  signal_mean                         0.021      0.008      0.012        nan%     0.9061
+  resp_rate_mean                     22.429     19.923      2.507        nan%    -0.4395
+  spectral_rqi                        0.466      0.513     -0.046        nan%     0.4057
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.3709
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.4664
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -113,20 +109,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: accz_ribs_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                        -0.004      0.003     -0.007        nan%    -0.6242
-  resp_rate_mean                     16.741     15.019      1.723        nan%     0.8524
-  spectral_rqi                        0.680      0.741     -0.061        nan%     0.9440
+  signal_mean                        -0.019      0.008     -0.027        nan%     0.6242
+  resp_rate_mean                     21.738     19.923      1.815        nan%    -0.5345
+  spectral_rqi                        0.545      0.513      0.032        nan%     0.8621
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.6804
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.5450
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -136,20 +132,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: gyrx_ribs_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                        -0.000      0.003     -0.003        nan%     0.4002
-  resp_rate_mean                     22.667     15.019      7.648        nan%     0.7518
-  spectral_rqi                        0.324      0.741     -0.417        nan%     0.5100
+  signal_mean                        -0.001      0.008     -0.009        nan%    -0.2943
+  resp_rate_mean                     21.341     19.923      1.419        nan%    -0.4121
+  spectral_rqi                        0.399      0.513     -0.114        nan%    -0.1083
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.3239
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.3989
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -159,20 +155,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: gyry_ribs_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                         0.000      0.003     -0.003        nan%    -0.8705
-  resp_rate_mean                     15.565     15.019      0.546        nan%     0.5623
-  spectral_rqi                        0.718      0.741     -0.024        nan%     0.9916
+  signal_mean                         0.003      0.008     -0.006        nan%    -0.4722
+  resp_rate_mean                     19.371     19.923     -0.552        nan%     0.9674
+  spectral_rqi                        0.565      0.513      0.053        nan%     0.5327
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.7177
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.5653
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -182,20 +178,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: gyrz_ribs_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                        -0.000      0.003     -0.003        nan%    -0.1434
-  resp_rate_mean                     15.467     15.019      0.449        nan%     0.3745
-  spectral_rqi                        0.469      0.741     -0.272        nan%     0.5492
+  signal_mean                         0.002      0.008     -0.007        nan%     0.0011
+  resp_rate_mean                     21.400     19.923      1.477        nan%     0.8787
+  spectral_rqi                        0.431      0.513     -0.082        nan%    -0.1710
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.4689
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.4310
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -205,20 +201,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: accx_chest_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                        -0.003      0.003     -0.006        nan%    -0.1313
-  resp_rate_mean                     35.758     15.019     20.739        nan%    -0.6425
-  spectral_rqi                        0.540      0.741     -0.201        nan%     0.4452
+  signal_mean                         0.009      0.008      0.001        nan%    -0.6335
+  resp_rate_mean                     48.825     19.923     28.902        nan%    -0.1830
+  spectral_rqi                        0.461      0.513     -0.052        nan%     0.5715
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.5403
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.4612
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -228,20 +224,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: accy_chest_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                        -0.005      0.003     -0.009        nan%    -0.8665
-  resp_rate_mean                     16.511     15.019      1.492        nan%     0.8896
-  spectral_rqi                        0.601      0.741     -0.140        nan%     0.5708
+  signal_mean                         0.088      0.008      0.080        nan%    -0.9933
+  resp_rate_mean                     58.707     19.923     38.785        nan%     0.1639
+  spectral_rqi                        0.432      0.513     -0.081        nan%     0.3322
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.6015
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.4318
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -251,20 +247,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: accz_chest_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                         0.001      0.003     -0.002        nan%     0.3748
-  resp_rate_mean                     15.738     15.019      0.719        nan%     0.5441
-  spectral_rqi                        0.615      0.741     -0.126        nan%     0.9493
+  signal_mean                         0.014      0.008      0.006        nan%     0.5195
+  resp_rate_mean                     41.869     19.923     21.946        nan%    -0.1654
+  spectral_rqi                        0.452      0.513     -0.060        nan%     0.3532
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.6149
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.4525
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -274,20 +270,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: gyrx_chest_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                         0.000      0.003     -0.003        nan%    -0.2791
-  resp_rate_mean                     15.669     15.019      0.650        nan%     0.5524
-  spectral_rqi                        0.699      0.741     -0.042        nan%     0.9778
+  signal_mean                         0.005      0.008     -0.003        nan%    -0.9182
+  resp_rate_mean                     21.789     19.923      1.867        nan%    -0.3759
+  spectral_rqi                        0.458      0.513     -0.055        nan%    -0.7540
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.6993
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.4582
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -297,20 +293,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: gyry_chest_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                         0.000      0.003     -0.003        nan%    -0.1297
-  resp_rate_mean                     15.602     15.019      0.583        nan%     0.0959
-  spectral_rqi                        0.620      0.741     -0.122        nan%     0.7155
+  signal_mean                        -0.001      0.008     -0.009        nan%     0.9268
+  resp_rate_mean                     20.578     19.923      0.655        nan%    -0.2320
+  spectral_rqi                        0.480      0.513     -0.033        nan%     0.3042
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.6196
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.4802
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -320,20 +316,20 @@ Generated: 2026-06-06 02:23:18
   PAIR: gyrz_chest_imu_vs_ref_respiration
   Type: Respiration
   Window: 10s
-  Paired segments: 4
+  Paired segments: 5
 ============================================================
 
   Feature                          Dev Mean   Ref Mean  Mean Diff  Mean %Diff  Pearson r
   ----------------------------------------------------------------------------------
   peak_method                           N/A        N/A        N/A         N/A        N/A
-  signal_mean                         0.000      0.003     -0.003        nan%    -0.0366
-  resp_rate_mean                     53.676     15.019     38.658        nan%     0.6443
-  spectral_rqi                        0.244      0.741     -0.497        nan%    -0.9706
+  signal_mean                         0.004      0.008     -0.005        nan%    -0.9270
+  resp_rate_mean                     21.248     19.923      1.325        nan%    -0.4020
+  spectral_rqi                        0.392      0.513     -0.121        nan%    -0.9561
 
   RESPIRATORY SIGNAL QUALITY INDICES
   ---------------------------------------------
-  dev_spectral_rqi                        0.2440
-  ref_spectral_rqi                        0.7412
+  dev_spectral_rqi                        0.3922
+  ref_spectral_rqi                        0.5128
 
   ENERGY-WEIGHTED SIGNAL QUALITY
   ----------------------------------------
@@ -345,62 +341,58 @@ Generated: 2026-06-06 02:23:18
 ============================================================
 
   lead1_vs_ref_lead1:
-    Device: {'pan_tompkins': 11}
-    Reference: {'pan_tompkins': 11}
 
   lead2_vs_ref_lead2:
-    Device: {'pan_tompkins': 11}
-    Reference: {'pan_tompkins': 11}
 
   impedance_pneumography_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   accx_ribs_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   accy_ribs_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   accz_ribs_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   gyrx_ribs_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   gyry_ribs_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   gyrz_ribs_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   accx_chest_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   accy_chest_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   accz_chest_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   gyrx_chest_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   gyry_chest_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
   gyrz_chest_imu_vs_ref_respiration:
-    Device: {'ampd': 4}
-    Reference: {'ampd': 4}
+    Device: {}
+    Reference: {}
 
