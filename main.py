@@ -1,139 +1,57 @@
-from pyexpat import features
-
 import pandas as pd
 import numpy as np
-import struct
-from utils import ( 
-    parse_arguments, 
-    read_binary_samples_hex, 
-    convert_binary_data, 
-    extract_signals, 
-    remove_dc_offset, 
-    preprocess_signals, 
-    preprocess_ecg, 
-    preprocess_respiration, 
-    align_signals,
-    apply_lag,
-    export_all, 
-    visualize_all,
-    read_all_references, 
-    compare_features,  
-    assess_all_quality, 
-    export_quality_report, 
-    plot_quality_dashboard,
-    assess_ecg_quality, 
-    assess_respiration_quality
-    )
+from utils import (
+    parse_arguments, read_binary_samples_hex, convert_binary_data,
+    extract_signals, remove_dc_offset, preprocess_signals,
+    preprocess_ecg, preprocess_respiration, align_signals, apply_lag,
+    export_all, visualize_all, read_all_references, compare_features,
+    assess_all_quality, export_quality_report, plot_quality_dashboard,
+    assess_ecg_quality, assess_respiration_quality
+)
 
-
+RESP_DEVICE_ONLY = [
+    "accx_ribs_imu", "accy_ribs_imu", "accz_ribs_imu",
+    "gyrx_ribs_imu", "gyry_ribs_imu", "gyrz_ribs_imu",
+    "accx_chest_imu", "accy_chest_imu", "accz_chest_imu",
+    "gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu",
+]
 
 def main():
-
-    # Get file path from terminal
     args = parse_arguments()
 
-    # ═════════════════════════════════════════════════════════
-    #  DEVICE + REF SIGNAL READING AND AlIGNMENT
-    # ═════════════════════════════════════════════════════════
-    print("\n" + "=" * 60)
-    print("DEVICE + REF SIGNAL READING AND AlIGNMENT")
-    print("=" * 60)
+    # Device signals
+    _, raw = read_binary_samples_hex(args['dev_path'], 88)
+    signals = extract_signals(convert_binary_data(raw), cut_starting_samples=1000, cut_ending_samples=0)
+    dev = preprocess_signals(remove_dc_offset(signals, exclude=['body_temperature']))[0]
 
-    dev_path = args['dev_path']  # device data (ECG + IMU + Temperature)
+    # Reference signals
+    ref_raw, _ = read_all_references(bitt_path=args['bitt_path'], bpc_path=args['bpc_path'],
+                                     target_fs=250, cut_starting_samples=1000, cut_ending_samples=0)
+    ref = {}
+    for name, sig in remove_dc_offset(ref_raw).items():
+        if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs=250)
+        elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=250)
+        else:                             ref[name] = sig
 
-    # Read binary data from device file
-    _, raw = read_binary_samples_hex(dev_path,88)
-    dev_data_raw = convert_binary_data(raw)
+    # Alignment — ECG
+    dev['lead2'], ref['ref_lead2'], _ = align_signals(dev['lead2'], ref['ref_lead2'], fs=250)
 
-    print(f"\nDev. Data shape:       {dev_data_raw.shape}")
-    signals = extract_signals(dev_data_raw, cut_starting_samples=1000, cut_ending_samples=0)
-    signals_clean = remove_dc_offset(signals, exclude=['body_temperature'])
-    preprocessed_signals, spike_masks = preprocess_signals(signals_clean)
-
-    print(f'\n  Device signals after preprocessing: {list(preprocessed_signals.keys())}')
-
-    # Reading refence signals (ECG + Respiration)
-    ref_signals, ref_metadata = read_all_references(
-        bitt_path=args['bitt_path'], # reference data (ECG)
-        bpc_path=args['bpc_path'], # reference data (Respiration)
-        target_fs=250,
-        cut_starting_samples=1000,
-        cut_ending_samples=0
-    )
-
-    # DC offset removal for reference signals
-    ref_signals_dc = remove_dc_offset(ref_signals)
-    print(f'\n  Reference signals after DC offset removal: {list(ref_signals_dc.keys())}')
-
-    ref_preprocessed = {}
-    for name, sig in ref_signals_dc.items():
-        if name.startswith('ref_lead'):
-            ref_preprocessed[name] = preprocess_ecg(sig, fs=250)
-            print(f"  [OK] Preprocessed {name} (ECG pipeline)")
-        elif name.startswith('ref_resp'):
-            ref_preprocessed[name] = preprocess_respiration(sig, fs=250)
-            print(f"  [OK] Preprocessed {name} (Respiration pipeline)")
-        else:
-            ref_preprocessed[name] = sig
-
-    print(f'\n  Preprocessed reference signals: {list(ref_preprocessed.keys())}')
-
-
-    ld2_al, ref_ld2_al, ecg_lag = align_signals(
-            preprocessed_signals["lead2"],
-            ref_preprocessed["ref_lead2"],
-            fs=250
-        )
-    
-    preprocessed_signals["lead2"] = ld2_al
-    ref_preprocessed["ref_lead2"] = ref_ld2_al
-    
-    ip_al, ref_resp_al, resp_lag = align_signals(
-            preprocessed_signals["impedance_pneumography"],
-            ref_preprocessed["ref_respiration"],
-            fs=250
-        )
-    
-    preprocessed_signals["impedance_pneumography"] = ip_al
-    ref_preprocessed["ref_respiration"] = ref_resp_al
-
-
-    # ─── RESP: align device-reference pair together ───────────
-    RESP_DEVICE_ONLY = [
-        "accx_ribs_imu", "accy_ribs_imu", "accz_ribs_imu",
-        "gyrx_ribs_imu", "gyry_ribs_imu", "gyrz_ribs_imu",
-        "accx_chest_imu", "accy_chest_imu", "accz_chest_imu",
-        "gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu"
-    ]
-
-    # Use the paired length as master length for unpaired RESP signals
-    resp_master_len = len(preprocessed_signals["impedance_pneumography"])
+    # Alignment — Respiration
+    dev['impedance_pneumography'], ref['ref_respiration'], resp_lag = align_signals(
+        dev['impedance_pneumography'], ref['ref_respiration'], fs=250)
+    master_len = len(dev['impedance_pneumography'])
     for key in RESP_DEVICE_ONLY:
-        if key in preprocessed_signals:
-            preprocessed_signals[key], _ = apply_lag(preprocessed_signals[key], resp_lag)
-            preprocessed_signals[key] = preprocessed_signals[key][:resp_master_len]
-            print(f"  [RESP] {key}: {len(preprocessed_signals[key])} samples")
+        if key in dev:
+            dev[key], _ = apply_lag(dev[key], resp_lag)
+            dev[key] = dev[key][:master_len]
 
-    # ═════════════════════════════════════════════════════════
-    #  SEGMENT-BASED COMPARISON
-    # ═════════════════════════════════════════════════════════
-    print("\n" + "=" * 60)
-    print("[PIPELINE] Segment-Based Feature Comparison")
-    print("=" * 60)
-
-    comparison_results = compare_features(
-        dev_preprocessed=preprocessed_signals,
-        ref_preprocessed=ref_preprocessed,
-        fs=250,
-        window_sec=10,
-        output_dir="outputs/comparison"
-    )
+    # Comparison
+    compare_features(dev_preprocessed=dev, ref_preprocessed=ref,
+                     fs=250, window_sec=10, output_dir="outputs/comparison")
 
 if __name__ == "__main__":
     main()
 
-
-# python main.py -f1 "../subject_3/wire/dev/laying_dev.bin" -f2 "../subject_3/wire/reference/laying_ecg.EDF" -f3 "../subject_3/wire/reference/laying_resp.acq"
 # python main.py --dev "../subject_3/wire/dev/laying_dev.bin" --bitt "../subject_3/wire/reference/laying_ecg.EDF" --bpc "../subject_3/wire/reference/laying_resp.acq"
 
 '''
