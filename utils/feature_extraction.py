@@ -163,7 +163,7 @@ def segment_and_extract(dev_signal, ref_signal, fs=250, window_sec=10, signal_ty
 
 def compare_features(dev_preprocessed, ref_preprocessed, fs=250, window_sec=10,
                      output_dir="outputs/comparison"):
-    for sub in ("reports", "tables", "plots"):
+    for sub in ("tables", "plots"):
         os.makedirs(os.path.join(output_dir, sub), exist_ok=True)
     results = {}
     resp_win = max(30, window_sec)
