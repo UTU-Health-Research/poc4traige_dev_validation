@@ -1,5 +1,3 @@
-import pandas as pd
-import numpy as np
 from utils import (
     parse_arguments, read_binary_samples_hex, convert_binary_data,
     extract_signals, remove_dc_offset, preprocess_signals,
