@@ -1,5 +1,5 @@
 import numpy as np
-from vitalwave.basic_algos import butter_filter
+from vitalwave.basic_algos import butter_filter, moving_average_filter
 from scipy.signal import correlate
 
 SIGNAL_MAP = {
@@ -47,6 +47,7 @@ def preprocess_respiration(signal, fs=250):
     sig = np.asarray(signal, dtype=np.float64).ravel()
     sig = butter_filter(arr=sig, n=2, wn=np.array([0.1]), filter_type='high', fs=fs)
     sig = butter_filter(arr=sig, n=2, wn=np.array([1.0]), filter_type='low',  fs=fs)
+    sig = moving_average_filter(sig, window=int(fs * 0.25))
     return sig
 
 
@@ -54,8 +55,10 @@ def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0):
     sig = np.asarray(signal, dtype=np.float64).ravel()
     spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
     idx = np.arange(len(sig), dtype=np.float64)
-    sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask])
-    sig = butter_filter(arr=sig, n=4, wn=np.array([highcut]), filter_type='low', fs=fs)
+    sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask]) #
+    sig = butter_filter(arr=sig, n=2, wn=np.array([0.1]), filter_type='high', fs=fs)
+    sig = butter_filter(arr=sig, n=2, wn=np.array([1.0]), filter_type='low',  fs=fs)
+    sig = moving_average_filter(sig, window=int(fs * 0.25))
     return sig, spike_mask
 
 

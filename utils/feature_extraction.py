@@ -17,6 +17,11 @@ RESP_SIGNAL_PAIRS = {k: "ref_respiration" for k in [
     "gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu",
 ]}
 
+RESP_MODALITIES_FOR_RR = [
+    "impedance_pneumography",
+    "gyry_ribs_imu",
+]
+
 # ── R-peak helpers ────────────────────────────────────────────────────────────
 
 def _get_clean_r_peaks(sig, fs):
@@ -27,8 +32,8 @@ def _get_clean_r_peaks(sig, fs):
         return np.array([], dtype=int)
     if len(peaks) < 2:
         return peaks
-    # Remove physiologically impossible intervals (> 220 bpm)
-    min_gap = fs * 60.0 / 220
+    # Remove physiologically impossible intervals (> 200 bpm)
+    min_gap = fs * 60.0 / 200
     filtered = [peaks[0]]
     for p in peaks[1:]:
         if p - filtered[-1] >= min_gap:
@@ -36,7 +41,7 @@ def _get_clean_r_peaks(sig, fs):
     peaks = np.array(filtered, dtype=int)
     if len(peaks) >= 4:
         try:
-            r = np.array(filter_hr_peaks(peaks=peaks, fs=fs, hr_min=30, hr_max=220,
+            r = np.array(filter_hr_peaks(peaks=peaks, fs=fs, hr_min=30, hr_max=200,
                                          kernel_size=3, sdsd_max=0.5), dtype=int)
             if len(r) >= 2:
                 peaks = r
@@ -56,7 +61,7 @@ def extract_segment_ecg_features(segment, fs=250):
         return base
     rr = np.diff(r_peaks) / fs * 1000.0
     valid = (60000.0 / np.where(rr > 0, rr, np.inf))
-    mask = (valid >= 30) & (valid <= 220)
+    mask = (valid >= 30) & (valid <= 200)
     if not mask.any():
         return base
     base['mean_hr'] = float(np.mean(60000.0 / rr[mask]))
@@ -103,11 +108,9 @@ def extract_segment_resp_features(segment, fs=250):
     try:
         p = np.array(ampd(sig, fs), dtype=int)
         p = p[(p >= 0) & (p < len(sig))]
-        if len(p) >= 2:
-            bbi = np.diff(p) / fs
-            bbi_v = bbi[(bbi > 0.5) & (bbi < 20.0)]
-            if len(bbi_v):
-                base['resp_rate_mean'] = float(np.mean(60.0 / bbi_v))
+        # same function for HR is used for respiration rate, but with different parameters to capture slower breathing patterns
+        _, rr_mean = filter_hr_peaks(peaks=p, fs=fs, hr_min=3, hr_max=40, kernel_size=3, sdsd_max=None)
+        base['resp_rate_mean'] = rr_mean
     except Exception:
         pass
     try:
@@ -118,7 +121,7 @@ def extract_segment_resp_features(segment, fs=250):
 
 # ── Segmentation engine ───────────────────────────────────────────────────────
 
-def segment_and_extract(dev_signal, ref_signal, fs=250, window_sec=10, signal_type="ecg"):
+def segment_and_extract(dev_signal, ref_signal, fs=250, window_sec=10, signal_type="ecg", sig_name="signal"):
     dev_sig = np.asarray(dev_signal, dtype=np.float64).ravel()
     ref_sig = np.asarray(ref_signal, dtype=np.float64).ravel()
     min_len = min(len(dev_sig), len(ref_sig))
@@ -128,7 +131,6 @@ def segment_and_extract(dev_signal, ref_signal, fs=250, window_sec=10, signal_ty
     if n == 0:
         print(f"  [WARNING] Too short ({min_len/fs:.1f}s) for {window_sec}s windows")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
     fn = extract_segment_ecg_features if signal_type == "ecg" else extract_segment_resp_features
     dev_rows, ref_rows = [], []
     for i in range(n):
@@ -159,6 +161,73 @@ def segment_and_extract(dev_signal, ref_signal, fs=250, window_sec=10, signal_ty
         paired[f'AE_{col}']  = np.abs(dv - rv)
     return dev_df, ref_df, paired
 
+
+def _aggregate_segment_respiration_rate(results, modalities=RESP_MODALITIES_FOR_RR):
+    """
+    Build a per-segment table containing each modality's resp_rate_mean (device & reference)
+    and an averaged respiration rate across modalities for each segment.
+
+    Returns a DataFrame with columns:
+      segment, start_sec, end_sec,
+      dev_rr_<modality>, ref_rr_<modality>, AE_rr_<modality>,
+      dev_rr_mean_fused, ref_rr_mean_fused, AE_rr_mean_fused
+    """
+    # collect paired tables for the requested modalities
+    dfs = {}
+    for mod in modalities:
+        key = f"{mod}_vs_ref_respiration"
+        if key not in results:
+            continue
+        df = results[key].get("paired_df", pd.DataFrame())
+        if len(df):
+            dfs[mod] = df.copy()
+
+    if not dfs:
+        return pd.DataFrame()
+
+    # base index = intersection of segments across available modalities
+    common_segments = None
+    for mod, df in dfs.items():
+        segs = set(df["segment"].values)
+        common_segments = segs if common_segments is None else (common_segments & segs)
+
+    if not common_segments:
+        return pd.DataFrame()
+
+    common_segments = sorted(common_segments)
+
+    # Build output scaffold using timing from the first modality
+    first_mod = next(iter(dfs.keys()))
+    base = dfs[first_mod][dfs[first_mod]["segment"].isin(common_segments)] \
+        .sort_values("segment").reset_index(drop=True)
+
+    out = base[["segment", "start_sec", "end_sec"]].copy()
+
+    # Collect modality-specific rr columns
+    dev_cols = []
+    ref_cols = []
+
+    for mod, df in dfs.items():
+        d = df[df["segment"].isin(common_segments)].sort_values("segment").reset_index(drop=True)
+
+        # We expect extract_segment_resp_features to have created resp_rate_mean
+        dev_rr = pd.to_numeric(d.get("dev_resp_rate_mean"), errors="coerce")
+        ref_rr = pd.to_numeric(d.get("ref_resp_rate_mean"), errors="coerce")
+
+        out[f"dev_rr_{mod}"] = dev_rr.values
+        out[f"ref_rr_{mod}"] = ref_rr.values
+        out[f"AE_rr_{mod}"]  = np.abs(dev_rr.values - ref_rr.values)
+
+        dev_cols.append(f"dev_rr_{mod}")
+        ref_cols.append(f"ref_rr_{mod}")
+
+    # Fused mean across modalities (skip NaNs)
+    out["dev_rr_mean_fused"] = out[dev_cols].mean(axis=1, skipna=True)
+    out["ref_rr_mean_fused"] = out[ref_cols].mean(axis=1, skipna=True)
+    out["AE_rr_mean_fused"]  = np.abs(out["dev_rr_mean_fused"] - out["ref_rr_mean_fused"])
+
+    return out
+
 # ── Master comparison ─────────────────────────────────────────────────────────
 
 def compare_features(dev_preprocessed, ref_preprocessed, fs=250, window_sec=10,
@@ -175,12 +244,22 @@ def compare_features(dev_preprocessed, ref_preprocessed, fs=250, window_sec=10,
         if dev_name not in dev_preprocessed or ref_name not in ref_preprocessed:
             print(f"  [SKIP] {dev_name}"); continue
         key = f"{dev_name}_vs_{ref_name}"
-        dev_df, ref_df, paired_df = segment_and_extract(
-            dev_preprocessed[dev_name], ref_preprocessed[ref_name],
-            fs=fs, window_sec=win, signal_type=sig_type)
-        results[key] = dict(signal_type=sig_type.upper(), dev_name=dev_name,
-                            ref_name=ref_name, window_sec=win,
-                            dev_df=dev_df, ref_df=ref_df, paired_df=paired_df)
+        if dev_name in ["lead2", "impedance_pneumography", "gyry_ribs_imu", "accz_chest_imu"]:
+            dev_df, ref_df, paired_df = segment_and_extract(
+                dev_preprocessed[dev_name], ref_preprocessed[ref_name],
+                fs=fs, window_sec=win, signal_type=sig_type, sig_name=dev_name)
+            results[key] = dict(signal_type=sig_type.upper(), dev_name=dev_name,
+                                ref_name=ref_name, window_sec=win,
+                                dev_df=dev_df, ref_df=ref_df, paired_df=paired_df)
+        else:
+            continue
+
+    # Aggregate respiration-rate across the three modalities per segment
+    resp_fused = _aggregate_segment_respiration_rate(results)
+    results["resp_modality"] = {
+        "description": "Per-segment fused respiration rate mean across impedance_pneumography, gyry_ribs_imu, accz_chest_imu",
+        "paired_df": resp_fused
+    }
 
     _export_segment_tables(results, output_dir)
     return results
@@ -191,8 +270,8 @@ def _export_segment_tables(results, output_dir):
     tables_dir = os.path.join(output_dir, "tables")
     os.makedirs(tables_dir, exist_ok=True)
     for key, res in results.items():
-        if key == 'resp_modality':
-            continue
+        # if key == 'resp_modality':
+        #     continue
         df = res['paired_df']
         if not len(df):
             continue
