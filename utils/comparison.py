@@ -46,6 +46,7 @@ ECG_SIGNAL_PAIRS = {
 
 RESP_SIGNAL_PAIRS = {
     "impedance_pneumography": "ref_respiration",
+    "gyry_ribs_imu": "ref_respiration",
 }
 
 RESP_MODALITY_SOURCES = {

@@ -1,0 +1,30 @@
+{
+    "lead1_vs_ref_lead1": {
+        "pearson_r": 0.4362160594727858,
+        "spearman_r": 0.5936967508053463,
+        "r_squared": 0.18990881918243374,
+        "peak_cross_corr": 0.43621605947273256,
+        "peak_lag_sec": 0.0
+    },
+    "lead2_vs_ref_lead2": {
+        "pearson_r": 0.5649209701633505,
+        "spearman_r": 0.6960525013989579,
+        "r_squared": 0.3191183122979814,
+        "peak_cross_corr": 0.5649209701632952,
+        "peak_lag_sec": 0.0
+    },
+    "impedance_pneumography_vs_ref_respiration": {
+        "pearson_r": 0.6357284184747355,
+        "spearman_r": 0.6678853999015288,
+        "r_squared": 0.40415062081234365,
+        "peak_cross_corr": 0.6357284184747208,
+        "peak_lag_sec": 0.0
+    },
+    "gyry_ribs_imu_vs_ref_respiration": {
+        "pearson_r": -0.11840475881986097,
+        "spearman_r": -0.141560791698717,
+        "r_squared": 0.014019678735599506,
+        "peak_cross_corr": 0.4113295930979505,
+        "peak_lag_sec": 1.476
+    }
+}

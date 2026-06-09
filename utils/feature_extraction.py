@@ -759,7 +759,7 @@ def _compute_statistical_features(signal, prefix):
 
 # ECG_SIGNALS = ["lead1", "lead2", "c1", "c2", "c3", "c4", "c5"]
 ECG_SIGNALS = ["lead1", "lead2"]
-RESPIRATION_SIGNALS = ["impedance_pneumography"]
+RESPIRATION_SIGNALS = ["impedance_pneumography", "gyry_ribs_imu"]
 TEMPERATURE_SIGNALS = ["body_temperature"]
 
 
@@ -803,6 +803,7 @@ def extract_all_features(preprocessed, fs=250):
     print("=" * 60)
     for name in RESPIRATION_SIGNALS:
         if name in preprocessed:
+            print(f"  Extracting features from respiration signal &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&: {name}")
             feats, fids = extract_respiration_features(
                 preprocessed[name], fs=fs, signal_name=name
             )
