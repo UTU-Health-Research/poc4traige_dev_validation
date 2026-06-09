@@ -1,5 +1,5 @@
 import numpy as np
-from vitalwave.basic_algos import butter_filter, moving_average_filter
+from vitalwave.basic_algos import butter_filter, moving_average_filter, min_max_normalize
 from scipy.signal import correlate
 
 SIGNAL_MAP = {
@@ -37,14 +37,15 @@ def remove_dc_offset(signals, exclude=None):
 
 
 def preprocess_ecg(signal, fs=250):
-    sig = np.asarray(signal, dtype=np.float64).ravel()
+    sig = min_max_normalize(np.asarray(signal, dtype=np.float64).ravel())
     sig = butter_filter(arr=sig, n=2, wn=np.array([5.0]),  filter_type='high', fs=fs)
     sig = butter_filter(arr=sig, n=2, wn=np.array([40.0]), filter_type='low',  fs=fs)
+    sig = min_max_normalize(np.asarray(signal, dtype=np.float64).ravel())
     return sig
 
 
 def preprocess_respiration(signal, fs=250):
-    sig = np.asarray(signal, dtype=np.float64).ravel()
+    sig = min_max_normalize(np.asarray(signal, dtype=np.float64).ravel())
     sig = butter_filter(arr=sig, n=2, wn=np.array([0.1]), filter_type='high', fs=fs)
     sig = butter_filter(arr=sig, n=2, wn=np.array([1.0]), filter_type='low',  fs=fs)
     sig = moving_average_filter(sig, window=int(fs * 0.25))
@@ -52,7 +53,7 @@ def preprocess_respiration(signal, fs=250):
 
 
 def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0):
-    sig = np.asarray(signal, dtype=np.float64).ravel()
+    sig = min_max_normalize(np.asarray(signal, dtype=np.float64).ravel())
     spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
     idx = np.arange(len(sig), dtype=np.float64)
     sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask]) #
@@ -71,14 +72,14 @@ def preprocess_signals(signals, fs=250):
     for name in IMU_SIGNALS:
         if name in signals:
             preprocessed[name], spike_masks[name] = preprocess_imu(signals[name], fs=fs)
-    for name in TEMPERATURE_SIGNALS:
-        if name in signals: preprocessed[name] = np.asarray(signals[name], dtype=np.float64).copy()
+    # for name in TEMPERATURE_SIGNALS:
+    #     if name in signals: preprocessed[name] = np.asarray(signals[name], dtype=np.float64).copy()
     return preprocessed, spike_masks
 
 
 def align_signals(dev_sig, ref_sig, fs, max_lag_sec=10.0):
-    dev = np.asarray(dev_sig, dtype=np.float64).ravel()
-    ref = np.asarray(ref_sig, dtype=np.float64).ravel()
+    dev = min_max_normalize(np.asarray(dev_sig, dtype=np.float64).ravel())
+    ref = min_max_normalize(np.asarray(ref_sig, dtype=np.float64).ravel())
     n = min(len(dev), len(ref))
     dev, ref = dev[:n], ref[:n]
 

@@ -5,6 +5,8 @@ from utils import (
     read_all_references, compare_features
 )
 from batch_run import run_batch_from_yaml
+import matplotlib.pyplot as plt
+import numpy as np
 
 RESP_DEVICE_ONLY = [
     "accx_ribs_imu", "accy_ribs_imu", "accz_ribs_imu",
@@ -21,20 +23,41 @@ def main():
 
     # Device signals
     _, raw = read_binary_samples_hex(args['dev_path'], 88)
-    signals = extract_signals(convert_binary_data(raw), cut_starting_samples=1000, cut_ending_samples=0)
-    dev = preprocess_signals(remove_dc_offset(signals, exclude=['body_temperature']))[0]
+    signals = extract_signals(convert_binary_data(raw), cut_starting_samples=0, cut_ending_samples=0)
+    
+    plt.plot(np.array(signals['impedance_pneumography']), label='impedance_pneumography')
+    plt.plot(np.array(signals['gyry_ribs_imu']), label='gyry_ribs_imu')
+    plt.legend()
+    plt.show()
+    
+    dev = preprocess_signals(signals)[0]
+    
+    plt.plot(np.array(dev['impedance_pneumography']), label='impedance_pneumography')
+    plt.plot(np.array(dev['gyry_ribs_imu']), label='gyry_ribs_imu')
+    plt.legend()
+    plt.show()
 
     # Reference signals
     ref_raw, _ = read_all_references(bitt_path=args['bitt_path'], bpc_path=args['bpc_path'],
-                                     target_fs=250, cut_starting_samples=1000, cut_ending_samples=0)
+                                     target_fs=250, cut_starting_samples=0, cut_ending_samples=0, temp=dev['lead2'])
     ref = {}
-    for name, sig in remove_dc_offset(ref_raw).items():
+    for name, sig in ref_raw.items():
         if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs=250)
         elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=250)
         else:                             ref[name] = sig
 
+    plt.plot(np.array(ref['ref_lead2']), label='prep_ref_lead2')
+    plt.plot(np.array(ref['ref_respiration']), label='ref_respiration')
+    plt.legend()
+    plt.show()
+
     # Alignment — ECG
     dev['lead2'], ref['ref_lead2'], _ = align_signals(dev['lead2'], ref['ref_lead2'], fs=250)
+
+    plt.plot(np.array(dev['lead2']), label='align_lead2')
+    plt.plot(np.array(ref['ref_lead2']), label='ref_lead2')
+    plt.legend()
+    plt.show()
 
     # Alignment — Respiration
     dev['impedance_pneumography'], ref['ref_respiration'], resp_lag = align_signals(
@@ -53,6 +76,7 @@ if __name__ == "__main__":
     main()
 
 # python main.py --dev "../subject_3/wire/dev/laying_dev.bin" --bitt "../subject_3/wire/reference/laying_ecg.EDF" --bpc "../subject_3/wire/reference/laying_resp.acq"
+# python main.py --yaml run.yaml
 
 '''
 git remote add origin <repository_url> (add a remote repository)

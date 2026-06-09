@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from scipy import signal
 
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd
 from vitalwave.basic_algos import filter_hr_peaks
@@ -103,6 +104,44 @@ def segment_spi(segment, fs, window_duration=4.0, warmup_fraction=0.25):
 
 # ── Respiration feature extraction ───────────────────────────────────────────
 
+def filter_rr_peaks(peaks, fs:int, hr_min=3, hr_max=40, kernel_size=7, sdsd_max=None):
+    
+    # Calculate R-R intervals in samples
+    rri_s = np.diff(peaks)
+    # Convert R-R intervals into seconds
+    rri = rri_s / fs
+    # Calculate heart rate from R-R intervals
+    hr = 60 / rri
+    print(f"peaks: {len(peaks)}, rri (s): {rri}, hr (bpm): {hr}")
+    # Apply median filter to the heart rate signal to smooth it
+    hr_med = signal.medfilt(hr, kernel_size)
+    # Calculate the SDSD for the R-R intervals
+    rr_diff = np.diff(rri)
+    sdsd = np.std(rr_diff)
+
+    #ONLY THIS SIMPE THRS PART SEEMS TO BE NEW, OTHERWISE ALREADY INCLUDED IN ABOVE FUNCTION 
+    # Check if SDSD exceeds the acceptable maximum, if so return empty array and NaN
+    if sdsd_max is not None and sdsd > sdsd_max:
+        return np.array([]), np.nan
+  
+    # Create a mask for heart rate values within the specified range
+    valid_hr_mask = (hr_med >= hr_min) & (hr_med <= hr_max)
+    # Select valid R-R intervals
+    valid_rri = rri[valid_hr_mask]
+    # Calculate the mean heart rate from valid R-R intervals
+    valid_hr_mean = 60 / np.mean(valid_rri)
+    # Initialize valid peaks list with the first peak
+    valid_peaks = [peaks[0]]
+    # Calculate cumulative sum to find the valid peak indices # JUST USE CUMSUM
+    cumulative_sum = peaks[0]
+    for i in range(len(valid_rri)):
+        cumulative_sum += valid_rri[i] * fs
+        valid_peaks.append(int(cumulative_sum))
+    
+    # Return the array of valid peak indices and the mean heart rate
+    return np.array(valid_peaks), valid_hr_mean
+
+
 def extract_segment_resp_features(segment, fs=250):
     sig = np.asarray(segment, dtype=np.float64).ravel()
     if len(sig) < 2 * fs:
@@ -112,7 +151,7 @@ def extract_segment_resp_features(segment, fs=250):
         p = np.array(ampd(sig, fs), dtype=int)
         p = p[(p >= 0) & (p < len(sig))]
         # same function for HR is used for respiration rate, but with different parameters to capture slower breathing patterns
-        _, rr_mean = filter_hr_peaks(peaks=p, fs=fs, hr_min=3, hr_max=40, kernel_size=3, sdsd_max=None)
+        _, rr_mean = filter_rr_peaks(peaks=p, fs=fs, hr_min=3, hr_max=40, kernel_size=3, sdsd_max=None)
         base['resp_rate_mean'] = rr_mean
     except Exception:
         pass

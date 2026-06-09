@@ -22,6 +22,7 @@ def read_bittium_edf(filepath, channel_map=None, cut_starting_samples=0, cut_end
     channel_map = channel_map or BITTIUM_CHANNEL_MAP
     edf = mne.io.read_raw_edf(filepath, preload=True, verbose=False)
     fs  = edf.info['sfreq']
+    
     signals = {}
     for name, ch in channel_map.items():
         if ch in edf.ch_names:
@@ -42,16 +43,23 @@ def read_biopac_acq(filepath, channel_map=None, cut_starting_samples=0, cut_endi
     metadata = {'device': 'Biopac', 'filepath': filepath, 'fs_map': fs_map}
     return signals, metadata
 
-
-def read_all_references(bitt_path, bpc_path, target_fs=250, cut_starting_samples=0, cut_ending_samples=0):
+import matplotlib.pyplot as plt
+def read_all_references(bitt_path, bpc_path, target_fs=250, cut_starting_samples=0, cut_ending_samples=0, temp=None):
     kwargs = dict(cut_starting_samples=cut_starting_samples, cut_ending_samples=cut_ending_samples)
 
     bitt_signals, bitt_meta = read_bittium_edf(bitt_path, **kwargs)
     bpc_signals,  bpc_meta  = read_biopac_acq(bpc_path,  **kwargs)
+    
+    plt.plot(100*np.array(bitt_signals['ref_lead2'])+0.8, label='ref_lead2')
+    plt.plot(np.array(temp), label='dev_lead2_')
+    plt.legend()
+    plt.show()
 
-    ref_signals = {name: _resample(sig, bitt_meta['fs'], target_fs)
-                   for name, sig in bitt_signals.items()}
-    ref_signals.update({name: _resample(sig, bpc_meta['fs_map'][name], target_fs)
-                        for name, sig in bpc_signals.items()})
+    # ref_signals = {name: _resample(sig, bitt_meta['fs'], target_fs)
+    #                for name, sig in bitt_signals.items()}
+    ref_signals = bitt_signals
+    ref_signals.update(bpc_signals)
+    # ref_signals.update({name: _resample(sig, bpc_meta['fs_map'][name], target_fs)
+    #                     for name, sig in bpc_signals.items()})
 
     return ref_signals, {'bittium': bitt_meta, 'biopac': bpc_meta, 'target_fs': target_fs}

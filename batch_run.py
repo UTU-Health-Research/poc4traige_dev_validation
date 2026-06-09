@@ -82,7 +82,7 @@ def run_batch_from_yaml(yaml_path):
 
     subjects = cfg.get("subjects") or sorted([d for d in os.listdir(root) if d.startswith("subject_")])
     configs = cfg.get("configurations", ["patch", "wire"])
-
+    KEEP_ACTIVITIES = {"walking", "laying"}
     for subj in subjects:
         for conf in configs:
             base = os.path.join(root, subj, conf)
@@ -102,7 +102,8 @@ def run_batch_from_yaml(yaml_path):
             for dev_path in bin_files:
                 fname = os.path.basename(dev_path)  # e.g. "laying_dev.BIN"
                 activity = fname.rsplit("_dev.", 1)[0]  # robust vs BIN/bin
-
+                if activity not in KEEP_ACTIVITIES:
+                    continue
                 # reference naming you actually have:
                 #   <activity>_ecg.EDF (or .edf)
                 #   <activity>_resp.acq
