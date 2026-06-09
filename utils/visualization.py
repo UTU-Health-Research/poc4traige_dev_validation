@@ -166,6 +166,7 @@ def plot_ecg_with_peaks(preprocessed, fiducials, signal_name="lead1",
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
+    plt.show()
 
     if save:
         suffix = f"_{time_window[0]}s_{time_window[1]}s" if time_window else ""
