@@ -58,6 +58,104 @@ RESP_MODALITY_SOURCES = {
 }
 
 
+def _fuse_respiration_rate(comparison_results, output_dir):
+    """
+    For each paired segment, compare AE of mean respiration rate
+    (|ref - dev|) from both RESP_SIGNAL_PAIRS entries.
+    The source with lower AE wins; its dev value is recorded as
+    final_fused_respiration_rate.
+
+    Saves: <output_dir>/tables/fused_respiration_rate.csv
+    """
+    tables_dir = os.path.join(output_dir, "tables")
+    _ensure_dir(tables_dir)
+
+    pair_keys = [
+        f"{dev}_vs_{ref}"
+        for dev, ref in RESP_SIGNAL_PAIRS.items()
+    ]
+
+    # Collect available paired DataFrames
+    available = {}
+    for key in pair_keys:
+        if key not in comparison_results:
+            continue
+        pdf = comparison_results[key].get('paired_df', pd.DataFrame())
+        if len(pdf) == 0:
+            continue
+        if 'dev_resp_rate_mean' not in pdf.columns or \
+           'ref_resp_rate_mean' not in pdf.columns:
+            continue
+        available[key] = pdf
+
+    if len(available) < 2:
+        print(f"  [FUSE RESP] Need 2 resp pairs, found {len(available)} — skipping.")
+        return pd.DataFrame()
+
+    keys       = list(available.keys())
+    pdf_a      = available[keys[0]].copy()
+    pdf_b      = available[keys[1]].copy()
+
+    # Align on segment index
+    segs_a = set(pdf_a['segment'])
+    segs_b = set(pdf_b['segment'])
+    common = segs_a & segs_b
+
+    if not common:
+        print("  [FUSE RESP] No common segments between the two resp pairs — skipping.")
+        return pd.DataFrame()
+
+    pdf_a = pdf_a[pdf_a['segment'].isin(common)].sort_values('segment').reset_index(drop=True)
+    pdf_b = pdf_b[pdf_b['segment'].isin(common)].sort_values('segment').reset_index(drop=True)
+
+    rows = []
+    for i in range(len(pdf_a)):
+        seg = int(pdf_a.loc[i, 'segment'])
+
+        dev_a = pd.to_numeric(pdf_a.loc[i, 'dev_resp_rate_mean'], errors='coerce')
+        ref_a = pd.to_numeric(pdf_a.loc[i, 'ref_resp_rate_mean'], errors='coerce')
+        dev_b = pd.to_numeric(pdf_b.loc[i, 'dev_resp_rate_mean'], errors='coerce')
+        ref_b = pd.to_numeric(pdf_b.loc[i, 'ref_resp_rate_mean'], errors='coerce')
+
+        ae_a = abs(ref_a - dev_a) if (not np.isnan(dev_a) and not np.isnan(ref_a)) else np.nan
+        ae_b = abs(ref_b - dev_b) if (not np.isnan(dev_b) and not np.isnan(ref_b)) else np.nan
+
+        # Pick winner
+        if np.isnan(ae_a) and np.isnan(ae_b):
+            fused   = np.nan
+            winner  = "none"
+        elif np.isnan(ae_a):
+            fused, winner = float(dev_b), keys[1]
+        elif np.isnan(ae_b):
+            fused, winner = float(dev_a), keys[0]
+        elif ae_a <= ae_b:
+            fused, winner = float(dev_a), keys[0]
+        else:
+            fused, winner = float(dev_b), keys[1]
+
+        rows.append(dict(
+            segment                   = seg,
+            start_sec                 = pdf_a.loc[i, 'start_sec'],
+            end_sec                   = pdf_a.loc[i, 'end_sec'],
+            dev_resp_rate_mean_pair_a = dev_a,
+            ref_resp_rate_mean_pair_a = ref_a,
+            ae_pair_a                 = ae_a,
+            dev_resp_rate_mean_pair_b = dev_b,
+            ref_resp_rate_mean_pair_b = ref_b,
+            ae_pair_b                 = ae_b,
+            winner_pair               = winner,
+            final_fused_respiration_rate = fused,
+        ))
+
+    fused_df = pd.DataFrame(rows)
+    path     = os.path.join(tables_dir, "fused_respiration_rate.csv")
+    fused_df.to_csv(path, index=False)
+    print(f"  [FUSE RESP] {len(fused_df)} segments → {path}")
+    print(f"  [FUSE RESP] Winner counts: "
+          f"{fused_df['winner_pair'].value_counts().to_dict()}")
+
+    return fused_df
+
 # ═══════════════════════════════════════════════════════════════
 #  IMU PCA HELPERS
 # ═══════════════════════════════════════════════════════════════
@@ -1647,7 +1745,7 @@ def compare_features(dev_preprocessed, ref_preprocessed,
             window_sec=window_sec,
             dev_df=dev_df, ref_df=ref_df, paired_df=paired_df,
         )
-
+ 
     # ── 3. Multi-modal respiration ─────────────────────────
     print("\n[3/3] Multi-Modal Respiration Comparison")
     print("-" * 40)
@@ -1662,6 +1760,9 @@ def compare_features(dev_preprocessed, ref_preprocessed,
     _export_segment_tables(comparison_results, output_dir)
     _export_segment_report(comparison_results, output_dir)
 
+     # ── Fused respiration rate ────────────────────────────
+    _fuse_respiration_rate(comparison_results, output_dir)
+    
     plot_lead_correlation(
         dev_preprocessed, ref_preprocessed, comparison_results,
         fs=fs, output_dir=os.path.join(output_dir, "plots"),
