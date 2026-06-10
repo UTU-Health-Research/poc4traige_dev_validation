@@ -2,6 +2,7 @@ from pyexpat import features
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import struct
 from utils import ( 
     parse_arguments, 
@@ -13,6 +14,7 @@ from utils import (
     preprocess_ecg, 
     preprocess_respiration, 
     align_signals,
+    apply_lag,
     extract_ecg_features, 
     extract_respiration_features, 
     extract_all_features, 
@@ -87,10 +89,9 @@ def main():
 
     aligned_signals = {}
     signals_to_align = {
-    "lead1"  : {"device": "lead1", "ref": "ref_lead1"},
+    "lead1" : {"device": "lead1", "ref": "ref_lead1"},
     "lead2" : {"device": "lead2", "ref": "ref_lead2"},
-    "respiration1" : {"device": "impedance_pneumography", "ref": "ref_respiration"},
-    "respiration2" : {"device": "gyry_ribs_imu", "ref": "ref_respiration"},
+    "respiration" : {"device": "impedance_pneumography", "ref": "ref_respiration"},
     }
 
     for lead_name, pair in signals_to_align.items():
@@ -121,6 +122,15 @@ def main():
     ref_preprocessed['ref_respiration'] = aligned_signals.get('respiration', {}).get('ref')
 
 
+
+    master_len = len(np.array(preprocessed_signals['impedance_pneumography']))
+    preprocessed_signals['gyry_ribs_imu'] = apply_lag(preprocessed_signals['gyry_ribs_imu'], lag)
+    preprocessed_signals['gyry_ribs_imu'] = preprocessed_signals['gyry_ribs_imu'][:master_len]
+
+    plt.plot(preprocessed_signals['lead2'], label="lead2")
+    plt.plot(ref_preprocessed['ref_lead2'], label="ref_lead2")
+    plt.legend()
+    plt.show()
     
     # ═════════════════════════════════════════════════════════
     #  SEGMENT-BASED COMPARISON (New)

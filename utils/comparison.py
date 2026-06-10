@@ -145,6 +145,7 @@ def _fuse_respiration_rate(comparison_results, output_dir):
             ae_pair_b                 = ae_b,
             winner_pair               = winner,
             final_fused_respiration_rate = fused,
+            ref = ref_a,
         ))
 
     fused_df = pd.DataFrame(rows)
@@ -1143,6 +1144,8 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
     ref_sig        = ref_sig[:min_len]
     n_segments     = min_len // window_samples
 
+    print(f"number of segments are {n_segments} (segment length = {window_sec}s)")
+
     if n_segments == 0:
         print(f"    [WARNING] Signals too short for {window_sec}s segments "
               f"(length={min_len} samples = {min_len / fs:.1f}s)")
@@ -1241,40 +1244,40 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
         for col in te_df.columns:
             paired_df[col] = te_df[col].values
 
-    # ── Respiration: AC RQI quality gate ──────────────────
-    if (signal_type == "respiration"
-            and ac_rqi_min is not None
-            and len(paired_df) > 0):
+    # # ── Respiration: AC RQI quality gate ──────────────────
+    # if (signal_type == "respiration"
+    #         and ac_rqi_min is not None
+    #         and len(paired_df) > 0):
 
-        dev_ac = pd.to_numeric(
-            paired_df.get('dev_ac_rqi',
-                          pd.Series([float('nan')] * len(paired_df))),
-            errors='coerce'
-        )
-        ref_ac = pd.to_numeric(
-            paired_df.get('ref_ac_rqi',
-                          pd.Series([float('nan')] * len(paired_df))),
-            errors='coerce'
-        )
+    #     dev_ac = pd.to_numeric(
+    #         paired_df.get('dev_ac_rqi',
+    #                       pd.Series([float('nan')] * len(paired_df))),
+    #         errors='coerce'
+    #     )
+    #     ref_ac = pd.to_numeric(
+    #         paired_df.get('ref_ac_rqi',
+    #                       pd.Series([float('nan')] * len(paired_df))),
+    #         errors='coerce'
+    #     )
 
-        paired_df['quality_gate_pass'] = (
-            (dev_ac >= ac_rqi_min) & (ref_ac >= ac_rqi_min)
-        ).astype(int)
+    #     paired_df['quality_gate_pass'] = (
+    #         (dev_ac >= ac_rqi_min) & (ref_ac >= ac_rqi_min)
+    #     ).astype(int)
 
-        n_before   = len(paired_df)
-        n_excluded = int((paired_df['quality_gate_pass'] == 0).sum())
+    #     n_before   = len(paired_df)
+    #     n_excluded = int((paired_df['quality_gate_pass'] == 0).sum())
 
-        if n_excluded > 0:
-            print(f"    [QUALITY GATE] ac_rqi_min={ac_rqi_min}: "
-                  f"excluded {n_excluded}/{n_before} segments")
-            paired_df_clean = (paired_df[paired_df['quality_gate_pass'] == 1]
-                               .reset_index(drop=True))
-            print(f"    [QUALITY GATE] {len(paired_df_clean)} segments remain")
-        else:
-            paired_df_clean = paired_df.copy()
-            print(f"    [QUALITY GATE] All {n_before} segments pass")
+    #     if n_excluded > 0:
+    #         print(f"    [QUALITY GATE] ac_rqi_min={ac_rqi_min}: "
+    #               f"excluded {n_excluded}/{n_before} segments")
+    #         paired_df_clean = (paired_df[paired_df['quality_gate_pass'] == 1]
+    #                            .reset_index(drop=True))
+    #         print(f"    [QUALITY GATE] {len(paired_df_clean)} segments remain")
+    #     else:
+    #         paired_df_clean = paired_df.copy()
+    #         print(f"    [QUALITY GATE] All {n_before} segments pass")
 
-        paired_df.attrs['paired_df_clean'] = paired_df_clean
+    #     paired_df.attrs['paired_df_clean'] = paired_df_clean
 
     # ── Energy-weighted signal quality summary ─────────────
     def _weighted_avg(df, value_col, weight_col='signal_energy'):
@@ -1745,59 +1748,13 @@ def compare_features(dev_preprocessed, ref_preprocessed,
             window_sec=window_sec,
             dev_df=dev_df, ref_df=ref_df, paired_df=paired_df,
         )
- 
-    # ── 3. Multi-modal respiration ─────────────────────────
-    print("\n[3/3] Multi-Modal Respiration Comparison")
-    print("-" * 40)
-    modality_results = compare_resp_modalities(
-        dev_preprocessed, fs=fs, window_sec=window_sec,
-        output_dir=output_dir
-    )
-    if modality_results:
-        comparison_results['resp_modality'] = modality_results
 
-    # ── Export ────────────────────────────────────────────
     _export_segment_tables(comparison_results, output_dir)
     _export_segment_report(comparison_results, output_dir)
 
      # ── Fused respiration rate ────────────────────────────
     _fuse_respiration_rate(comparison_results, output_dir)
-    
-    plot_lead_correlation(
-        dev_preprocessed, ref_preprocessed, comparison_results,
-        fs=fs, output_dir=os.path.join(output_dir, "plots"),
-        show=False, save=True
-    )
-
-    # ── Beat-level RR tables ──────────────────────────────
-    rr_dir = os.path.join(output_dir, "tables", "beat_rr")
-    _ensure_dir(rr_dir)
-
-    for dev_name, ref_name in ECG_SIGNAL_PAIRS.items():
-        if (dev_name not in dev_preprocessed or
-                ref_name not in ref_preprocessed):
-            continue
-
-        paired_beats, rr_summary = pair_rr_sequences(
-            dev_preprocessed[dev_name],
-            ref_preprocessed[ref_name],
-            fs=fs, window_sec=window_sec
-        )
-        label = f"{dev_name}_vs_{ref_name}"
-
-        if len(paired_beats) > 0:
-            bt_path = os.path.join(rr_dir, f"{label}_beat_rr.csv")
-            paired_beats.to_csv(bt_path, index=False)
-            print(f"  [TABLE] {bt_path}")
-
-        if rr_summary:
-            sm_path = os.path.join(rr_dir, f"{label}_rr_summary.json")
-            with open(sm_path, 'w', encoding='utf-8') as fj:
-                json.dump(
-                    {k: _make_serializable(v) for k, v in rr_summary.items()},
-                    fj, indent=4
-                )
-            print(f"  [JSON]  {sm_path}")
+ 
 
     return comparison_results
 

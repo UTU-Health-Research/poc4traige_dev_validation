@@ -402,6 +402,11 @@ def align_signals(dev_sig, bit_sig, fs):
     lags        = np.arange(-len(dev_norm)+1, len(dev_norm))
     best_lag    = lags[np.argmax(correlation)]
 
+    if best_lag > 400 or best_lag < -400:
+        print(f"  [WARNING] Large lag detected: {best_lag} samples ({best_lag/fs:.2f}s). Check signal quality and timestamps.")
+        correlation[np.abs(lags) > int(5 * fs)] = -np.inf
+        best_lag = lags[np.argmax(correlation)]
+
     # ─── Align ────────────────────────────────────────────────
     if best_lag > 0:
         dev_aligned = dev_norm[best_lag:]
@@ -415,3 +420,8 @@ def align_signals(dev_sig, bit_sig, fs):
 
     min_len = min(len(dev_aligned), len(bit_aligned))
     return dev_aligned[:min_len], bit_aligned[:min_len], best_lag
+
+def apply_lag(dev_sig, lag):
+    dev = np.asarray(dev_sig, dtype=np.float64).ravel()
+    dev = dev[lag:] if lag > 0 else (dev[:len(dev) - abs(lag)] if lag < 0 else dev)
+    return dev
