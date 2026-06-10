@@ -60,47 +60,50 @@ RESP_MODALITY_SOURCES = {
 
 def _fuse_respiration_rate(comparison_results, output_dir):
     """
-    For each paired segment, compare AE of mean respiration rate
-    (|ref - dev|) from both RESP_SIGNAL_PAIRS entries.
-    The source with lower AE wins; its dev value is recorded as
-    final_fused_respiration_rate.
+    Compute a weighted-average fused respiration rate per segment
+    from both RESP_SIGNAL_PAIRS entries.
+
+    Weights (fixed):
+        impedance_pneumography  → 1
+        gyry_ribs_imu           → 2
+
+    Handles NaN gracefully: if one source is NaN for a segment,
+    the other source's value is used as-is (full weight falls on
+    the available source).
 
     Saves: <output_dir>/tables/fused_respiration_rate.csv
     """
     tables_dir = os.path.join(output_dir, "tables")
     _ensure_dir(tables_dir)
 
-    pair_keys = [
-        f"{dev}_vs_{ref}"
-        for dev, ref in RESP_SIGNAL_PAIRS.items()
-    ]
+    # Fixed weights matching RESP_SIGNAL_PAIRS key order
+    PAIR_WEIGHTS = {
+        "impedance_pneumography_vs_ref_respiration": 1,
+        "gyry_ribs_imu_vs_ref_respiration":          2,
+    }
 
     # Collect available paired DataFrames
     available = {}
-    for key in pair_keys:
+    for key, weight in PAIR_WEIGHTS.items():
         if key not in comparison_results:
             continue
         pdf = comparison_results[key].get('paired_df', pd.DataFrame())
         if len(pdf) == 0:
             continue
-        if 'dev_resp_rate_mean' not in pdf.columns or \
-           'ref_resp_rate_mean' not in pdf.columns:
+        if 'dev_resp_rate_mean' not in pdf.columns:
             continue
-        available[key] = pdf
+        available[key] = (pdf, weight)
 
     if len(available) < 2:
         print(f"  [FUSE RESP] Need 2 resp pairs, found {len(available)} — skipping.")
         return pd.DataFrame()
 
-    keys       = list(available.keys())
-    pdf_a      = available[keys[0]].copy()
-    pdf_b      = available[keys[1]].copy()
+    keys   = list(available.keys())
+    pdf_a, w_a = available[keys[0]]   # impedance, weight=1
+    pdf_b, w_b = available[keys[1]]   # gyroscope,  weight=2
 
-    # Align on segment index
-    segs_a = set(pdf_a['segment'])
-    segs_b = set(pdf_b['segment'])
-    common = segs_a & segs_b
-
+    # Align on common segments
+    common = set(pdf_a['segment']) & set(pdf_b['segment'])
     if not common:
         print("  [FUSE RESP] No common segments between the two resp pairs — skipping.")
         return pd.DataFrame()
@@ -110,52 +113,43 @@ def _fuse_respiration_rate(comparison_results, output_dir):
 
     rows = []
     for i in range(len(pdf_a)):
-        seg = int(pdf_a.loc[i, 'segment'])
-
         dev_a = pd.to_numeric(pdf_a.loc[i, 'dev_resp_rate_mean'], errors='coerce')
-        ref_a = pd.to_numeric(pdf_a.loc[i, 'ref_resp_rate_mean'], errors='coerce')
         dev_b = pd.to_numeric(pdf_b.loc[i, 'dev_resp_rate_mean'], errors='coerce')
-        ref_b = pd.to_numeric(pdf_b.loc[i, 'ref_resp_rate_mean'], errors='coerce')
+        ref = pd.to_numeric(pdf_a.loc[i, 'ref_resp_rate_mean'], errors='coerce')
 
-        ae_a = abs(ref_a - dev_a) if (not np.isnan(dev_a) and not np.isnan(ref_a)) else np.nan
-        ae_b = abs(ref_b - dev_b) if (not np.isnan(dev_b) and not np.isnan(ref_b)) else np.nan
+        a_valid = not np.isnan(dev_a)
+        b_valid = not np.isnan(dev_b)
 
-        # Pick winner
-        if np.isnan(ae_a) and np.isnan(ae_b):
-            fused   = np.nan
-            winner  = "none"
-        elif np.isnan(ae_a):
-            fused, winner = float(dev_b), keys[1]
-        elif np.isnan(ae_b):
-            fused, winner = float(dev_a), keys[0]
-        elif ae_a <= ae_b:
-            fused, winner = float(dev_a), keys[0]
+        if not a_valid and not b_valid:
+            fused = np.nan
+        elif not a_valid:
+            fused = float(dev_b)          # only gyro available
+        elif not b_valid:
+            fused = float(dev_a)          # only impedance available
         else:
-            fused, winner = float(dev_b), keys[1]
+            fused = float(
+                (w_a * dev_a + w_b * dev_b) / (w_a + w_b)
+            )
 
         rows.append(dict(
-            segment                   = seg,
-            start_sec                 = pdf_a.loc[i, 'start_sec'],
-            end_sec                   = pdf_a.loc[i, 'end_sec'],
-            dev_resp_rate_mean_pair_a = dev_a,
-            ref_resp_rate_mean_pair_a = ref_a,
-            ae_pair_a                 = ae_a,
-            dev_resp_rate_mean_pair_b = dev_b,
-            ref_resp_rate_mean_pair_b = ref_b,
-            ae_pair_b                 = ae_b,
-            winner_pair               = winner,
-            final_fused_respiration_rate = fused,
-            ref = ref_a,
+            segment                          = int(pdf_a.loc[i, 'segment']),
+            start_sec                        = pdf_a.loc[i, 'start_sec'],
+            end_sec                          = pdf_a.loc[i, 'end_sec'],
+            dev_resp_rate_mean_impedance     = dev_a,
+            dev_resp_rate_mean_gyro          = dev_b,
+            weight_impedance                 = w_a,
+            weight_gyro                      = w_b,
+            final_fused_respiration_rate     = fused,
+            ref_respiration_rate        = ref,
         ))
 
     fused_df = pd.DataFrame(rows)
     path     = os.path.join(tables_dir, "fused_respiration_rate.csv")
     fused_df.to_csv(path, index=False)
     print(f"  [FUSE RESP] {len(fused_df)} segments → {path}")
-    print(f"  [FUSE RESP] Winner counts: "
-          f"{fused_df['winner_pair'].value_counts().to_dict()}")
 
     return fused_df
+
 
 # ═══════════════════════════════════════════════════════════════
 #  IMU PCA HELPERS
