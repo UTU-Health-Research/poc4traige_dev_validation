@@ -1,9 +1,6 @@
-from pyexpat import features
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import struct
 from utils import ( 
     parse_arguments, 
     read_binary_samples_hex, 
@@ -15,28 +12,20 @@ from utils import (
     preprocess_respiration, 
     align_signals,
     apply_lag,
-    extract_ecg_features, 
-    extract_respiration_features, 
-    extract_all_features, 
-    export_all, 
-    visualize_all,
     read_all_references, 
     compare_features, 
-    plot_all_signal_overlays, 
-    assess_all_quality, 
-    export_quality_report, 
-    plot_quality_dashboard,
-    assess_ecg_quality, 
-    assess_respiration_quality
     )
 
+from batch_run import run_batch_from_yaml
 
 
 def main():
 
     # Get file path from terminal
     args = parse_arguments()
-
+    if args.get("yaml_path"):
+        run_batch_from_yaml(args["yaml_path"])
+        return
     # ═════════════════════════════════════════════════════════
     #  DEVICE + REF SIGNAL READING AND AlIGNMENT
     # ═════════════════════════════════════════════════════════
@@ -127,11 +116,15 @@ def main():
     preprocessed_signals['gyry_ribs_imu'] = apply_lag(preprocessed_signals['gyry_ribs_imu'], lag)
     preprocessed_signals['gyry_ribs_imu'] = preprocessed_signals['gyry_ribs_imu'][:master_len]
 
-    plt.plot(preprocessed_signals['lead2'], label="lead2")
-    plt.plot(ref_preprocessed['ref_lead2'], label="ref_lead2")
+    plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
+    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
     plt.legend()
     plt.show()
     
+    plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
+    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
+    plt.legend()
+    plt.show()
     # ═════════════════════════════════════════════════════════
     #  SEGMENT-BASED COMPARISON (New)
     # ═════════════════════════════════════════════════════════
@@ -153,6 +146,7 @@ if __name__ == "__main__":
 
 # python main.py -f1 "../subject_3/wire/dev/laying_dev.bin" -f2 "../subject_3/wire/reference/laying_ecg.EDF" -f3 "../subject_3/wire/reference/laying_resp.acq"
 # python main.py --dev "../subject_3/wire/dev/laying_dev.bin" --bitt "../subject_3/wire/reference/laying_ecg.EDF" --bpc "../subject_3/wire/reference/laying_resp.acq"
+# python main.py --yaml run.yaml
 
 '''
 git remote add origin <repository_url> (add a remote repository)

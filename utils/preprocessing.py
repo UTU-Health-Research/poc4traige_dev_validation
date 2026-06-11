@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from vitalwave.basic_algos import butter_filter
+from vitalwave.basic_algos import butter_filter, moving_average_filter
 from scipy.signal import correlate
 
 SIGNAL_MAP = {
@@ -147,144 +147,29 @@ def remove_dc_offset(signals, exclude=None):
 
 
 def preprocess_respiration(signal, fs=250):
-    """
-    Respiration Signal Preprocessing using vitalwave:
-        Step 1 → High-pass filter at 0.05 Hz (remove baseline drift)
-        Step 2 → Low-pass filter  at 1.0  Hz (remove high-freq noise)
-
-    Preserves breathing band: 0.1 – 0.5 Hz
-
-    Parameters
-    ----------
-    signal : array-like
-        Raw respiration signal (impedance pneumography).
-    fs : int
-        Sampling frequency in Hz (default: 250).
-
-    Returns
-    -------
-    np.ndarray
-        Cleaned respiration signal.
-    """
-
-    sig = np.array(signal, dtype=np.float64).flatten()
-
-    # Step 1: High-pass at 0.05 Hz → remove slow baseline drift
-    sig_hp = butter_filter(
-        arr=sig,
-        n=2,
-        wn=np.array([0.1]),
-        filter_type='high',
-        fs=fs
-    )
-
-    # Step 2: Low-pass at 1.0 Hz → remove noise above breathing band
-    sig_lp = butter_filter(
-        arr=sig_hp,
-        n=2,
-        wn=np.array([1.0]),
-        filter_type='low',
-        fs=fs
-    )
-
-    return sig_lp
+    sig = np.asarray(signal, dtype=np.float64).ravel()
+    sig = butter_filter(arr=sig, n=2, wn=np.array([0.1]), filter_type='high', fs=fs)
+    sig = butter_filter(arr=sig, n=2, wn=np.array([1.0]), filter_type='low',  fs=fs)
+    sig = moving_average_filter(sig, window=int(fs * 0.25))
+    return sig
 
 
 def preprocess_ecg(signal, fs=250):
-    """
-    ECG Preprocessing using vitalwave:
-        Step 1 → High-pass filter at 0.5 Hz  (remove baseline wander)
-        Step 2 → Low-pass filter  at 20.0 Hz  (remove high-freq noise)
-
-    Parameters
-    ----------
-    signal : array-like
-        Raw ECG signal.
-    fs : int
-        Sampling frequency in Hz (default: 250).
-
-    Returns
-    -------
-    np.ndarray
-        Cleaned ECG signal.
-    """
-
-    sig = np.array(signal, dtype=np.float64).flatten()
-
-    # Step 1: High-pass at 5.0 Hz → remove baseline wander
-    sig_hp = butter_filter(
-        arr=sig,
-        n=2,
-        wn=np.array([5.0]),
-        filter_type='high',
-        fs=fs
-    )
-
-    # Step 2: Low-pass at 40.0 Hz → remove high-frequency noise
-    sig_lp = butter_filter(
-        arr=sig_hp,
-        n=2,
-        wn=np.array([40.0]),
-        filter_type='low',
-        fs=fs
-    )
-
-    return sig_lp
+    sig = np.asarray(signal, dtype=np.float64).ravel()
+    sig = butter_filter(arr=sig, n=2, wn=np.array([5.0]),  filter_type='high', fs=fs)
+    sig = butter_filter(arr=sig, n=2, wn=np.array([40.0]), filter_type='low',  fs=fs)
+    return sig
 
 
 def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0):
-    """
-    IMU Preprocessing using vitalwave:
-        Step 1 → Spike detection (z-score based)
-        Step 2 → Interpolation over spikes
-        Step 3 → Low-pass filter at 2.0 Hz (remove high-freq noise)
-
-    Parameters
-    ----------
-    signal : array-like
-        Raw IMU signal (accelerometer or gyroscope).
-    fs : int
-        Sampling frequency in Hz (default: 250).
-    spike_threshold : float
-        Z-score threshold for spike detection (default: 3.0).
-    highcut : float
-        Low-pass cutoff frequency in Hz (default: 2.0).
-
-    Returns
-    -------
-    sig_lp : np.ndarray
-        Cleaned IMU signal.
-    spike_mask : np.ndarray of bool
-        Boolean mask indicating detected spike locations.
-    """
-
-    sig = np.array(signal, dtype=np.float64).flatten()
-
-    # Step 1: Detect spikes via z-score
-    mean = np.mean(sig)
-    std  = np.std(sig)
-
-    spike_mask = np.abs(sig - mean) > spike_threshold * std
-    n_spikes   = np.sum(spike_mask)
-    # print(f"  Spikes detected: {n_spikes} samples "
-    #       f"({100 * n_spikes / len(sig):.2f}% of signal)")
-
-    # Step 2: Interpolate over spike locations
-    indices      = np.arange(len(sig), dtype=np.float64)
-    good_indices = indices[~spike_mask]
-    good_values  = sig[~spike_mask]
-    sig_clean    = np.interp(indices, good_indices, good_values)
-
-    # Step 3: Low-pass filter at highcut Hz
-    sig_lp = butter_filter(
-        arr=sig_clean,
-        n=4,
-        wn=np.array([highcut]),
-        filter_type='low',
-        fs=fs
-    )
-
-    return sig_lp, spike_mask
+    sig = np.asarray(signal, dtype=np.float64).ravel()
+    spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
+    idx = np.arange(len(sig), dtype=np.float64)
+    sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask]) #
+    sig = butter_filter(arr=sig, n=2, wn=np.array([0.1]), filter_type='high', fs=fs)
+    sig = butter_filter(arr=sig, n=2, wn=np.array([1.0]), filter_type='low',  fs=fs)
+    sig = moving_average_filter(sig, window=int(fs * 0.25))
+    return sig, spike_mask
 
 
 ECG_SIGNALS = [
