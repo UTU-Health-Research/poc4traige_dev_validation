@@ -2,7 +2,9 @@ from utils import (
     parse_arguments, read_binary_samples_hex, convert_binary_data,
     extract_signals, remove_dc_offset, preprocess_signals,
     preprocess_ecg, preprocess_respiration, align_signals, apply_lag,
-    read_all_references, compare_features
+    export_all, visualize_all, read_all_references, compare_features,
+    assess_all_quality, export_quality_report,
+    plot_quality_dashboard, assess_ecg_quality, assess_respiration_quality,
 )
 from batch_run import run_batch_from_yaml
 import matplotlib.pyplot as plt
@@ -15,62 +17,76 @@ RESP_DEVICE_ONLY = [
     "gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu",
 ]
 
+SIGNALS_TO_ALIGN = {
+    "lead1":       {"device": "lead1",                  "ref": "ref_lead1"},
+    "lead2":       {"device": "lead2",                  "ref": "ref_lead2"},
+    "respiration": {"device": "impedance_pneumography", "ref": "ref_respiration"},
+}
+
+
 def main():
     args = parse_arguments()
     if args.get("yaml_path"):
         run_batch_from_yaml(args["yaml_path"])
         return
 
-    # Device signals
-    _, raw = read_binary_samples_hex(args['dev_path'], 88)
-    signals = extract_signals(convert_binary_data(raw), cut_starting_samples=0, cut_ending_samples=0)
-    
-    plt.plot(np.array(signals['impedance_pneumography']), label='impedance_pneumography')
-    plt.plot(np.array(signals['gyry_ribs_imu']), label='gyry_ribs_imu')
-    plt.legend()
-    plt.show()
-    
-    dev = preprocess_signals(signals)[0]
-    
-    plt.plot(np.array(dev['impedance_pneumography']), label='impedance_pneumography')
-    plt.plot(np.array(dev['gyry_ribs_imu']), label='gyry_ribs_imu')
-    plt.legend()
-    plt.show()
+    # ── Device signals ────────────────────────────────────────────────────────
+    print("\n" + "=" * 60)
+    print("DEVICE + REF SIGNAL READING AND ALIGNMENT")
+    print("=" * 60)
 
-    # Reference signals
-    ref_raw, _ = read_all_references(bitt_path=args['bitt_path'], bpc_path=args['bpc_path'],
-                                     target_fs=250, cut_starting_samples=0, cut_ending_samples=0, temp=dev['lead2'])
+    _, raw       = read_binary_samples_hex(args['dev_path'], 88)
+    dev_data_raw = convert_binary_data(raw)
+    print(f"\nDev. Data shape: {dev_data_raw.shape}")
+
+    signals = extract_signals(dev_data_raw, cut_starting_samples=1000, cut_ending_samples=0)
+    dev, _  = preprocess_signals(remove_dc_offset(signals, exclude=['body_temperature']))
+    print(f"\n  Device signals after preprocessing: {list(dev.keys())}")
+
+    # ── Reference signals ─────────────────────────────────────────────────────
+    ref_raw, _ = read_all_references(
+        bitt_path=args['bitt_path'], bpc_path=args['bpc_path'],
+        target_fs=250, cut_starting_samples=1000, cut_ending_samples=0,
+    )
+    ref_dc = remove_dc_offset(ref_raw)
+    print(f"\n  Reference signals after DC offset removal: {list(ref_dc.keys())}")
+
     ref = {}
-    for name, sig in ref_raw.items():
-        if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs=250)
-        elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=250)
+    for name, sig in ref_dc.items():
+        if   name.startswith('ref_lead'): ref[name] = preprocess_ecg(sig, fs=250);         print(f"  [OK] {name} (ECG)")
+        elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=250); print(f"  [OK] {name} (Respiration)")
         else:                             ref[name] = sig
+    print(f"\n  Preprocessed reference signals: {list(ref.keys())}")
 
-    plt.plot(np.array(ref['ref_lead2']), label='prep_ref_lead2')
-    plt.plot(np.array(ref['ref_respiration']), label='ref_respiration')
-    plt.legend()
-    plt.show()
+    # ── Alignment ─────────────────────────────────────────────────────────────
+    resp_lag = 0
+    for label, pair in SIGNALS_TO_ALIGN.items():
+        dev_key, ref_key          = pair["device"], pair["ref"]
+        dev[dev_key], ref[ref_key], lag = align_signals(dev[dev_key], ref[ref_key], fs=250)
+        print(f"{label}:  lag={lag} samples ({lag/250:.3f}s)  |  "
+              f"{len(dev[dev_key])} samples  ({len(dev[dev_key])/250:.2f}s)")
+        if label == "respiration":
+            resp_lag = lag
 
-    # Alignment — ECG
-    dev['lead2'], ref['ref_lead2'], _ = align_signals(dev['lead2'], ref['ref_lead2'], fs=250)
+    # ── Apply respiration lag to all IMU channels ─────────────────────────────
+    master_len = len(dev['impedance_pneumography'])
+    for key in RESP_DEVICE_ONLY:
+        if key in dev:
+            dev[key] = apply_lag(dev[key], resp_lag)[:master_len]
 
     plt.plot(np.array(dev['lead2']), label='align_lead2')
     plt.plot(np.array(ref['ref_lead2']), label='ref_lead2')
     plt.legend()
     plt.show()
 
-    # Alignment — Respiration
-    dev['impedance_pneumography'], ref['ref_respiration'], resp_lag = align_signals(
-        dev['impedance_pneumography'], ref['ref_respiration'], fs=250)
-    master_len = len(dev['impedance_pneumography'])
-    for key in RESP_DEVICE_ONLY:
-        if key in dev:
-            dev[key], _ = apply_lag(dev[key], resp_lag)
-            dev[key] = dev[key][:master_len]
+    # ── Segment-based feature comparison ─────────────────────────────────────
+    print("\n" + "=" * 60)
+    print("[PIPELINE] Segment-Based Feature Comparison")
+    print("=" * 60)
 
-    # Comparison
     compare_features(dev_preprocessed=dev, ref_preprocessed=ref,
                      fs=250, window_sec=10, output_dir="outputs/comparison")
+
 
 if __name__ == "__main__":
     main()
