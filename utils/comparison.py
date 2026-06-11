@@ -320,8 +320,13 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
     min_len = min(len(dev_sig), len(ref_sig))
     dev_sig, ref_sig = dev_sig[:min_len], ref_sig[:min_len]
 
-    W = int(window_sec * fs)
-    n = min_len // W
+    # W = int(window_sec * fs)
+    # n = min_len // W
+
+    W    = int(window_sec * fs)
+    step = W // 2                        # 50% overlap
+    n    = (min_len - W) // step + 1     # number of windows that fully fit
+
     if n == 0:
         print(f"  [WARNING] Too short ({min_len/fs:.1f}s) for {window_sec}s windows")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -333,7 +338,8 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
 
     dev_rows, ref_rows = [], []
     for i in range(n):
-        s, e = i * W, i * W + W
+        # s, e = i * W, i * W + W
+        s, e = i * step, i * step + W
         info = dict(segment=i, start_sec=s / fs, end_sec=e / fs)
         for sig, rows in ((dev_sig, dev_rows), (ref_sig, ref_rows)):
             r = fn(sig[s:e], fs)
