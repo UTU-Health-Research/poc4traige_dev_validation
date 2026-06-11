@@ -92,9 +92,11 @@ def run_batch_from_yaml(yaml_path):
             dev_dir = os.path.join(base, "dev")
             ref_dir = os.path.join(base, "reference")
 
-            # match .bin or .BIN
-            bin_files = sorted(glob.glob(os.path.join(dev_dir, "*_dev.bin")) +
-                            glob.glob(os.path.join(dev_dir, "*_dev.BIN")))
+            bin_files = sorted({
+                os.path.normcase(p): p
+                for p in (glob.glob(os.path.join(dev_dir, "*_dev.bin")) +
+                        glob.glob(os.path.join(dev_dir, "*_dev.BIN")))
+            }.values())
             if not bin_files:
                 print(f"[SKIP] no dev bin files: {subj}/{conf}")
                 continue
@@ -133,7 +135,7 @@ def run_batch_from_yaml(yaml_path):
                 grand = pd.concat(grand_rows, ignore_index=True) if grand_rows else pd.DataFrame()
                 out_path = os.path.join(out_root, "grand_all_subjects.csv")
                 grand.to_csv(out_path, index=False)
-                print(f"[WROTE] {out_path}")
+                # print(f"[WROTE] {out_path}")
 
 
 def results_to_grand_rows(results, subject, activity, configuration):

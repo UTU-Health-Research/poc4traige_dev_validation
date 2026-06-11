@@ -280,22 +280,31 @@ def extract_segment_ecg_features(segment, fs=250):
 # ═══════════════════════════════════════════════════════════════
 
 def extract_segment_resp_features(segment, fs=250):
-    sig = np.asarray(segment, dtype=np.float64).ravel()
+    """
+    Returns
+    -------
+    dict with keys: resp_rate_mean, spi
+    None if segment shorter than 2 s.
+    """
+    sig = np.array(segment, dtype=np.float64).flatten()
     if len(sig) < 2 * fs:
         return None
-    base = dict(resp_rate_mean=float('nan'), spi_mean=float('nan'))
+
+    base = dict(resp_rate_mean=float('nan'), spi=float('nan'))
+
+    # ── Respiration rate ──────────────────────────────────────
     try:
-        p = np.array(ampd(sig, fs), dtype=int)
-        p = p[(p >= 0) & (p < len(sig))]
-        # same function for HR is used for respiration rate, but with different parameters to capture slower breathing patterns
-        _, rr_mean = filter_hr_peaks(peaks=p, fs=fs, hr_min=3, hr_max=40, kernel_size=3, sdsd_max=None)
-        base['resp_rate_mean'] = rr_mean
+        peaks              = _get_resp_peaks(sig, fs)
+        base['resp_rate_mean'] = _resp_rate_from_peaks(peaks, fs)
     except Exception:
         pass
+
+    # ── SPI ───────────────────────────────────────────────────
     try:
-        base['spi_mean'] = segment_spi(sig, fs)
+        base['spi'] = segment_spi(sig, fs)
     except Exception:
         pass
+
     return base
 
 
@@ -317,7 +326,7 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
         print(f"  [WARNING] Too short ({min_len/fs:.1f}s) for {window_sec}s windows")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    print(f"  {sig_name}: {n} segments × {window_sec}s")
+    # print(f"  {sig_name}: {n} segments × {window_sec}s")
 
     fn = (extract_segment_ecg_features if signal_type == "ecg"
           else extract_segment_resp_features)
@@ -352,7 +361,7 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
         paired[f'ref_{col}'] = rv
         paired[f'AE_{col}']  = np.abs(dv - rv)
 
-    print(f"    Paired: {len(paired)} segments")
+    # print(f"    Paired: {len(paired)} segments")
     return dev_df, ref_df, paired
 
 
@@ -360,75 +369,122 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
 #  7. FUSED RESPIRATION RATE
 # ═══════════════════════════════════════════════════════════════
 
-def _fuse_respiration_rate(comparison_results, output_dir):
+def _fuse_respiration_rate(comparison_results, output_dir,
+                           rate_threshold=25.0):
     """
-    Weighted-average fused respiration rate per segment
-    from both RESP_SIGNAL_PAIRS entries.
+    Per-segment fused DEVICE respiration rate.
 
-    Weights:
-        impedance_pneumography  → 1
-        gyry_ribs_imu           → 2
+    Fusion rules (applied per segment):
+        - If both values are within threshold  → weighted average (imp×1, imu×2)
+        - If one value exceeds threshold       → use the other value as-is
+        - If both values exceed threshold      → use the lower of the two
+        - Reference is plain mean (same physical reference device)
+
+    Returns a DataFrame with columns:
+        segment, start_sec, end_sec,
+        dev_rr_impedance_pneumography, dev_rr_gyry_ribs_imu,
+        ref_rr_impedance_pneumography, ref_rr_gyry_ribs_imu,
+        AE_rr_impedance_pneumography,  AE_rr_gyry_ribs_imu,
+        dev_rr_mean_fused, ref_rr_mean_fused, AE_rr_mean_fused
     """
-    tables_dir  = os.path.join(output_dir, "tables")
+    MODALITIES   = ["impedance_pneumography", "gyry_ribs_imu"]
+    BASE_WEIGHTS = {"impedance_pneumography": 1.0, "gyry_ribs_imu": 2.0}
+
+    tables_dir = os.path.join(output_dir, "tables")
     _ensure_dir(tables_dir)
 
-    PAIR_WEIGHTS = {
-        "impedance_pneumography_vs_ref_respiration": 1,
-        "gyry_ribs_imu_vs_ref_respiration":          2,
-    }
+    # ── Collect paired DataFrames ─────────────────────────────────────────────
+    dfs = {}
+    for mod in MODALITIES:
+        key = f"{mod}_vs_ref_respiration"
+        pdf = comparison_results.get(key, {}).get("paired_df", pd.DataFrame())
+        if len(pdf) and "dev_resp_rate_mean" in pdf.columns:
+            dfs[mod] = pdf.copy()
 
-    available = {}
-    for key, weight in PAIR_WEIGHTS.items():
-        pdf = comparison_results.get(key, {}).get('paired_df', pd.DataFrame())
-        if len(pdf) and 'dev_resp_rate_mean' in pdf.columns:
-            available[key] = (pdf, weight)
-
-    if len(available) < 2:
-        print(f"  [FUSE RESP] Need 2 resp pairs, found {len(available)} — skipping.")
+    if len(dfs) < 2:
+        print(f"  [FUSE RESP] Need both modalities, found {list(dfs.keys())} — skipping.")
         return pd.DataFrame()
 
-    keys       = list(available.keys())
-    pdf_a, w_a = available[keys[0]]
-    pdf_b, w_b = available[keys[1]]
-
-    common = set(pdf_a['segment']) & set(pdf_b['segment'])
-    if not common:
+    # ── Intersection of segments ──────────────────────────────────────────────
+    common_segments = sorted(
+        set(dfs["impedance_pneumography"]["segment"].values)
+        & set(dfs["gyry_ribs_imu"]["segment"].values)
+    )
+    if not common_segments:
         print("  [FUSE RESP] No common segments — skipping.")
         return pd.DataFrame()
 
-    pdf_a = pdf_a[pdf_a['segment'].isin(common)].sort_values('segment').reset_index(drop=True)
-    pdf_b = pdf_b[pdf_b['segment'].isin(common)].sort_values('segment').reset_index(drop=True)
+    # ── Build aligned per-modality arrays ─────────────────────────────────────
+    aligned = {}
+    for mod in MODALITIES:
+        d = (dfs[mod][dfs[mod]["segment"].isin(common_segments)]
+             .sort_values("segment").reset_index(drop=True))
+        aligned[mod] = {
+            "dev": pd.to_numeric(d["dev_resp_rate_mean"], errors="coerce").values,
+            "ref": pd.to_numeric(d["ref_resp_rate_mean"], errors="coerce").values,
+        }
 
-    rows = []
-    for i in range(len(pdf_a)):
-        dev_a = pd.to_numeric(pdf_a.loc[i, 'dev_resp_rate_mean'], errors='coerce')
-        dev_b = pd.to_numeric(pdf_b.loc[i, 'dev_resp_rate_mean'], errors='coerce')
-        ref   = pd.to_numeric(pdf_a.loc[i, 'ref_resp_rate_mean'], errors='coerce')
+    # ── Output scaffold ───────────────────────────────────────────────────────
+    base = (dfs["impedance_pneumography"]
+            [dfs["impedance_pneumography"]["segment"].isin(common_segments)]
+            .sort_values("segment").reset_index(drop=True))
+    out  = base[["segment", "start_sec", "end_sec"]].copy()
 
-        a_ok, b_ok = not np.isnan(dev_a), not np.isnan(dev_b)
-        if   not a_ok and not b_ok: fused = float('nan')
-        elif not a_ok:              fused = float(dev_b)
-        elif not b_ok:              fused = float(dev_a)
-        else:                       fused = float((w_a * dev_a + w_b * dev_b) / (w_a + w_b))
+    for mod in MODALITIES:
+        dev_rr = aligned[mod]["dev"]
+        ref_rr = aligned[mod]["ref"]
+        out[f"dev_rr_{mod}"] = dev_rr
+        out[f"ref_rr_{mod}"] = ref_rr
+        out[f"AE_rr_{mod}"]  = np.abs(dev_rr - ref_rr)
 
-        rows.append(dict(
-            segment                      = int(pdf_a.loc[i, 'segment']),
-            start_sec                    = pdf_a.loc[i, 'start_sec'],
-            end_sec                      = pdf_a.loc[i, 'end_sec'],
-            dev_resp_rate_mean_impedance = dev_a,
-            dev_resp_rate_mean_gyro      = dev_b,
-            weight_impedance             = w_a,
-            weight_gyro                  = w_b,
-            final_fused_respiration_rate = fused,
-            ref_respiration_rate         = ref,
-        ))
+    # ── Per-segment fusion (device only) ──────────────────────────────────────
+    imp_dev   = aligned["impedance_pneumography"]["dev"]
+    imu_dev   = aligned["gyry_ribs_imu"]["dev"]
+    fused_dev = np.full(len(out), float('nan'))
 
-    fused_df = pd.DataFrame(rows)
-    path     = os.path.join(tables_dir, "fused_respiration_rate.csv")
-    fused_df.to_csv(path, index=False)
-    print(f"  [FUSE RESP] {len(fused_df)} segments → {path}")
-    return fused_df
+    for i in range(len(out)):
+        v_imp = imp_dev[i]
+        v_imu = imu_dev[i]
 
+        imp_ok  = not np.isnan(v_imp)
+        imu_ok  = not np.isnan(v_imu)
+        imp_sane = imp_ok and v_imp <= rate_threshold
+        imu_sane = imu_ok and v_imu <= rate_threshold
+
+        if   imp_sane and imu_sane:
+            # Both within threshold → weighted average
+            fused_dev[i] = float(np.average([v_imp, v_imu],
+                                            weights=[BASE_WEIGHTS["impedance_pneumography"],
+                                                     BASE_WEIGHTS["gyry_ribs_imu"]]))
+        elif imp_sane and not imu_sane:
+            # Only impedance is sane → use it directly
+            fused_dev[i] = float(v_imp)
+        elif imu_sane and not imp_sane:
+            # Only IMU is sane → use it directly
+            fused_dev[i] = float(v_imu)
+        else:
+            # Both exceed threshold → fallback to the lower of the two available values
+            candidates   = [v for v in [v_imp, v_imu] if not np.isnan(v)]
+            fused_dev[i] = float(min(candidates)) if candidates else float('nan')
+
+    # ── Reference: plain mean (same physical reference, no weighting) ─────────
+    imp_ref   = aligned["impedance_pneumography"]["ref"]
+    imu_ref   = aligned["gyry_ribs_imu"]["ref"]
+    fused_ref = np.nanmean(np.column_stack([imp_ref, imu_ref]), axis=1)
+
+    out["dev_rr_mean_fused"] = fused_dev
+    out["ref_rr_mean_fused"] = fused_ref
+    out["AE_rr_mean_fused"]  = np.abs(fused_dev - fused_ref)
+
+    # ── Save ──────────────────────────────────────────────────────────────────
+    # path = os.path.join(tables_dir, "fused_respiration_rate.csv")
+    # out.to_csv(path, index=False)
+    # print(f"  [FUSE RESP] {len(out)} segments → {path}")
+    # print(f"  [FUSE RESP] threshold={rate_threshold} bpm | "
+    #       f"base weights: impedance={BASE_WEIGHTS['impedance_pneumography']}, "
+    #       f"imu={BASE_WEIGHTS['gyry_ribs_imu']}")
+
+    return out
 
 # ═══════════════════════════════════════════════════════════════
 #  8. GRAND TABLE  (from feature_extraction.py)
@@ -469,7 +525,7 @@ def _export_grand_table(results, output_dir, subject, activity, configuration):
     path  = os.path.join(output_dir, "tables", "grand_features.csv")
     _ensure_dir(os.path.join(output_dir, "tables"))
     grand.to_csv(path, index=False)
-    print(f"  [TABLE] {path}")
+    # print(f"  [TABLE] {path}")
     return grand
 
 
@@ -516,9 +572,9 @@ def compare_features(dev_preprocessed, ref_preprocessed,
     resp_win           = max(30, window_sec)
 
     # ── 1. ECG ───────────────────────────────────────────────
-    print("\n" + "=" * 60)
-    print("[1/2] ECG Segment Comparison")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("[1/2] ECG Segment Comparison")
+    # print("=" * 60)
     for dev_name, ref_name in ECG_SIGNAL_PAIRS.items():
         if dev_name not in dev_preprocessed or ref_name not in ref_preprocessed:
             print(f"  [SKIP] {dev_name}"); continue
@@ -533,9 +589,9 @@ def compare_features(dev_preprocessed, ref_preprocessed,
             dev_df=dev_df, ref_df=ref_df, paired_df=paired_df)
 
     # ── 2. Respiration ───────────────────────────────────────
-    print("\n" + "=" * 60)
-    print(f"[2/2] Respiration Segment Comparison ({resp_win}s windows)")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print(f"[2/2] Respiration Segment Comparison ({resp_win}s windows)")
+    # print("=" * 60)
     for dev_name, ref_name in RESP_SIGNAL_PAIRS.items():
         if dev_name not in dev_preprocessed or ref_name not in ref_preprocessed:
             print(f"  [SKIP] {dev_name}"); continue
@@ -550,10 +606,15 @@ def compare_features(dev_preprocessed, ref_preprocessed,
             dev_df=dev_df, ref_df=ref_df, paired_df=paired_df)
 
     # ── 3. Fused respiration rate ─────────────────────────────
-    _fuse_respiration_rate(comparison_results, output_dir)
+    resp_fused = _fuse_respiration_rate(comparison_results, output_dir)
+
+    comparison_results["resp_modality"] = {
+        "description": "Per-segment fused respiration rate mean across impedance_pneumography, gyry_ribs_imu",
+        "paired_df": resp_fused
+    }
 
     # ── 4. Export ─────────────────────────────────────────────
-    _export_segment_tables(comparison_results, output_dir)
+    # _export_segment_tables(comparison_results, output_dir)
     _export_grand_table(comparison_results, output_dir,
                         subject, activity, configuration)
 

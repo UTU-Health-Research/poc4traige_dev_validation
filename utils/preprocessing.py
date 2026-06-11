@@ -85,9 +85,9 @@ def extract_signals(df, cut_starting_samples=0, cut_ending_samples=0):
     for signal_name, col_name in SIGNAL_MAP.items():
         signals[signal_name] = df[col_name][cut_starting_samples:-1*cut_ending_samples if cut_ending_samples > 0 else None].reset_index(drop=True)
 
-    print(f"[OK] Extracted {len(signals)} signals")
-    print(f"[OK] Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
-    print(f"[OK] Samples per signal: {len(df) - cut_starting_samples - cut_ending_samples}, {((len(df) - cut_starting_samples - cut_ending_samples) / 250):.2f}s")
+    # print(f"[OK] Extracted {len(signals)} signals")
+    # print(f"[OK] Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
+    # print(f"[OK] Samples per signal: {len(df) - cut_starting_samples - cut_ending_samples}, {((len(df) - cut_starting_samples - cut_ending_samples) / 250):.2f}s")
 
     return signals
 
@@ -139,9 +139,9 @@ def remove_dc_offset(signals, exclude=None):
             dc_removed[name] = signal.copy() - dc_offset
             removed_count += 1
 
-    print(f"[OK] DC offset removed from {removed_count} signals")
-    if skipped_count > 0:
-        print(f"[OK] Skipped {skipped_count} signals: {exclude}")
+    # print(f"[OK] DC offset removed from {removed_count} signals")
+    # if skipped_count > 0:
+    #     print(f"[OK] Skipped {skipped_count} signals: {exclude}")
 
     return dc_removed
 
@@ -215,40 +215,40 @@ def preprocess_signals(signals, fs=250):
     spike_masks  = {}
 
     # ─── ECG Channels ──────────────────────────────────────
-    print("\n[PREPROCESSING] ECG Signals")
-    print("-" * 40)
+    # print("\n[PREPROCESSING] ECG Signals")
+    # print("-" * 40)
     for name in ECG_SIGNALS:
         if name in signals:
             preprocessed[name] = preprocess_ecg(signals[name], fs=fs)
-            print(f"  ✓ {name}")
+            # print(f"  ✓ {name}")
 
     # ─── Respiration ───────────────────────────────────────
-    print("\n[PREPROCESSING] Respiration Signals")
-    print("-" * 40)
+    # print("\n[PREPROCESSING] Respiration Signals")
+    # print("-" * 40)
     for name in RESPIRATION_SIGNALS:
         if name in signals:
             preprocessed[name] = preprocess_respiration(signals[name], fs=fs)
-            print(f"  ✓ {name}")
+            # print(f"  ✓ {name}")
 
     # ─── IMU Channels ──────────────────────────────────────
-    print("\n[PREPROCESSING] IMU Signals")
-    print("-" * 40)
+    # print("\n[PREPROCESSING] IMU Signals")
+    # print("-" * 40)
     for name in IMU_SIGNALS:
         if name in signals:
-            print(f"  Processing {name}:")
+            # print(f"  Processing {name}:")
             sig_clean, mask = preprocess_imu(signals[name], fs=fs)
             preprocessed[name] = sig_clean
             spike_masks[name]  = mask
 
     # ─── Temperature (pass through — no filtering) ────────
-    print("\n[PREPROCESSING] Temperature")
-    print("-" * 40)
+    # print("\n[PREPROCESSING] Temperature")
+    # print("-" * 40)
     for name in TEMPERATURE_SIGNALS:
         if name in signals:
             preprocessed[name] = np.array(signals[name], dtype=np.float64).copy()
-            print(f"  ✓ {name} (no filtering applied)")
+            # print(f"  ✓ {name} (no filtering applied)")
 
-    print(f"\n[OK] Preprocessed {len(preprocessed)}/{len(signals)} signals")
+    # print(f"\n[OK] Preprocessed {len(preprocessed)}/{len(signals)} signals")
 
     return preprocessed, spike_masks
 

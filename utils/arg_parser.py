@@ -56,7 +56,7 @@ def parse_arguments():
             print(f"[ERROR] {key} — File is empty: {file_path}")
             sys.exit(1)
 
-        print(f"[OK] {key}: {file_path} ({file_ext}, {os.path.getsize(file_path)/1024:.2f} KB)")
+        # print(f"[OK] {key}: {file_path} ({file_ext}, {os.path.getsize(file_path)/1024:.2f} KB)")
 
     return {
         "yaml_path": None,

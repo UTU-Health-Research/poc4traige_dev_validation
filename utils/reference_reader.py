@@ -35,17 +35,17 @@ def inspect_edf(filepath):
         'n_samples': len(edf_file.times),
     }
 
-    print(f"\n{'=' * 60}")
-    print(f"[INSPECT] Bittium Faros .EDF File")
-    print(f"{'=' * 60}")
-    print(f"  File:      {filepath}")
-    print(f"  Fs:        {info['sampling_frequency']} Hz")
-    print(f"  Channels:  {info['n_channels']}")
-    print(f"  Duration:  {info['duration_sec']:.2f} s")
-    print(f"  Samples:   {info['n_samples']}")
-    print(f"\n  Channel List:")
-    for i, ch in enumerate(edf_file.ch_names):
-        print(f"    [{i}] {ch}")
+    # print(f"\n{'=' * 60}")
+    # print(f"[INSPECT] Bittium Faros .EDF File")
+    # print(f"{'=' * 60}")
+    # print(f"  File:      {filepath}")
+    # print(f"  Fs:        {info['sampling_frequency']} Hz")
+    # print(f"  Channels:  {info['n_channels']}")
+    # print(f"  Duration:  {info['duration_sec']:.2f} s")
+    # print(f"  Samples:   {info['n_samples']}")
+    # print(f"\n  Channel List:")
+    # for i, ch in enumerate(edf_file.ch_names):
+    #     print(f"    [{i}] {ch}")
 
     return info
 
@@ -86,16 +86,16 @@ def inspect_acq(filepath):
         'channels': channels_info,
     }
 
-    print(f"\n{'=' * 60}")
-    print(f"[INSPECT] Biopac .ACQ File")
-    print(f"{'=' * 60}")
-    print(f"  File:      {filepath}")
-    print(f"  Channels:  {info['n_channels']}")
-    print(f"\n  {'Index':<8} {'Name':<30} {'Fs (Hz)':<12} {'Samples':<12} {'Units'}")
-    print(f"  {'-' * 75}")
-    for ch in channels_info:
-        print(f"  {ch['index']:<8} {ch['name']:<30} {ch['fs']:<12.1f} "
-              f"{ch['n_samples']:<12} {ch['units']}")
+    # print(f"\n{'=' * 60}")
+    # print(f"[INSPECT] Biopac .ACQ File")
+    # print(f"{'=' * 60}")
+    # print(f"  File:      {filepath}")
+    # print(f"  Channels:  {info['n_channels']}")
+    # print(f"\n  {'Index':<8} {'Name':<30} {'Fs (Hz)':<12} {'Samples':<12} {'Units'}")
+    # print(f"  {'-' * 75}")
+    # for ch in channels_info:
+    #     print(f"  {ch['index']:<8} {ch['name']:<30} {ch['fs']:<12.1f} "
+    #           f"{ch['n_samples']:<12} {ch['units']}")
 
     return info
 
@@ -148,9 +148,9 @@ def read_bittium_edf(filepath, channel_map=None, cut_starting_samples=0, cut_end
     signals = {}
     available_channels = edf_file.ch_names
 
-    print(f"\n{'=' * 60}")
-    print(f"[READ] Bittium Faros EDF")
-    print(f"{'=' * 60}")
+    # print(f"\n{'=' * 60}")
+    # print(f"[READ] Bittium Faros EDF")
+    # print(f"{'=' * 60}")
 
     for friendly_name, edf_name in channel_map.items():
 
@@ -163,8 +163,8 @@ def read_bittium_edf(filepath, channel_map=None, cut_starting_samples=0, cut_end
                 sig = sig[cut_starting_samples:-1*cut_ending_samples if cut_ending_samples > 0 else None]
 
             signals[friendly_name] = sig
-            print(f"  [OK] {friendly_name:<20} <- {edf_name:<25} "
-                  f"({len(sig)} samples, {len(sig)/fs:.2f}s)")
+            # print(f"  [OK] {friendly_name:<20} <- {edf_name:<25} "
+            #       f"({len(sig)} samples, {len(sig)/fs:.2f}s)")
         else:
             print(f"  [--] {friendly_name:<20} <- {edf_name:<25} NOT FOUND")
 
@@ -178,10 +178,10 @@ def read_bittium_edf(filepath, channel_map=None, cut_starting_samples=0, cut_end
         'cut_ending_samples': cut_ending_samples,
     }
 
-    print(f"\n  Fs:        {fs} Hz")
-    print(f"  Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
-    # print(f"  Duration:  {metadata['duration_sec']:.2f} s")
-    print(f"  Extracted: {len(signals)} channels")
+    # print(f"\n  Fs:        {fs} Hz")
+    # print(f"  Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
+    # # print(f"  Duration:  {metadata['duration_sec']:.2f} s")
+    # print(f"  Extracted: {len(signals)} channels")
 
     return signals, metadata
 
@@ -228,9 +228,9 @@ def read_biopac_acq(filepath, channel_map=None, cut_starting_samples=0, cut_endi
     signals = {}
     fs_map = {}
 
-    print(f"\n{'=' * 60}")
-    print(f"[READ] Biopac ACQ")
-    print(f"{'=' * 60}")
+    # print(f"\n{'=' * 60}")
+    # print(f"[READ] Biopac ACQ")
+    # print(f"{'=' * 60}")
 
     for friendly_name, ch_index in channel_map.items():
 
@@ -246,8 +246,8 @@ def read_biopac_acq(filepath, channel_map=None, cut_starting_samples=0, cut_endi
             signals[friendly_name] = sig
             fs_map[friendly_name] = ch_fs
 
-            print(f"  [OK] {friendly_name:<20} <- Ch[{ch_index}] '{ch.name}' "
-                  f"({len(sig)} samples, {ch_fs} Hz, {len(sig)/ch_fs:.2f}s, {ch.units})")
+            # print(f"  [OK] {friendly_name:<20} <- Ch[{ch_index}] '{ch.name}' "
+            #       f"({len(sig)} samples, {ch_fs} Hz, {len(sig)/ch_fs:.2f}s, {ch.units})")
         else:
             print(f"  [--] {friendly_name:<20} <- Ch[{ch_index}] INDEX OUT OF RANGE")
 
@@ -260,8 +260,8 @@ def read_biopac_acq(filepath, channel_map=None, cut_starting_samples=0, cut_endi
         'cut_ending_samples': cut_ending_samples,
     }
 
-    print(f"\n  Extracted: {len(signals)} channels")
-    print(f"  Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
+    # print(f"\n  Extracted: {len(signals)} channels")
+    # print(f"  Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
 
     return signals, metadata
 
@@ -295,9 +295,9 @@ def read_all_references(bitt_path, bpc_path, target_fs=250, cut_starting_samples
         Combined metadata from both devices.
     """
 
-    print("\n" + "=" * 60)
-    print("[REFERENCE] Reading all reference signals")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("[REFERENCE] Reading all reference signals")
+    # print("=" * 60)
 
     ref_signals = {}
     ref_metadata = {}
@@ -312,8 +312,8 @@ def read_all_references(bitt_path, bpc_path, target_fs=250, cut_starting_samples
     for name, sig in bitt_signals.items():
         if bitt_fs != target_fs:
             sig_resampled = _resample_signal(sig, bitt_fs, target_fs)
-            print(f"  [RESAMPLE] {name}: {bitt_fs} Hz -> {target_fs} Hz "
-                  f"({len(sig)} -> {len(sig_resampled)} samples)")
+            # print(f"  [RESAMPLE] {name}: {bitt_fs} Hz -> {target_fs} Hz "
+                #   f"({len(sig)} -> {len(sig_resampled)} samples)")
             ref_signals[name] = sig_resampled
         else:
             ref_signals[name] = sig
@@ -328,21 +328,21 @@ def read_all_references(bitt_path, bpc_path, target_fs=250, cut_starting_samples
         ch_fs = bpc_meta['fs_map'].get(name, target_fs)
         if ch_fs != target_fs:
             sig_resampled = _resample_signal(sig, ch_fs, target_fs)
-            print(f"  [RESAMPLE] {name}: {ch_fs} Hz -> {target_fs} Hz "
-                  f"({len(sig)} -> {len(sig_resampled)} samples)")
+            # print(f"  [RESAMPLE] {name}: {ch_fs} Hz -> {target_fs} Hz "
+            #       f"({len(sig)} -> {len(sig_resampled)} samples)")
             ref_signals[name] = sig_resampled
         else:
             ref_signals[name] = sig
 
     # ─── Summary ──────────────────────────────────────────
-    print(f"\n{'=' * 60}")
-    print(f"[REFERENCE] Summary")
-    print(f"{'=' * 60}")
-    print(f"  Total signals:    {len(ref_signals)}")
-    print(f"  Target Fs:        {target_fs} Hz")
-    for name, sig in ref_signals.items():
-        print(f"  {name:<25} : {len(sig)} samples, "
-              f"{len(sig)/target_fs:.2f}s")
+    # print(f"\n{'=' * 60}")
+    # print(f"[REFERENCE] Summary")
+    # print(f"{'=' * 60}")
+    # print(f"  Total signals:    {len(ref_signals)}")
+    # print(f"  Target Fs:        {target_fs} Hz")
+    # for name, sig in ref_signals.items():
+    #     print(f"  {name:<25} : {len(sig)} samples, "
+    #           f"{len(sig)/target_fs:.2f}s")
 
     ref_metadata['target_fs'] = target_fs
 

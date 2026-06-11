@@ -29,9 +29,9 @@ def main():
     # ═════════════════════════════════════════════════════════
     #  DEVICE + REF SIGNAL READING AND AlIGNMENT
     # ═════════════════════════════════════════════════════════
-    print("\n" + "=" * 60)
-    print("DEVICE + REF SIGNAL READING AND AlIGNMENT")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("DEVICE + REF SIGNAL READING AND AlIGNMENT")
+    # print("=" * 60)
 
     dev_path = args['dev_path']  # device data (ECG + IMU + Temperature)
 
@@ -39,12 +39,12 @@ def main():
     _, raw = read_binary_samples_hex(dev_path,88)
     dev_data_raw = convert_binary_data(raw)
 
-    print(f"\nDev. Data shape:       {dev_data_raw.shape}")
+    # print(f"\nDev. Data shape:       {dev_data_raw.shape}")
     signals = extract_signals(dev_data_raw, cut_starting_samples=1000, cut_ending_samples=0)
     signals_clean = remove_dc_offset(signals, exclude=['body_temperature'])
     preprocessed_signals, spike_masks = preprocess_signals(signals_clean)
 
-    print(f'\n  Device signals after preprocessing: {list(preprocessed_signals.keys())}')
+    # print(f'\n  Device signals after preprocessing: {list(preprocessed_signals.keys())}')
 
     # Reading refence signals (ECG + Respiration)
     ref_signals, ref_metadata = read_all_references(
@@ -57,16 +57,16 @@ def main():
 
     # DC offset removal for reference signals
     ref_signals_dc = remove_dc_offset(ref_signals)
-    print(f'\n  Reference signals after DC offset removal: {list(ref_signals_dc.keys())}')
+    # print(f'\n  Reference signals after DC offset removal: {list(ref_signals_dc.keys())}')
 
     ref_preprocessed = {}
     for name, sig in ref_signals_dc.items():
         if name.startswith('ref_lead'):
             ref_preprocessed[name] = preprocess_ecg(sig, fs=250)
-            print(f"  [OK] Preprocessed {name} (ECG pipeline)")
+            # print(f"  [OK] Preprocessed {name} (ECG pipeline)")
         elif name.startswith('ref_resp'):
             ref_preprocessed[name] = preprocess_respiration(sig, fs=250)
-            print(f"  [OK] Preprocessed {name} (Respiration pipeline)")
+            # print(f"  [OK] Preprocessed {name} (Respiration pipeline)")
         # elif name.startswith('ref_acc'):
         #     from utils.preprocessing import preprocess_imu
         #     ref_preprocessed[name], _ = preprocess_imu(sig, fs=250)
@@ -74,7 +74,7 @@ def main():
         else:
             ref_preprocessed[name] = sig
 
-    print(f'\n  Preprocessed reference signals: {list(ref_preprocessed.keys())}')
+    # print(f'\n  Preprocessed reference signals: {list(ref_preprocessed.keys())}')
 
     aligned_signals = {}
     signals_to_align = {
@@ -93,11 +93,11 @@ def main():
             "device"  : dev_al,
             "ref" : bit_al
         }
-        print(f"{lead_name}:")
-        print(f"  Best lag         : {lag} samples ({lag/250:.3f}s)")
-        print(f"  Samples aligned  : {len(dev_al)}")
-        print(f"  Duration aligned : {len(dev_al)/250:.2f}s")
-        print(f" Aligned signals keys: {list(aligned_signals.keys())}\n")
+        # print(f"{lead_name}:")
+        # print(f"  Best lag         : {lag} samples ({lag/250:.3f}s)")
+        # print(f"  Samples aligned  : {len(dev_al)}")
+        # print(f"  Duration aligned : {len(dev_al)/250:.2f}s")
+        # print(f" Aligned signals keys: {list(aligned_signals.keys())}\n")
 
 
     # replace preprocessed signals with aligned versions for ECG and respiration
@@ -116,21 +116,21 @@ def main():
     preprocessed_signals['gyry_ribs_imu'] = apply_lag(preprocessed_signals['gyry_ribs_imu'], lag)
     preprocessed_signals['gyry_ribs_imu'] = preprocessed_signals['gyry_ribs_imu'][:master_len]
 
-    plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
-    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
-    plt.legend()
-    plt.show()
+    # plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
+    # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
+    # plt.legend()
+    # plt.show()
     
-    plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
-    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
-    plt.legend()
-    plt.show()
+    # plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
+    # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
+    # plt.legend()
+    # plt.show()
     # ═════════════════════════════════════════════════════════
     #  SEGMENT-BASED COMPARISON (New)
     # ═════════════════════════════════════════════════════════
-    print("\n" + "=" * 60)
-    print("[PIPELINE] Segment-Based Feature Comparison")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("[PIPELINE] Segment-Based Feature Comparison")
+    # print("=" * 60)
 
     comparison_results = compare_features(
         dev_preprocessed=preprocessed_signals,
