@@ -16,6 +16,7 @@ from utils import (
     compare_features, 
     plot_resp_signal_overlay,
     plot_ecg_signal_overlay,
+    plot_temperature,
     )
 
 from batch_run import run_batch_from_yaml
@@ -135,6 +136,12 @@ def main():
             ref_signal='ref_respiration',
             fs=250, time_window=(0, 10)
         )
+    
+    plot_temperature(
+        preprocessed_signals, fs=250,
+        reference_temp=35.7,
+        lbl="Armpit", lgd_loc="lower"
+    )
 
     # plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
     # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")

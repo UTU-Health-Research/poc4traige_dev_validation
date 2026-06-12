@@ -794,3 +794,69 @@ def plot_resp_signal_overlay(dev_preprocessed, ref_preprocessed,
         plt.show()
     else:
         plt.close(fig)
+
+
+def plot_temperature(preprocessed, signal_name="body_temperature",
+                      reference_temp=None, fs=250,
+                      output_dir="outputs/comparison/plots",
+                      show=False, save=True, lbl=None, lgd_loc=None):
+    """
+    Plot measured body temperature against a single reference
+    temperature acquired with a digital thermometer.
+
+    Parameters
+    ----------
+    preprocessed : dict
+        Preprocessed signals dictionary.
+    signal_name : str
+        Key for the temperature signal.
+    reference_temp : float or None
+        Single reference temperature value (°C) from a digital
+        thermometer.  Plotted as a horizontal dashed line.
+    fs : int
+        Sampling frequency.
+    output_dir : str
+    show : bool
+    save : bool
+    """
+
+    if save:
+        _ensure_dir(output_dir)
+
+    if signal_name not in preprocessed:
+        print(f"[WARNING] {signal_name} not found")
+        return
+
+    sig = np.array(preprocessed[signal_name], dtype=np.float64).flatten()
+    t = np.arange(len(sig)) / fs
+
+    # ── figure sized for a single column in a two-column layout ──
+    fig, ax = plt.subplots(figsize=(7, 2))
+
+    # Measured temperature
+    ax.plot(t, sig, color='steelblue', linewidth=2,
+            label=f'Measured Temperature ({lbl})')
+
+    # Reference temperature (horizontal line)
+    if reference_temp is not None:
+        ax.axhline(y=reference_temp, color='crimson', linestyle='--',
+                    linewidth=2, label=f'Reference ({reference_temp:.1f} °C)')
+
+    # ax.set_title("Body Temperature (Armpit)", fontsize=13, fontweight='bold')
+    # ax.set_xlabel("Time (s)", fontsize=13)
+    # ax.set_ylabel("Temp. (°C)", fontsize=13)
+    ax.tick_params(axis='both', labelsize=13)
+    ax.legend(fontsize=13, loc=f'{lgd_loc} right', framealpha=0.5, frameon=True)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if save:
+        filepath = os.path.join(output_dir, f"temperature_{signal_name}.png")
+        fig.savefig(filepath, dpi=700, bbox_inches='tight')
+        print(f"  [SAVED] {filepath}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
