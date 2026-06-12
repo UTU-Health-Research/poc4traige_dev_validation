@@ -566,6 +566,7 @@ def _export_segment_tables(comparison_results, output_dir):
         print(f"  [TABLE] {p}")
 
 
+
 # ═══════════════════════════════════════════════════════════════
 #  10. MASTER COMPARISON FUNCTION
 # ═══════════════════════════════════════════════════════════════
@@ -638,3 +639,97 @@ def compare_features(dev_preprocessed, ref_preprocessed,
                         subject, activity, configuration)
 
     return comparison_results
+
+
+def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
+                         dev_signal_1, dev_signal_2, ref_signal,
+                         fs=250, time_window=None,
+                         output_dir="outputs/comparison/plots",
+                         show=False, save=True):
+    """
+    Overlay two device signals and one reference signal for visual comparison.
+
+    Parameters
+    ----------
+    dev_preprocessed : dict
+        Device preprocessed signals.
+    ref_preprocessed : dict
+        Reference preprocessed signals.
+    dev_signal_1 : str
+        First device signal key.
+    dev_signal_2 : str
+        Second device signal key.
+    ref_signal : str
+        Reference signal key.
+    fs : int
+        Sampling frequency.
+    time_window : tuple, optional
+        (start_sec, end_sec) for zoom.
+    """
+
+    if save:
+        _ensure_dir(output_dir)
+
+    missing = [s for s in [dev_signal_1, dev_signal_2] if s not in dev_preprocessed]
+    if missing:
+        print(f"[WARNING] Device signal(s) not found: {missing}")
+        return
+    if ref_signal not in ref_preprocessed:
+        print(f"[WARNING] Reference signal not found: {ref_signal}")
+        return
+
+    dev_sig_1 = np.array(dev_preprocessed[dev_signal_1], dtype=np.float64).flatten()
+    dev_sig_2 = np.array(dev_preprocessed[dev_signal_2], dtype=np.float64).flatten()
+    ref_sig   = np.array(ref_preprocessed[ref_signal],   dtype=np.float64).flatten()
+
+    fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+
+    # # Normalized overlay
+    # def normalize(sig):
+    #     return (sig - np.mean(sig)) / max(np.std(sig), 1e-8)
+
+    # dev_norm_1 = normalize(dev_sig_1)
+    # dev_norm_2 = normalize(dev_sig_2)
+    # ref_norm   = normalize(ref_sig)
+
+    dev_norm_1 = dev_sig_1
+    dev_norm_2 = dev_sig_2
+    ref_norm   = ref_sig
+
+    min_len  = min(len(dev_norm_1), len(dev_norm_2), len(ref_norm))
+    t_common = np.arange(min_len) / fs
+
+    ax.plot(t_common, dev_norm_1[:min_len], color='steelblue',
+            linewidth=2, alpha=0.7, label='IP',
+            marker='o', markevery=fs, markersize=7, markerfacecolor='steelblue')
+    ax.plot(t_common, dev_norm_2[:min_len], color='mediumseagreen',
+            linewidth=2.5, alpha=0.7, label='Gyr',
+            marker='s', markevery=fs, markersize=7, markerfacecolor='mediumseagreen')
+    ax.plot(t_common, ref_norm[:min_len],   color='coral',
+            linewidth=2.5, alpha=0.7, label='RR',
+            marker='d', markevery=fs, markersize=7, markerfacecolor='coral')
+    # ax.set_title("Normalized Signal Overlay", fontweight='bold', fontsize=14)
+    ax.set_xlabel("Time (s)", fontsize=14)
+    ax.set_ylabel("Normalized Amplitude", fontsize=14)
+    ax.tick_params(axis='both', labelsize=14)
+    ax.legend(loc='upper right', fontsize=14, framealpha=0.8)
+    ax.grid(True, alpha=0.3)
+
+    if time_window is not None:
+        ax.set_xlim(time_window)
+
+    plt.tight_layout()
+
+    if save:
+        suffix   = f"_{time_window[0]}s_{time_window[1]}s" if time_window else ""
+        filepath = os.path.join(
+            output_dir,
+            f"overlay_{dev_signal_1}_{dev_signal_2}_vs_{ref_signal}{suffix}.png"
+        )
+        fig.savefig(filepath, dpi=700, bbox_inches='tight')
+        print(f"  [PLOT] {filepath}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)

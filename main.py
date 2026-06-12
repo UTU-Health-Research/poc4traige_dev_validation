@@ -14,6 +14,7 @@ from utils import (
     apply_lag,
     read_all_references, 
     compare_features, 
+    plot_signal_overlay,
     )
 
 from batch_run import run_batch_from_yaml
@@ -115,6 +116,12 @@ def main():
     master_len = len(np.array(preprocessed_signals['impedance_pneumography']))
     preprocessed_signals['gyry_ribs_imu'] = apply_lag(preprocessed_signals['gyry_ribs_imu'], lag)
     preprocessed_signals['gyry_ribs_imu'] = preprocessed_signals['gyry_ribs_imu'][:master_len]
+
+    plot_signal_overlay(
+            preprocessed_signals, ref_preprocessed,
+            'impedance_pneumography', 'gyry_ribs_imu', 'ref_respiration',
+            fs=250, time_window=(0, 10)
+        )
 
     # plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
     # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
