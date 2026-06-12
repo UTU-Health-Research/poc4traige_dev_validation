@@ -12,6 +12,7 @@ from itertools import combinations
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd, msptd, find_peaks
 from vitalwave.basic_algos import butter_filter, filter_hr_peaks, min_max_normalize
 from vitalwave.signal_quality import Absolute_Signal_to_noise_Ratio
+from matplotlib.ticker import MaxNLocator
 
 
 def _ensure_dir(path):
@@ -641,8 +642,70 @@ def compare_features(dev_preprocessed, ref_preprocessed,
     return comparison_results
 
 
-def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
-                         dev_signal_1, dev_signal_2, ref_signal,
+def plot_ecg_signal_overlay(dev_preprocessed, ref_preprocessed,
+                         dev_signal_1=None, ref_signal=None,
+                         fs=250, time_window=None,
+                         output_dir="outputs/comparison/plots",
+                         show=False, save=True):
+
+    if save:
+        _ensure_dir(output_dir)
+
+    dev_sig_1 = np.array(dev_preprocessed[dev_signal_1], dtype=np.float64).flatten()
+    ref_sig   = np.array(ref_preprocessed[ref_signal],   dtype=np.float64).flatten()
+
+    fig, ax = plt.subplots(1, 1, figsize=(7, 2))
+
+    # Normalized overlay
+    def normalize(sig):
+        return (sig - np.mean(sig)) / max(np.std(sig), 1e-8)
+
+    dev_norm_1 = normalize(dev_sig_1)
+    ref_norm   = normalize(ref_sig)
+
+    min_len  = len(dev_norm_1)
+    t_common = np.arange(min_len) / fs
+
+    ax.plot(t_common, dev_norm_1[:min_len], color='steelblue',
+            linewidth=2, alpha=0.7, label=f'dev_lead2',
+            marker='o', markevery=fs, markersize=7, markerfacecolor='steelblue')
+    ax.plot(t_common, ref_norm[:min_len],   color='coral',
+            linewidth=2.5, alpha=0.7, label=f'ref_lead2',
+            marker='d', markevery=fs, markersize=7, markerfacecolor='coral')
+    # ax.set_title("Normalized Signal Overlay", fontweight='bold', fontsize=14)
+    # ax.set_xlabel("Time (s)", fontsize=13)
+    # ax.set_ylabel("Amplitude", fontsize=13)
+    ax.tick_params(axis='both', labelsize=13)
+    ax.legend(loc='upper right', fontsize=13, framealpha=0.8)
+    ax.grid(True, alpha=0.3)
+
+    # if time_window is not None:
+    #     ax.set_xlim(time_window)
+    #     start = int(np.ceil(time_window[0]))
+    #     end   = int(np.floor(time_window[1]))
+    #     ax.set_xticks(np.arange(start, end + 1, 1))  # dynamic integer ticks
+
+    if time_window is not None:
+        ax.set_xlim(time_window)
+
+    plt.tight_layout()
+
+    if save:
+        suffix   = f"_{time_window[0]}s_{time_window[1]}s" if time_window else ""
+        filepath = os.path.join(
+            output_dir,
+            f"overlay_{dev_signal_1}_vs_{ref_signal}{suffix}.png"
+        )
+        fig.savefig(filepath, dpi=700, bbox_inches='tight')
+        print(f"  [PLOT] {filepath}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+def plot_resp_signal_overlay(dev_preprocessed, ref_preprocessed,
+                         dev_signal_1=None, dev_signal_2=None, ref_signal=None,
                          fs=250, time_window=None,
                          output_dir="outputs/comparison/plots",
                          show=False, save=True):
@@ -682,19 +745,15 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
     dev_sig_2 = np.array(dev_preprocessed[dev_signal_2], dtype=np.float64).flatten()
     ref_sig   = np.array(ref_preprocessed[ref_signal],   dtype=np.float64).flatten()
 
-    fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+    fig, ax = plt.subplots(1, 1, figsize=(7, 2))
 
-    # # Normalized overlay
-    # def normalize(sig):
-    #     return (sig - np.mean(sig)) / max(np.std(sig), 1e-8)
+    # Normalized overlay
+    def normalize(sig):
+        return (sig - np.mean(sig)) / max(np.std(sig), 1e-8)
 
-    # dev_norm_1 = normalize(dev_sig_1)
-    # dev_norm_2 = normalize(dev_sig_2)
-    # ref_norm   = normalize(ref_sig)
-
-    dev_norm_1 = dev_sig_1
-    dev_norm_2 = dev_sig_2
-    ref_norm   = ref_sig
+    dev_norm_1 = normalize(dev_sig_1)
+    dev_norm_2 = normalize(dev_sig_2)
+    ref_norm   = normalize(ref_sig)
 
     min_len  = min(len(dev_norm_1), len(dev_norm_2), len(ref_norm))
     t_common = np.arange(min_len) / fs
@@ -709,15 +768,17 @@ def plot_signal_overlay(dev_preprocessed, ref_preprocessed,
             linewidth=2.5, alpha=0.7, label='RR',
             marker='d', markevery=fs, markersize=7, markerfacecolor='coral')
     # ax.set_title("Normalized Signal Overlay", fontweight='bold', fontsize=14)
-    ax.set_xlabel("Time (s)", fontsize=14)
-    ax.set_ylabel("Normalized Amplitude", fontsize=14)
-    ax.tick_params(axis='both', labelsize=14)
-    ax.legend(loc='upper right', fontsize=14, framealpha=0.8)
+    # ax.set_xlabel("Time (s)", fontsize=13)
+    # ax.set_ylabel("Amplitude", fontsize=13)
+    ax.tick_params(axis='both', labelsize=13)
+    ax.legend(loc='upper right', fontsize=13, framealpha=0.8)
     ax.grid(True, alpha=0.3)
+    # ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     if time_window is not None:
         ax.set_xlim(time_window)
 
+    
     plt.tight_layout()
 
     if save:
