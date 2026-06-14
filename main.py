@@ -121,37 +121,37 @@ def main():
 
     
     
-    plot_ecg_signal_overlay(
-            preprocessed_signals, ref_preprocessed,
-            dev_signal_1='lead2',  
-            ref_signal='ref_lead2',
-            fs=250, time_window=(0, 10)
-        )
+    # plot_ecg_signal_overlay(
+    #         preprocessed_signals, ref_preprocessed,
+    #         dev_signal_1='lead2',  
+    #         ref_signal='ref_lead2',
+    #         fs=250, time_window=(0, 10)
+    #     )
     
 
-    plot_resp_signal_overlay(
-            preprocessed_signals, ref_preprocessed,
-            dev_signal_1='impedance_pneumography', 
-            dev_signal_2='gyry_ribs_imu', 
-            ref_signal='ref_respiration',
-            fs=250, time_window=(0, 10)
-        )
+    # plot_resp_signal_overlay(
+    #         preprocessed_signals, ref_preprocessed,
+    #         dev_signal_1='impedance_pneumography', 
+    #         dev_signal_2='gyry_ribs_imu', 
+    #         ref_signal='ref_respiration',
+    #         fs=250, time_window=(0, 10)
+    #     )
     
-    plot_temperature(
-        preprocessed_signals, fs=250,
-        reference_temp=35.7,
-        lbl="Armpit", lgd_loc="lower"
-    )
+    # plot_temperature(
+    #     preprocessed_signals, fs=250,
+    #     reference_temp=35.7,
+    #     lbl="Armpit", lgd_loc="lower"
+    # )
 
-    # plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
-    # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
-    # plt.legend()
-    # plt.show()
+    plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
+    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
+    plt.legend()
+    plt.show()
     
-    # plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
-    # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
-    # plt.legend()
-    # plt.show()
+    plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
+    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
+    plt.legend()
+    plt.show()
     # ═════════════════════════════════════════════════════════
     #  SEGMENT-BASED COMPARISON (New)
     # ═════════════════════════════════════════════════════════
