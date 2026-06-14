@@ -25,7 +25,7 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
     signals = extract_signals(convert_binary_data(raw),
                               cut_starting_samples=cut_starting_samples,
                               cut_ending_samples=cut_ending_samples)
-    dev = preprocess_signals(remove_dc_offset(signals, exclude=['body_temperature']))[0]
+    dev = preprocess_signals(remove_dc_offset(signals, exclude=['body_temperature']), activity=activity)[0]
 
     # Reference signals
     ref_raw, _ = read_all_references(bitt_path=bitt_path, bpc_path=bpc_path,
@@ -34,8 +34,8 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
                                      cut_ending_samples=cut_ending_samples)
     ref = {}
     for name, sig in remove_dc_offset(ref_raw).items():
-        if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs=fs)
-        elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=fs)
+        if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs=fs, activity=activity)
+        elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=fs, activity=activity)
         else:                             ref[name] = sig
 
     # Alignment — ECG
@@ -47,11 +47,14 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
         dev['impedance_pneumography'], ref['ref_respiration'], resp_lag = align_signals(
             dev['impedance_pneumography'], ref['ref_respiration'], fs=fs
         )
-        master_len = len(dev['impedance_pneumography'])
-        for key in RESP_DEVICE_ONLY:
-            if key in dev:
-                dev[key] = apply_lag(dev[key], resp_lag)
-                dev[key] = dev[key][:master_len]
+        # master_len = len(dev['impedance_pneumography'])
+        # for key in RESP_DEVICE_ONLY:
+        #     if key in dev:
+        #         dev[key] = apply_lag(dev[key], resp_lag)
+        #         dev[key] = dev[key][:master_len]
+        dev['gyry_ribs_imu'], _, _ = align_signals(
+            dev['gyry_ribs_imu'], ref['ref_respiration'], fs=fs
+        )
 
     # Comparison (make compare_features accept subject/activity/configuration if you want a grand file)
     results = compare_features(dev_preprocessed=dev, ref_preprocessed=ref,

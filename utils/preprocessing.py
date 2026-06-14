@@ -146,29 +146,59 @@ def remove_dc_offset(signals, exclude=None):
     return dc_removed
 
 
-def preprocess_respiration(signal, fs=250):
+def preprocess_respiration(signal, fs=250, activity='unknown'):
     sig = np.asarray(signal, dtype=np.float64).ravel()
-    sig = butter_filter(arr=sig, n=2, wn=np.array([0.1]), filter_type='high', fs=fs)
-    sig = butter_filter(arr=sig, n=2, wn=np.array([1.0]), filter_type='low',  fs=fs)
-    sig = moving_average_filter(sig, window=int(fs * 0.25))
+
+    PROFILES = {
+        #              order   hp_hz   lp_hz   ma_window_s
+        'laying':      (2,      0.1,    0.7,    0.25),
+        'walking':    (3,      0.15,    0.8,    0.25),
+        'unknown':    (2,      0.15,   0.8,    0.25),
+    }
+    
+    # print(f"activity: {activity}")
+    order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
+    # print(f"order: {order}, hp: {hp}, lp: {lp}")
+
+    sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
+    sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
+    sig = moving_average_filter(sig, window=int(fs * ma_win))
+
+    # sig = butter_filter(arr=sig, n=2, wn=np.array([0.15]), filter_type='high', fs=fs)
+    # sig = butter_filter(arr=sig, n=2, wn=np.array([0.8]), filter_type='low',  fs=fs)
+    # sig = moving_average_filter(sig, window=int(fs * 0.25))
     return sig
 
 
-def preprocess_ecg(signal, fs=250):
+def preprocess_ecg(signal, fs=250, activity="unknown"):
     sig = np.asarray(signal, dtype=np.float64).ravel()
     sig = butter_filter(arr=sig, n=2, wn=np.array([5.0]),  filter_type='high', fs=fs)
     sig = butter_filter(arr=sig, n=2, wn=np.array([40.0]), filter_type='low',  fs=fs)
     return sig
 
 
-def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0):
+def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='unknown'):
     sig = np.asarray(signal, dtype=np.float64).ravel()
+
+    PROFILES = {
+        #              order   hp_hz   lp_hz   ma_window_s
+        'laying':     (2,      0.1,    0.7,    0.25),
+        'walking':    (3,      0.2,    0.8,    0.25),
+        'unknown':    (2,      0.15,   0.8,    0.25),
+    }
+
     spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
     idx = np.arange(len(sig), dtype=np.float64)
     sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask]) #
-    sig = butter_filter(arr=sig, n=2, wn=np.array([0.1]), filter_type='high', fs=fs)
-    sig = butter_filter(arr=sig, n=2, wn=np.array([1.0]), filter_type='low',  fs=fs)
-    sig = moving_average_filter(sig, window=int(fs * 0.25))
+
+    order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
+    sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
+    sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
+    sig = moving_average_filter(sig, window=int(fs * ma_win))
+
+    # sig = butter_filter(arr=sig, n=2, wn=np.array([0.15]), filter_type='high',  fs=fs)
+    # sig = butter_filter(arr=sig, n=2, wn=np.array([0.8]), filter_type='low', fs=fs)
+    # sig = moving_average_filter(sig, window=int(fs * 0.25))
     return sig, spike_mask
 
 
@@ -192,7 +222,7 @@ TEMPERATURE_SIGNALS = [
 ]
 
 
-def preprocess_signals(signals, fs=250):
+def preprocess_signals(signals, fs=250, activity='unknown'):
     """
     Applies appropriate preprocessing to each signal based on its type.
 
@@ -211,6 +241,7 @@ def preprocess_signals(signals, fs=250):
         Dictionary of spike masks for IMU signals only.
     """
 
+    # print(f"activity in preprocessing: {activity}")
     preprocessed = {}
     spike_masks  = {}
 
@@ -219,7 +250,7 @@ def preprocess_signals(signals, fs=250):
     # print("-" * 40)
     for name in ECG_SIGNALS:
         if name in signals:
-            preprocessed[name] = preprocess_ecg(signals[name], fs=fs)
+            preprocessed[name] = preprocess_ecg(signals[name], fs=fs, activity=activity)
             # print(f"  ✓ {name}")
 
     # ─── Respiration ───────────────────────────────────────
@@ -227,7 +258,7 @@ def preprocess_signals(signals, fs=250):
     # print("-" * 40)
     for name in RESPIRATION_SIGNALS:
         if name in signals:
-            preprocessed[name] = preprocess_respiration(signals[name], fs=fs)
+            preprocessed[name] = preprocess_respiration(signals[name], fs=fs, activity=activity)
             # print(f"  ✓ {name}")
 
     # ─── IMU Channels ──────────────────────────────────────
@@ -236,7 +267,7 @@ def preprocess_signals(signals, fs=250):
     for name in IMU_SIGNALS:
         if name in signals:
             # print(f"  Processing {name}:")
-            sig_clean, mask = preprocess_imu(signals[name], fs=fs)
+            sig_clean, mask = preprocess_imu(signals[name], fs=fs, activity=activity)
             preprocessed[name] = sig_clean
             spike_masks[name]  = mask
 

@@ -12,6 +12,7 @@ from utils import (
     preprocess_respiration, 
     align_signals,
     apply_lag,
+    normalize_signal,
     read_all_references, 
     compare_features, 
     plot_resp_signal_overlay,
@@ -20,7 +21,7 @@ from utils import (
     )
 
 from batch_run import run_batch_from_yaml
-
+from pathlib import Path
 
 def main():
 
@@ -38,6 +39,10 @@ def main():
 
     dev_path = args['dev_path']  # device data (ECG + IMU + Temperature)
 
+    stem = Path(dev_path).stem          # 'walking_dev'
+    actvity_name = stem.split('_')[0]        # 'walking'
+    activity = actvity_name.lower().strip()
+
     # Read binary data from device file
     _, raw = read_binary_samples_hex(dev_path,88)
     dev_data_raw = convert_binary_data(raw)
@@ -45,7 +50,7 @@ def main():
     # print(f"\nDev. Data shape:       {dev_data_raw.shape}")
     signals = extract_signals(dev_data_raw, cut_starting_samples=1000, cut_ending_samples=0)
     signals_clean = remove_dc_offset(signals, exclude=['body_temperature'])
-    preprocessed_signals, spike_masks = preprocess_signals(signals_clean)
+    preprocessed_signals, spike_masks = preprocess_signals(signals_clean, activity=activity)
 
     # print(f'\n  Device signals after preprocessing: {list(preprocessed_signals.keys())}')
 
@@ -65,10 +70,10 @@ def main():
     ref_preprocessed = {}
     for name, sig in ref_signals_dc.items():
         if name.startswith('ref_lead'):
-            ref_preprocessed[name] = preprocess_ecg(sig, fs=250)
+            ref_preprocessed[name] = preprocess_ecg(sig, fs=250, activity=activity)
             # print(f"  [OK] Preprocessed {name} (ECG pipeline)")
         elif name.startswith('ref_resp'):
-            ref_preprocessed[name] = preprocess_respiration(sig, fs=250)
+            ref_preprocessed[name] = preprocess_respiration(sig, fs=250, activity=activity)
             # print(f"  [OK] Preprocessed {name} (Respiration pipeline)")
         # elif name.startswith('ref_acc'):
         #     from utils.preprocessing import preprocess_imu
@@ -83,7 +88,8 @@ def main():
     signals_to_align = {
     "lead1" : {"device": "lead1", "ref": "ref_lead1"},
     "lead2" : {"device": "lead2", "ref": "ref_lead2"},
-    "respiration" : {"device": "impedance_pneumography", "ref": "ref_respiration"},
+    "respiration1" : {"device": "impedance_pneumography", "ref": "ref_respiration"},
+    "respiration2" : {"device": "gyry_ribs_imu", "ref": "ref_respiration"},
     }
 
     for lead_name, pair in signals_to_align.items():
@@ -106,20 +112,20 @@ def main():
     # replace preprocessed signals with aligned versions for ECG and respiration
     preprocessed_signals['lead1'] = aligned_signals.get('lead1', {}).get('device')
     preprocessed_signals['lead2'] = aligned_signals.get('lead2', {}).get('device')
-    preprocessed_signals['impedance_pneumography'] = aligned_signals.get('respiration', {}).get('device')
+    preprocessed_signals['impedance_pneumography'] = aligned_signals.get('respiration1', {}).get('device')
+    preprocessed_signals['gyry_ribs_imu'] = aligned_signals.get('respiration2', {}).get('device')
 
     # also update the reference preprocessed signals with the aligned versions
     ref_preprocessed['ref_lead1'] = aligned_signals.get('lead1', {}).get('ref')
     ref_preprocessed['ref_lead2'] = aligned_signals.get('lead2', {}).get('ref')
-    ref_preprocessed['ref_respiration'] = aligned_signals.get('respiration', {}).get('ref')
+    ref_preprocessed['ref_respiration'] = aligned_signals.get('respiration1', {}).get('ref')
 
 
 
-    master_len = len(np.array(preprocessed_signals['impedance_pneumography']))
-    preprocessed_signals['gyry_ribs_imu'] = apply_lag(preprocessed_signals['gyry_ribs_imu'], lag)
-    preprocessed_signals['gyry_ribs_imu'] = preprocessed_signals['gyry_ribs_imu'][:master_len]
-
-    
+    # master_len = len(np.array(preprocessed_signals['impedance_pneumography']))
+    # preprocessed_signals['gyry_ribs_imu'] = apply_lag(preprocessed_signals['gyry_ribs_imu'], lag)
+    # preprocessed_signals['gyry_ribs_imu'] = preprocessed_signals['gyry_ribs_imu'][:master_len]
+    # preprocessed_signals['gyry_ribs_imu'] = normalize_signal(np.array(preprocessed_signals['gyry_ribs_imu'], dtype=np.float64).flatten())
     
     # plot_ecg_signal_overlay(
     #         preprocessed_signals, ref_preprocessed,

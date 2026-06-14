@@ -146,30 +146,10 @@ def _get_resp_peaks(sig, fs):
         2. msptd
         3. simple threshold
     """
-    # ── Method 1: AMPD ────────────────────────────────────────
+    # ── Method: AMPD ────────────────────────────────────────
     try:
         p = np.array(ampd(sig, fs), dtype=int)
         p = p[(p >= 0) & (p < len(sig))]
-        if len(p) >= 2:
-            return p
-    except Exception:
-        pass
-
-    # ── Method 2: MSPTD ───────────────────────────────────────
-    try:
-        result = msptd(sig, fs)
-        p = np.array(result[0] if isinstance(result, tuple) else result, dtype=int)
-        p = p[(p >= 0) & (p < len(sig))]
-        if len(p) >= 2:
-            return p
-    except Exception:
-        pass
-
-    # ── Method 3: Simple threshold ────────────────────────────
-    try:
-        p, _ = find_peaks(sig, height=np.mean(sig) + 0.3 * np.std(sig),
-                          distance=int(fs * 1.0))
-        p = p.astype(int)
         if len(p) >= 2:
             return p
     except Exception:
@@ -179,16 +159,16 @@ def _get_resp_peaks(sig, fs):
 
 
 def _resp_rate_from_peaks(peaks, fs):
-    """
-    BBI validity window: 0.5 – 20 s  →  3 – 120 brpm.
-    Falls back to unfiltered BBI if the validity filter empties the array.
-    """
     if len(peaks) < 2:
         return float('nan')
-    bbi       = np.diff(peaks) / fs
-    bbi_valid = bbi[(bbi > 0.5) & (bbi < 20.0)]
+    
+    bbi = np.diff(peaks) / fs
+    bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
+    
+    # DO NOT fall back to garbage — return NaN instead
     if len(bbi_valid) == 0:
-        bbi_valid = bbi
+        return float('nan')  # ← Honest failure is better than corrupt output
+    
     return float(np.mean(60.0 / bbi_valid))
 
 
