@@ -117,22 +117,40 @@ def _filter_peaks_gentle(peaks, fs, hr_max=220):
     return np.array(filtered, dtype=int)
 
 
-def _get_clean_r_peaks(seg, fs):
+def _get_clean_r_peaks(seg, fs, activity="unknown"):
     """Detect → gentle filter → vitalwave filter."""
+
+    SDSD_THRESHOLDS = {
+    "laying":   0.08,   # ~80ms, resting HRV
+    "walking":  0.15,   # more motion, slightly relaxed
+    }
+    
+    # snr = float(Absolute_Signal_to_noise_Ratio(seg))
+    # if snr<0.5:
+    #     print(f"snr below threshold: {snr}")
+    #     return
+
     r_peaks, method = _detect_r_peaks_robust(seg, fs)
-    if len(r_peaks) < 2:
-        return r_peaks, method
-    r_peaks = _filter_peaks_gentle(r_peaks, fs)
-    if len(r_peaks) >= 4:
-        try:
-            r_vw = np.array(filter_hr_peaks(peaks=r_peaks, fs=fs,
-                                            hr_min=30, hr_max=220,
-                                            kernel_size=3, sdsd_max=0.5), dtype=int)
-            if len(r_vw) >= 2:
-                r_peaks = r_vw
-        except Exception:
-            pass
-    return r_peaks, method
+    # if len(r_peaks) < 2:
+    #     return r_peaks, method
+    # r_peaks = _filter_peaks_gentle(r_peaks, fs)
+    valid_r_peaks, valid_hr_mean = filter_hr_peaks(peaks=r_peaks, fs=fs,
+                                    hr_min=30, hr_max=220,
+                                    kernel_size=3, sdsd_max=0.35)
+    return valid_r_peaks, valid_hr_mean
+    # if len(r_peaks) >= 4:
+    #     sdsd_thresh = SDSD_THRESHOLDS.get(activity, 0.35)
+    #     try:
+    #         r_vw = np.array(filter_hr_peaks(peaks=r_peaks, fs=fs,
+    #                                         hr_min=30, hr_max=220,
+    #                                         kernel_size=3, sdsd_max=0.5), dtype=int)
+    #         if len(r_vw) >= 2:
+    #             r_peaks = r_vw
+    #     except Exception:
+    #         pass
+    # return r_peaks, method
+
+    
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -147,13 +165,10 @@ def _get_resp_peaks(sig, fs):
         3. simple threshold
     """
     # ── Method: AMPD ────────────────────────────────────────
-    try:
-        p = np.array(ampd(sig, fs), dtype=int)
-        p = p[(p >= 0) & (p < len(sig))]
-        if len(p) >= 2:
-            return p
-    except Exception:
-        pass
+    p = np.array(ampd(sig, fs), dtype=int)
+    p = p[(p >= 0) & (p < len(sig))]
+    if len(p) >= 2:
+        return p
 
     return np.array([], dtype=int)
 
@@ -209,7 +224,7 @@ def segment_spi(segment, fs, window_duration=4.0, warmup_fraction=0.25):
 #     Features: mean_hr, rmssd, snr
 # ═══════════════════════════════════════════════════════════════
 
-def extract_segment_ecg_features(segment, fs=250):
+def extract_segment_ecg_features(segment, fs=250, activity="unknown"):
     """
     Returns
     -------
@@ -230,45 +245,55 @@ def extract_segment_ecg_features(segment, fs=250):
         pass
 
     # ── R-peaks ───────────────────────────────────────────────
-    r_peaks, _ = _get_clean_r_peaks(sig, fs)
-    if len(r_peaks) < 2:
-        return base
-
-    rr   = np.diff(r_peaks) / fs * 1000.0                    # ms
-    hr   = 60000.0 / np.where(rr > 0, rr, np.inf)
-    mask = (hr >= 30) & (hr <= 220)
-
-
-    rr_ms_valid = rr[mask]
-    if len(rr_ms_valid) == 0:
-        return base
-
-    # if not mask.any():
+    valid_r_peaks, valid_hr = _get_clean_r_peaks(sig, fs, activity=activity)
+    base['mean_hr'] = valid_hr
+    # if len(r_peaks) < 2:
     #     return base
 
-    # ── Mean HR ───────────────────────────────────────────────
-    # base['mean_hr'] = float(np.mean(hr[mask]))
-    hr_valid = 60000.0 / rr_ms_valid
-    base['mean_hr'] = float(np.mean(hr_valid))
+    # rr   = np.diff(r_peaks) / fs * 1000.0                    # ms
+    # hr   = 60000.0 / np.where(rr > 0, rr, np.inf)
+    # mask = (hr >= 30) & (hr <= 220)
 
-    # ── RMSSD — gap-safe (both neighbours must pass mask) ─────
-    if len(rr) > 1:
-        both_valid = mask[:-1] & mask[1:]
-    #     diff_rr    = np.diff(rr)[both_valid]
-    #     base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2))) if len(diff_rr) else 0.0
+
+    # rr_ms_valid = rr[mask]
+    # if len(rr_ms_valid) == 0:
+    #     return base
+
+    # # if not mask.any():
+    # #     return base
+
+    # # ── Mean HR ───────────────────────────────────────────────
+    # # base['mean_hr'] = float(np.mean(hr[mask]))
+    # hr_valid = 60000.0 / rr_ms_valid
+    # base['mean_hr'] = float(np.mean(hr_valid))
+
+    # # ── RMSSD — gap-safe (both neighbours must pass mask) ─────
+    # if len(rr) > 1:
+    #     both_valid = mask[:-1] & mask[1:]
+    # #     diff_rr    = np.diff(rr)[both_valid]
+    # #     base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2))) if len(diff_rr) else 0.0
+    # # else:
+    # #     base['rmssd'] = 0.0
+
+    #     diff_rr_raw = np.diff(rr)
+    #     diff_rr     = diff_rr_raw[both_valid]
+
+
+    #     if len(diff_rr) > 0:
+    #         base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2)))
+    #     else:
+    #         base['rmssd'] = 0.0
+
     # else:
     #     base['rmssd'] = 0.0
 
-        diff_rr_raw = np.diff(rr)
-        diff_rr     = diff_rr_raw[both_valid]
-
-        if len(diff_rr) > 0:
-            base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2)))
-        else:
-            base['rmssd'] = 0.0
-
+    rr   = np.diff(valid_r_peaks) / fs * 1000.0
+    diff_rr = np.diff(rr)
+    if len(diff_rr) > 0:
+        base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2)))
     else:
         base['rmssd'] = 0.0
+
 
     return base
 
@@ -278,14 +303,23 @@ def extract_segment_ecg_features(segment, fs=250):
 #     Features: resp_rate_mean, spi
 # ═══════════════════════════════════════════════════════════════
 
-def extract_segment_resp_features(segment, fs=250):
+def extract_segment_resp_features(segment, fs=250, activity="unknown"):
     """
     Returns
     -------
     dict with keys: resp_rate_mean, spi
     None if segment shorter than 2 s.
     """
+    SQI_THRESHOLD = 0.4  # Tune empirically
+
     sig = np.array(segment, dtype=np.float64).flatten()
+
+    sqi= compute_resp_sqi(sig)
+
+    if sqi < SQI_THRESHOLD:
+        print(f"Segment rejected! as SNR is {sqi}")
+        return None
+
     if len(sig) < 2 * fs:
         return None
 
@@ -307,13 +341,24 @@ def extract_segment_resp_features(segment, fs=250):
     return base
 
 
+def compute_resp_sqi(segment):
+    """
+    Returns SQI score 0-1. Below threshold → reject segment.
+    """
+    sig = np.array(segment, dtype=np.float64)
+    
+    snr= float(Absolute_Signal_to_noise_Ratio(sig))
+    
+    return snr
+
+
 # ═══════════════════════════════════════════════════════════════
 #  6. PAIRED SEGMENTATION ENGINE
 # ═══════════════════════════════════════════════════════════════
 
 def segment_and_extract(dev_signal, ref_signal, fs=250,
                         window_sec=10, signal_type="ecg",
-                        sig_name="signal"):
+                        sig_name="signal", activity="unknown"):
     dev_sig = np.array(dev_signal, dtype=np.float64).flatten()
     ref_sig = np.array(ref_signal, dtype=np.float64).flatten()
     min_len = min(len(dev_sig), len(ref_sig))
@@ -336,7 +381,10 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
         s, e = i * W, i * W + W
         info = dict(segment=i, start_sec=s / fs, end_sec=e / fs)
         for sig, rows in ((dev_sig, dev_rows), (ref_sig, ref_rows)):
-            r = fn(sig[s:e], fs)
+            seg_snr = float(Absolute_Signal_to_noise_Ratio(sig[s:e]))
+            if seg_snr < 0.5:
+                continue
+            r = fn(sig[s:e], fs, activity=activity)
             if r is not None:
                 r.update(info); rows.append(r)
 
@@ -370,7 +418,7 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
 # ═══════════════════════════════════════════════════════════════
 
 def _fuse_respiration_rate(comparison_results, output_dir,
-                           rate_threshold=25.0):
+                           rate_threshold=25.0, activity=None):
     """
     Per-segment fused DEVICE respiration rate.
 
@@ -388,7 +436,15 @@ def _fuse_respiration_rate(comparison_results, output_dir,
         dev_rr_mean_fused, ref_rr_mean_fused, AE_rr_mean_fused
     """
     MODALITIES   = ["impedance_pneumography", "gyry_ribs_imu"]
-    BASE_WEIGHTS = {"impedance_pneumography": 1.0, "gyry_ribs_imu": 2.0}
+    # BASE_WEIGHTS = {"impedance_pneumography": 1.0, "gyry_ribs_imu": 2.0}
+    ACTIVITY_WEIGHTS = {
+    "laying":  {"impedance_pneumography": 1.5, "gyry_ribs_imu": 1.0},
+    "walking": {"impedance_pneumography": 0.6, "gyry_ribs_imu": 1.8},
+    "unknown": {"impedance_pneumography": 1.0, "gyry_ribs_imu": 1.0},
+    }
+
+    BASE_WEIGHTS = ACTIVITY_WEIGHTS.get(activity, ACTIVITY_WEIGHTS["unknown"])
+    print(f"BASE_WEIGHTS: {BASE_WEIGHTS}")
 
     tables_dir = os.path.join(output_dir, "tables")
     _ensure_dir(tables_dir)
@@ -583,7 +639,7 @@ def compare_features(dev_preprocessed, ref_preprocessed,
         dev_df, ref_df, paired_df = segment_and_extract(
             dev_preprocessed[dev_name], ref_preprocessed[ref_name],
             fs=fs, window_sec=window_sec,
-            signal_type="ecg", sig_name=dev_name)
+            signal_type="ecg", sig_name=dev_name, activity=activity)
         comparison_results[pair_name] = dict(
             signal_type='ECG', dev_name=dev_name, ref_name=ref_name,
             window_sec=window_sec,
@@ -600,14 +656,14 @@ def compare_features(dev_preprocessed, ref_preprocessed,
         dev_df, ref_df, paired_df = segment_and_extract(
             dev_preprocessed[dev_name], ref_preprocessed[ref_name],
             fs=fs, window_sec=resp_win,
-            signal_type="respiration", sig_name=dev_name)
+            signal_type="respiration", sig_name=dev_name, activity=activity)
         comparison_results[pair_name] = dict(
             signal_type='Respiration', dev_name=dev_name, ref_name=ref_name,
             window_sec=resp_win,
             dev_df=dev_df, ref_df=ref_df, paired_df=paired_df)
 
     # ── 3. Fused respiration rate ─────────────────────────────
-    resp_fused = _fuse_respiration_rate(comparison_results, output_dir)
+    resp_fused = _fuse_respiration_rate(comparison_results, output_dir, activity=activity)
 
     comparison_results["resp_modality"] = {
         "description": "Per-segment fused respiration rate mean across impedance_pneumography, gyry_ribs_imu",

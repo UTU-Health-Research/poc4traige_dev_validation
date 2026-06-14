@@ -1,0 +1,2 @@
+segment,start_sec,end_sec,dev_rr_impedance_pneumography,ref_rr_impedance_pneumography,AE_rr_impedance_pneumography,dev_rr_gyry_ribs_imu,ref_rr_gyry_ribs_imu,AE_rr_gyry_ribs_imu,dev_rr_mean_fused,ref_rr_mean_fused,AE_rr_mean_fused
+3,90.0,120.0,15.629828852176402,18.99607375916305,3.3662449069866476,17.202088356063978,18.99607375916305,1.7939854030990716,16.67800185476812,18.99607375916305,2.3180719043949303

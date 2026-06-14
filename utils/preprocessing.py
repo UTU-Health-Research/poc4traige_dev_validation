@@ -172,8 +172,13 @@ def preprocess_respiration(signal, fs=250, activity='unknown'):
 
 def preprocess_ecg(signal, fs=250, activity="unknown"):
     sig = np.asarray(signal, dtype=np.float64).ravel()
-    sig = butter_filter(arr=sig, n=2, wn=np.array([5.0]),  filter_type='high', fs=fs)
-    sig = butter_filter(arr=sig, n=2, wn=np.array([40.0]), filter_type='low',  fs=fs)
+
+    hp_freq = 5.0 if activity != "walking" else 8.0  # stricter for motion
+    lp_freq = 40.0
+    order   = 3 if activity == "walking" else 2       # steeper rolloff
+
+    sig = butter_filter(arr=sig, n=order, wn=hp_freq,  filter_type='high', fs=fs)
+    sig = butter_filter(arr=sig, n=order, wn=lp_freq, filter_type='low',  fs=fs)
     return sig
 
 
@@ -183,7 +188,7 @@ def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='u
     PROFILES = {
         #              order   hp_hz   lp_hz   ma_window_s
         'laying':     (2,      0.1,    0.7,    0.25),
-        'walking':    (3,      0.2,    0.8,    0.25),
+        'walking':    (3,      0.15,    0.8,    0.25),
         'unknown':    (2,      0.15,   0.8,    0.25),
     }
 
@@ -200,6 +205,7 @@ def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='u
     # sig = butter_filter(arr=sig, n=2, wn=np.array([0.8]), filter_type='low', fs=fs)
     # sig = moving_average_filter(sig, window=int(fs * 0.25))
     return sig, spike_mask
+
 
 
 ECG_SIGNALS = [
