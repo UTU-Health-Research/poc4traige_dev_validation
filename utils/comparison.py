@@ -310,15 +310,9 @@ def extract_segment_resp_features(segment, fs=250, activity="unknown"):
     dict with keys: resp_rate_mean, spi
     None if segment shorter than 2 s.
     """
-    SQI_THRESHOLD = 0.4  # Tune empirically
+
 
     sig = np.array(segment, dtype=np.float64).flatten()
-
-    sqi= compute_resp_sqi(sig)
-
-    if sqi < SQI_THRESHOLD:
-        print(f"Segment rejected! as SNR is {sqi}")
-        return None
 
     if len(sig) < 2 * fs:
         return None
@@ -358,7 +352,13 @@ def compute_resp_sqi(segment):
 
 def segment_and_extract(dev_signal, ref_signal, fs=250,
                         window_sec=10, signal_type="ecg",
-                        sig_name="signal", activity="unknown"):
+                        sig_name="signal", activity="unknown",
+                        snr_threshold=None,
+                        diagnose_snr=False):        # <-- toggle flag
+
+    if snr_threshold is None:
+        snr_threshold = 0.80 if signal_type == "ecg" else 0.05
+
     dev_sig = np.array(dev_signal, dtype=np.float64).flatten()
     ref_sig = np.array(ref_signal, dtype=np.float64).flatten()
     min_len = min(len(dev_sig), len(ref_sig))
@@ -371,22 +371,70 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
         print(f"  [WARNING] Too short ({min_len/fs:.1f}s) for {window_sec}s windows")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    # print(f"  {sig_name}: {n} segments × {window_sec}s")
+    # # ── SNR Diagnostic (run once to calibrate threshold) ─────────────────────
+    # if diagnose_snr and signal_type != "ecg":
+    #     dev_snrs, ref_snrs = [], []
+    #     for i in range(n):
+    #         s, e = i * W, i * W + W
+    #         try:
+    #             dev_snrs.append(float(Absolute_Signal_to_noise_Ratio(dev_sig[s:e])))
+    #             ref_snrs.append(float(Absolute_Signal_to_noise_Ratio(ref_sig[s:e])))
+    #         except Exception:
+    #             dev_snrs.append(np.nan)
+    #             ref_snrs.append(np.nan)
+
+    #     for label, snrs in [("DEV", dev_snrs), ("REF", ref_snrs)]:
+    #         valid = [v for v in snrs if not np.isnan(v)]
+    #         if valid:
+    #             print(f"  [SNR DIAG | {sig_name} | {label}] "
+    #                   f"n={len(valid)}  "
+    #                   f"min={np.min(valid):.4f}  "
+    #                   f"mean={np.mean(valid):.4f}  "
+    #                   f"max={np.max(valid):.4f}  "
+    #                   f"below_0.05={sum(v < 0.05 for v in valid)}  "
+    #                   f"below_0.10={sum(v < 0.10 for v in valid)}  "
+    #                   f"below_0.20={sum(v < 0.20 for v in valid)}")
+
 
     fn = (extract_segment_ecg_features if signal_type == "ecg"
           else extract_segment_resp_features)
 
     dev_rows, ref_rows = [], []
+    rejected = 0
+
     for i in range(n):
         s, e = i * W, i * W + W
         info = dict(segment=i, start_sec=s / fs, end_sec=e / fs)
-        for sig, rows in ((dev_sig, dev_rows), (ref_sig, ref_rows)):
-            seg_snr = float(Absolute_Signal_to_noise_Ratio(sig[s:e]))
-            if seg_snr < 0.5:
-                continue
-            r = fn(sig[s:e], fs, activity=activity)
-            if r is not None:
-                r.update(info); rows.append(r)
+
+        # -- SNR gate on device signal only ---------------------------
+        try:
+            dev_snr = float(Absolute_Signal_to_noise_Ratio(dev_sig[s:e]))
+        except Exception:
+            dev_snr = 0.0
+
+        if np.isnan(dev_snr) or dev_snr < snr_threshold:
+            rejected += 1
+            print(f"    [REJECT] seg={i} SNR={dev_snr:.4f} < {snr_threshold}")
+            continue
+
+        # -- Extract features -----------------------------------------
+        r_dev = fn(dev_sig[s:e], fs, activity=activity)
+        if r_dev is None:
+            rejected += 1
+            continue
+        r_dev.update(info)
+        dev_rows.append(r_dev)
+
+        r_ref = fn(ref_sig[s:e], fs, activity=activity)
+        if r_ref is None:
+            rejected += 1
+            dev_rows.pop()
+            continue
+        r_ref.update(info)
+        ref_rows.append(r_ref)
+
+    print(f"  [{sig_name}] {n} segments | accepted: {len(dev_rows)} | "
+          f"rejected: {rejected} (SNR<{snr_threshold} or extraction failed)")
 
     dev_df, ref_df = pd.DataFrame(dev_rows), pd.DataFrame(ref_rows)
     if not len(dev_df) or not len(ref_df):
@@ -409,7 +457,6 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
         paired[f'ref_{col}'] = rv
         paired[f'AE_{col}']  = np.abs(dv - rv)
 
-    # print(f"    Paired: {len(paired)} segments")
     return dev_df, ref_df, paired
 
 
@@ -417,39 +464,21 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
 #  7. FUSED RESPIRATION RATE
 # ═══════════════════════════════════════════════════════════════
 
-def _fuse_respiration_rate(comparison_results, output_dir,
-                           rate_threshold=25.0, activity=None):
+def _fuse_respiration_rate(comparison_results, output_dir, activity=None):
     """
-    Per-segment fused DEVICE respiration rate.
-
-    Fusion rules (applied per segment):
-        - If both values are within threshold  → weighted average (imp×1, imu×2)
-        - If one value exceeds threshold       → use the other value as-is
-        - If both values exceed threshold      → use the lower of the two
-        - Reference is plain mean (same physical reference device)
-
-    Returns a DataFrame with columns:
-        segment, start_sec, end_sec,
-        dev_rr_impedance_pneumography, dev_rr_gyry_ribs_imu,
-        ref_rr_impedance_pneumography, ref_rr_gyry_ribs_imu,
-        AE_rr_impedance_pneumography,  AE_rr_gyry_ribs_imu,
-        dev_rr_mean_fused, ref_rr_mean_fused, AE_rr_mean_fused
+    Fuse device respiration rate from IP and GYR via weighted average.
+    Reference is taken as-is (identical across modalities).
     """
-    MODALITIES   = ["impedance_pneumography", "gyry_ribs_imu"]
-    # BASE_WEIGHTS = {"impedance_pneumography": 1.0, "gyry_ribs_imu": 2.0}
+    MODALITIES = ["impedance_pneumography", "gyry_ribs_imu"]
     ACTIVITY_WEIGHTS = {
-    "laying":  {"impedance_pneumography": 1.5, "gyry_ribs_imu": 1.0},
-    "walking": {"impedance_pneumography": 0.6, "gyry_ribs_imu": 1.8},
+    "laying":  {"impedance_pneumography": 1.0, "gyry_ribs_imu": 1.5},
+    "walking": {"impedance_pneumography": 1.0, "gyry_ribs_imu": 2.0},
     "unknown": {"impedance_pneumography": 1.0, "gyry_ribs_imu": 1.0},
-    }
+}
+    weights = ACTIVITY_WEIGHTS.get(activity, ACTIVITY_WEIGHTS["unknown"])
+    print(f"[FUSE RESP] Weights: {weights}")
 
-    BASE_WEIGHTS = ACTIVITY_WEIGHTS.get(activity, ACTIVITY_WEIGHTS["unknown"])
-    print(f"BASE_WEIGHTS: {BASE_WEIGHTS}")
-
-    tables_dir = os.path.join(output_dir, "tables")
-    _ensure_dir(tables_dir)
-
-    # ── Collect paired DataFrames ─────────────────────────────────────────────
+    # -- Collect paired DataFrames --------------------------------------------
     dfs = {}
     for mod in MODALITIES:
         key = f"{mod}_vs_ref_respiration"
@@ -461,7 +490,7 @@ def _fuse_respiration_rate(comparison_results, output_dir,
         print(f"  [FUSE RESP] Need both modalities, found {list(dfs.keys())} — skipping.")
         return pd.DataFrame()
 
-    # ── Intersection of segments ──────────────────────────────────────────────
+    # -- Intersection of segments ---------------------------------------------
     common_segments = sorted(
         set(dfs["impedance_pneumography"]["segment"].values)
         & set(dfs["gyry_ribs_imu"]["segment"].values)
@@ -470,7 +499,7 @@ def _fuse_respiration_rate(comparison_results, output_dir,
         print("  [FUSE RESP] No common segments — skipping.")
         return pd.DataFrame()
 
-    # ── Build aligned per-modality arrays ─────────────────────────────────────
+    # -- Align both modalities to common segments -----------------------------
     aligned = {}
     for mod in MODALITIES:
         d = (dfs[mod][dfs[mod]["segment"].isin(common_segments)]
@@ -480,65 +509,29 @@ def _fuse_respiration_rate(comparison_results, output_dir,
             "ref": pd.to_numeric(d["ref_resp_rate_mean"], errors="coerce").values,
         }
 
-    # ── Output scaffold ───────────────────────────────────────────────────────
-    base = (dfs["impedance_pneumography"]
-            [dfs["impedance_pneumography"]["segment"].isin(common_segments)]
-            .sort_values("segment").reset_index(drop=True))
-    out  = base[["segment", "start_sec", "end_sec"]].copy()
+    # -- Build output ---------------------------------------------------------
+    out = (dfs["impedance_pneumography"]
+           [dfs["impedance_pneumography"]["segment"].isin(common_segments)]
+           .sort_values("segment").reset_index(drop=True)
+           [["segment", "start_sec", "end_sec"]].copy())
 
     for mod in MODALITIES:
-        dev_rr = aligned[mod]["dev"]
-        ref_rr = aligned[mod]["ref"]
-        out[f"dev_rr_{mod}"] = dev_rr
-        out[f"ref_rr_{mod}"] = ref_rr
-        out[f"AE_rr_{mod}"]  = np.abs(dev_rr - ref_rr)
+        out[f"dev_rr_{mod}"] = aligned[mod]["dev"]
+        out[f"ref_rr_{mod}"] = aligned[mod]["ref"]
+        out[f"AE_rr_{mod}"]  = np.abs(aligned[mod]["dev"] - aligned[mod]["ref"])
 
-    # ── Per-segment fusion (device only) ──────────────────────────────────────
-    imp_dev   = aligned["impedance_pneumography"]["dev"]
-    imu_dev   = aligned["gyry_ribs_imu"]["dev"]
-    fused_dev = np.full(len(out), float('nan'))
+    # -- Weighted average (device only) ---------------------------------------
+    w_ip,  w_gy  = weights["impedance_pneumography"], weights["gyry_ribs_imu"]
+    dev_ip, dev_gy = aligned["impedance_pneumography"]["dev"], aligned["gyry_ribs_imu"]["dev"]
 
-    for i in range(len(out)):
-        v_imp = imp_dev[i]
-        v_imu = imu_dev[i]
+    fused_dev = (w_ip * dev_ip + w_gy * dev_gy) / (w_ip + w_gy)
 
-        imp_ok  = not np.isnan(v_imp)
-        imu_ok  = not np.isnan(v_imu)
-        imp_sane = imp_ok and v_imp <= rate_threshold
-        imu_sane = imu_ok and v_imu <= rate_threshold
-
-        if   imp_sane and imu_sane:
-            # Both within threshold → weighted average
-            fused_dev[i] = float(np.average([v_imp, v_imu],
-                                            weights=[BASE_WEIGHTS["impedance_pneumography"],
-                                                     BASE_WEIGHTS["gyry_ribs_imu"]]))
-        elif imp_sane and not imu_sane:
-            # Only impedance is sane → use it directly
-            fused_dev[i] = float(v_imp)
-        elif imu_sane and not imp_sane:
-            # Only IMU is sane → use it directly
-            fused_dev[i] = float(v_imu)
-        else:
-            # Both exceed threshold → fallback to the lower of the two available values
-            candidates   = [v for v in [v_imp, v_imu] if not np.isnan(v)]
-            fused_dev[i] = float(min(candidates)) if candidates else float('nan')
-
-    # ── Reference: plain mean (same physical reference, no weighting) ─────────
-    imp_ref   = aligned["impedance_pneumography"]["ref"]
-    imu_ref   = aligned["gyry_ribs_imu"]["ref"]
-    fused_ref = np.nanmean(np.column_stack([imp_ref, imu_ref]), axis=1)
+    # -- Reference: use directly (same physical device across modalities) -----
+    fused_ref = aligned["impedance_pneumography"]["ref"]
 
     out["dev_rr_mean_fused"] = fused_dev
     out["ref_rr_mean_fused"] = fused_ref
     out["AE_rr_mean_fused"]  = np.abs(fused_dev - fused_ref)
-
-    # ── Save ──────────────────────────────────────────────────────────────────
-    # path = os.path.join(tables_dir, "fused_respiration_rate.csv")
-    # out.to_csv(path, index=False)
-    # print(f"  [FUSE RESP] {len(out)} segments → {path}")
-    # print(f"  [FUSE RESP] threshold={rate_threshold} bpm | "
-    #       f"base weights: impedance={BASE_WEIGHTS['impedance_pneumography']}, "
-    #       f"imu={BASE_WEIGHTS['gyry_ribs_imu']}")
 
     return out
 
