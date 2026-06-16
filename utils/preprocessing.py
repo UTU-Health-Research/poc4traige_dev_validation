@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from vitalwave.basic_algos import butter_filter, moving_average_filter
 from scipy.signal import correlate
+import matplotlib.pyplot as plt
 
 SIGNAL_MAP = {
     # ECG channels
@@ -312,9 +313,13 @@ RESP_SIGNAL_PAIRS = {
 }
 
 def normalize_signal(sig):
-    return sig / np.max(np.abs(sig))
-
-def align_signals(dev_sig, bit_sig, fs):
+    s = np.max(np.abs(sig))
+    if s > 0:
+        return sig / s
+    else:
+        return sig
+    
+def align_signals(dev_sig, bit_sig, fs=250):
     """
     Normalize and align two signals using cross-correlation
     Returns aligned signals of equal length
@@ -357,7 +362,7 @@ def align_signals(dev_sig, bit_sig, fs):
             bit_aligned = bit_norm
 
         min_len = min(len(dev_aligned), len(bit_aligned))
-        return dev_aligned[:min_len], bit_aligned[:min_len], best_lag
+        return dev_aligned[:min_len], bit_aligned[:min_len], best_lag, min_len
 
     # ─── Align ────────────────────────────────────────────────
     if best_lag > 0:
@@ -371,9 +376,22 @@ def align_signals(dev_sig, bit_sig, fs):
         bit_aligned = bit_norm
 
     min_len = min(len(dev_aligned), len(bit_aligned))
-    return dev_aligned[:min_len], bit_aligned[:min_len], best_lag
+    return dev_aligned[:min_len], bit_aligned[:min_len], best_lag, min_len
 
-def apply_lag(dev_sig, lag):
-    dev = np.asarray(dev_sig, dtype=np.float64).ravel()
-    dev = dev[lag:] if lag > 0 else (dev[:len(dev) - abs(lag)] if lag < 0 else dev)
-    return dev
+def apply_lag(dev_sig, ref, lag, min_len):
+    s = np.max(np.abs(dev_sig))
+    if s > 0:
+        dev = normalize_signal(np.array(dev_sig, dtype=np.float64).flatten())
+        if lag > 0:
+            dev = dev[lag:]
+        dev = dev[:min_len]
+
+        phase_score = np.corrcoef(dev, ref)[0, 1]
+        # print(f"  Pearson correlation  : {phase_score:.4f}")
+        if phase_score < 0:
+            dev = -dev
+        
+        return dev
+    
+    else:
+        return dev_sig

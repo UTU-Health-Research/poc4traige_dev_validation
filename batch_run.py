@@ -1,6 +1,7 @@
 import os, re, glob
 import yaml
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from utils import (
     read_binary_samples_hex, convert_binary_data, extract_signals, remove_dc_offset,
@@ -37,44 +38,38 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
         if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs=fs, activity=activity)
         elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=fs, activity=activity)
         else:                             ref[name] = sig
-
+        
     # Alignment — ECG
-    if "lead2" in dev and "ref_lead2" in ref:
-        dev['lead2'], ref['ref_lead2'], _ = align_signals(dev['lead2'], ref['ref_lead2'], fs=fs)
+    dev['lead2'], ref['ref_lead2'], _, _ = align_signals(dev['lead2'], ref['ref_lead2'], fs=fs)
 
     # Alignment — Respiration
-    if "impedance_pneumography" in dev and "ref_respiration" in ref:
-        dev['impedance_pneumography'], ref['ref_respiration'], resp_lag = align_signals(
-            dev['impedance_pneumography'], ref['ref_respiration'], fs=fs
-        )
-        # master_len = len(dev['impedance_pneumography'])
-        # for key in RESP_DEVICE_ONLY:
-        #     if key in dev:
-        #         dev[key] = apply_lag(dev[key], resp_lag)
-        #         dev[key] = dev[key][:master_len]
-    if "gyry_ribs_imu" in dev and "ref_respiration" in ref:
-        dev['gyry_ribs_imu'], _, _ = align_signals(
-            dev['gyry_ribs_imu'], ref['ref_respiration'], fs=fs
-        )
-    if "accy_ribs_imu" in dev and "ref_respiration" in ref:
-        dev['accy_ribs_imu'], _, _ = align_signals(
-            dev['accy_ribs_imu'], ref['ref_respiration'], fs=fs
-        )
-    import matplotlib.pyplot as plt
+    dev['impedance_pneumography'], ref['ref_respiration'], resp_lag, min_len = align_signals(
+        dev['impedance_pneumography'], ref['ref_respiration'], fs=fs
+    )
+
+    for key in RESP_DEVICE_ONLY:
+        if key in dev.keys():
+            dev[key] = apply_lag(dev[key], ref['ref_respiration'], resp_lag, min_len)
+    
     # plt.plot(dev['lead2'], label="lead2")
     # plt.plot(ref['ref_lead2'], label="ref_lead2")
     # plt.legend()
     # plt.show()
 
-    plt.plot(dev['impedance_pneumography'], label="impedance_pneumography")
-    plt.plot(ref['ref_respiration'], label="ref_respiration")
-    plt.legend()
-    plt.show()
+    # plt.plot(dev['impedance_pneumography'], label="impedance_pneumography")
+    # plt.plot(ref['ref_respiration'], label="ref_respiration")
+    # plt.legend()
+    # plt.show()
 
-    plt.plot(dev['gyry_ribs_imu'], label="gyry_ribs_imu")
-    plt.plot(ref['ref_respiration'], label="ref_respiration")
-    plt.legend()
-    plt.show()
+    # plt.plot(dev['gyry_ribs_imu'], label="gyry_ribs_imu")
+    # plt.plot(ref['ref_respiration'], label="ref_respiration")
+    # plt.legend()
+    # plt.show()
+
+    # plt.plot(dev['accy_ribs_imu'], label="accy_ribs_imu")
+    # plt.plot(ref['ref_respiration'], label="ref_respiration")
+    # plt.legend()
+    # plt.show()
         
 
     # Comparison (make compare_features accept subject/activity/configuration if you want a grand file)

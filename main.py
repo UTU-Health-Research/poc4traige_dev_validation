@@ -85,41 +85,24 @@ def main():
 
     # print(f'\n  Preprocessed reference signals: {list(ref_preprocessed.keys())}')
 
-    aligned_signals = {}
-    signals_to_align = {
-    "lead1" : {"device": "lead1", "ref": "ref_lead1"},
-    "lead2" : {"device": "lead2", "ref": "ref_lead2"},
-    "respiration1" : {"device": "impedance_pneumography", "ref": "ref_respiration"},
-    "respiration2" : {"device": "gyry_ribs_imu", "ref": "ref_respiration"},
-    }
+    preprocessed_signals['lead2'], ref_preprocessed['ref_lead2'], _, _ = align_signals(preprocessed_signals['lead2'], ref_preprocessed['ref_lead2'], fs=250)
 
-    for lead_name, pair in signals_to_align.items():
-        dev_al, bit_al, lag = align_signals(
-            preprocessed_signals[pair["device"]],
-            ref_preprocessed[pair["ref"]],
-            fs=250
-        )
-        aligned_signals[lead_name] = {
-            "device"  : dev_al,
-            "ref" : bit_al
-        }
-        # print(f"{lead_name}:")
-        # print(f"  Best lag         : {lag} samples ({lag/250:.3f}s)")
-        # print(f"  Samples aligned  : {len(dev_al)}")
-        # print(f"  Duration aligned : {len(dev_al)/250:.2f}s")
-        # print(f" Aligned signals keys: {list(aligned_signals.keys())}\n")
+    # Alignment — Respiration
+    preprocessed_signals['impedance_pneumography'], ref_preprocessed['ref_respiration'], resp_lag, min_len = align_signals(
+        preprocessed_signals['impedance_pneumography'], ref_preprocessed['ref_respiration'], fs=250
+    )
 
+    RESP_DEVICE_ONLY = [
+    "accx_ribs_imu", "accy_ribs_imu", "accz_ribs_imu",
+    "gyrx_ribs_imu", "gyry_ribs_imu", "gyrz_ribs_imu",
+    "accx_chest_imu", "accy_chest_imu", "accz_chest_imu",
+    "gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu",
+    ]
+    
 
-    # replace preprocessed signals with aligned versions for ECG and respiration
-    preprocessed_signals['lead1'] = aligned_signals.get('lead1', {}).get('device')
-    preprocessed_signals['lead2'] = aligned_signals.get('lead2', {}).get('device')
-    preprocessed_signals['impedance_pneumography'] = aligned_signals.get('respiration1', {}).get('device')
-    preprocessed_signals['gyry_ribs_imu'] = aligned_signals.get('respiration2', {}).get('device')
-
-    # also update the reference preprocessed signals with the aligned versions
-    ref_preprocessed['ref_lead1'] = aligned_signals.get('lead1', {}).get('ref')
-    ref_preprocessed['ref_lead2'] = aligned_signals.get('lead2', {}).get('ref')
-    ref_preprocessed['ref_respiration'] = aligned_signals.get('respiration1', {}).get('ref')
+    for key in RESP_DEVICE_ONLY:
+        if key in preprocessed_signals.keys():
+            preprocessed_signals[key] = apply_lag(preprocessed_signals[key], ref_preprocessed['ref_respiration'], resp_lag, min_len)
 
 
 
@@ -155,15 +138,15 @@ def main():
     # plt.legend()
     # plt.show()
     
-    plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
-    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
-    plt.legend()
-    plt.show()
+    # plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
+    # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
+    # plt.legend()
+    # plt.show()
 
-    plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
-    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
-    plt.legend()
-    plt.show()
+    # plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
+    # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
+    # plt.legend()
+    # plt.show()
     
     # plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
     # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
