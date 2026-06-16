@@ -52,9 +52,30 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
         #     if key in dev:
         #         dev[key] = apply_lag(dev[key], resp_lag)
         #         dev[key] = dev[key][:master_len]
+    if "gyry_ribs_imu" in dev and "ref_respiration" in ref:
         dev['gyry_ribs_imu'], _, _ = align_signals(
             dev['gyry_ribs_imu'], ref['ref_respiration'], fs=fs
         )
+    if "accy_ribs_imu" in dev and "ref_respiration" in ref:
+        dev['accy_ribs_imu'], _, _ = align_signals(
+            dev['accy_ribs_imu'], ref['ref_respiration'], fs=fs
+        )
+    import matplotlib.pyplot as plt
+    # plt.plot(dev['lead2'], label="lead2")
+    # plt.plot(ref['ref_lead2'], label="ref_lead2")
+    # plt.legend()
+    # plt.show()
+
+    plt.plot(dev['impedance_pneumography'], label="impedance_pneumography")
+    plt.plot(ref['ref_respiration'], label="ref_respiration")
+    plt.legend()
+    plt.show()
+
+    plt.plot(dev['gyry_ribs_imu'], label="gyry_ribs_imu")
+    plt.plot(ref['ref_respiration'], label="ref_respiration")
+    plt.legend()
+    plt.show()
+        
 
     # Comparison (make compare_features accept subject/activity/configuration if you want a grand file)
     results = compare_features(dev_preprocessed=dev, ref_preprocessed=ref,

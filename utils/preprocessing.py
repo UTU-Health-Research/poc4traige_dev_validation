@@ -161,9 +161,9 @@ def preprocess_respiration(signal, fs=250, activity='unknown'):
 
     PROFILES = {
         #              order   hp_hz   lp_hz   ma_window_s
-        'laying':      (2,      0.1,    0.7,    0.25),
-        'walking':    (3,      0.15,    0.8,    0.25),
-        'unknown':    (2,      0.15,   0.8,    0.25),
+        'laying':      (2,      0.1,    0.7,    1.0),
+        'walking':    (3,      0.15,    0.8,    1.0),
+        'unknown':    (2,      0.15,   0.8,    1.0),
     }
     
     # print(f"activity: {activity}")
@@ -197,9 +197,9 @@ def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='u
 
     PROFILES = {
         #              order   hp_hz   lp_hz   ma_window_s
-        'laying':     (2,      0.1,    0.7,    0.25),
-        'walking':    (3,      0.15,    0.8,    0.25),
-        'unknown':    (2,      0.15,   0.8,    0.25),
+        'laying':     (2,      0.1,    0.7,    1.0),
+        'walking':    (3,      0.15,    0.8,    1.0),
+        'unknown':    (2,      0.15,   0.8,    1.0),
     }
 
     spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
@@ -319,13 +319,13 @@ def align_signals(dev_sig, bit_sig, fs):
     Normalize and align two signals using cross-correlation
     Returns aligned signals of equal length
     """
-    # dev_norm = normalize_signal(
-    #                np.array(dev_sig, dtype=np.float64).flatten())
-    # bit_norm = normalize_signal(
-    #                np.array(bit_sig, dtype=np.float64).flatten())
+    dev_norm = normalize_signal(
+                   np.array(dev_sig, dtype=np.float64).flatten())
+    bit_norm = normalize_signal(
+                   np.array(bit_sig, dtype=np.float64).flatten())
     
-    dev_norm = np.array(dev_sig, dtype=np.float64).flatten()
-    bit_norm = np.array(bit_sig, dtype=np.float64).flatten()
+    # dev_norm = np.array(dev_sig, dtype=np.float64).flatten()
+    # bit_norm = np.array(bit_sig, dtype=np.float64).flatten()
 
     # ─── Trim to same length ──────────────────────────────────
     min_samples = min(len(dev_norm), len(bit_norm))
@@ -337,11 +337,14 @@ def align_signals(dev_sig, bit_sig, fs):
     lags        = np.arange(-len(dev_norm)+1, len(dev_norm))
     best_lag    = lags[np.argmax(correlation)]
 
+    print(f"best lag without threshold is : {best_lag}")
+    
     if best_lag > 10000 or best_lag < -10000:
 
         print(f"  [WARNING] Large lag detected: {best_lag} samples ({best_lag/fs:.2f}s). Check signal quality and timestamps.")
         correlation[np.abs(lags) > int(5 * fs)] = -np.inf
         best_lag = lags[np.argmax(correlation)]
+        print(f"best lag is : {best_lag}")
         # ─── Align ────────────────────────────────────────────────
         if best_lag > 0:
             dev_aligned = dev_norm[best_lag:]

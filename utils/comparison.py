@@ -44,6 +44,7 @@ ECG_SIGNAL_PAIRS = {
 RESP_SIGNAL_PAIRS = {
     "impedance_pneumography": "ref_respiration",
     "gyry_ribs_imu":          "ref_respiration",
+    "accy_ribs_imu":          "ref_respiration",
 }
 
 
@@ -357,7 +358,7 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
                         diagnose_snr=False):        # <-- toggle flag
 
     if snr_threshold is None:
-        snr_threshold = 0.80 if signal_type == "ecg" else 0.05
+        snr_threshold = 0.85 if signal_type == "ecg" else 0.05
 
     dev_sig = np.array(dev_signal, dtype=np.float64).flatten()
     ref_sig = np.array(ref_signal, dtype=np.float64).flatten()
@@ -464,17 +465,115 @@ def segment_and_extract(dev_signal, ref_signal, fs=250,
 #  7. FUSED RESPIRATION RATE
 # ═══════════════════════════════════════════════════════════════
 
+# def _fuse_respiration_rate(comparison_results, output_dir, activity=None):
+#     """
+#     Fuse device respiration rate from IP and GYR via weighted average.
+#     Reference is taken as-is (identical across modalities).
+#     """
+#     MODALITIES = ["impedance_pneumography", "gyry_ribs_imu", "accy_ribs_imu"]
+#     ACTIVITY_WEIGHTS = {
+#     "laying": {
+#         "impedance_pneumography": 1.0,
+#         "gyry_ribs_imu":          1.5,
+#         "accy_ribs_imu":          1.5,   # equally reliable in laying
+#     },
+#     "walking": {
+#         "impedance_pneumography": 1.0,
+#         "gyry_ribs_imu":          2.0,   # most stable during walking
+#         "accy_ribs_imu":          0.5,   # heavily motion-corrupted
+#     },
+#     "unknown": {
+#         "impedance_pneumography": 1.0,
+#         "gyry_ribs_imu":          1.0,
+#         "accy_ribs_imu":          1.0,
+#     },
+#     }
+#     weights = ACTIVITY_WEIGHTS.get(activity, ACTIVITY_WEIGHTS["unknown"])
+#     print(f"[FUSE RESP] Weights: {weights}")
+
+#     # -- Collect paired DataFrames --------------------------------------------
+#     dfs = {}
+#     for mod in MODALITIES:
+#         key = f"{mod}_vs_ref_respiration"
+#         pdf = comparison_results.get(key, {}).get("paired_df", pd.DataFrame())
+#         if len(pdf) and "dev_resp_rate_mean" in pdf.columns:
+#             dfs[mod] = pdf.copy()
+
+#     if len(dfs) < 2:
+#         print(f"  [FUSE RESP] Need both modalities, found {list(dfs.keys())} — skipping.")
+#         return pd.DataFrame()
+
+#     # -- Intersection of segments ---------------------------------------------
+#     common_segments = sorted(
+#         set(dfs["impedance_pneumography"]["segment"].values)
+#         & set(dfs["gyry_ribs_imu"]["segment"].values)
+#     )
+#     if not common_segments:
+#         print("  [FUSE RESP] No common segments — skipping.")
+#         return pd.DataFrame()
+
+#     # -- Align both modalities to common segments -----------------------------
+#     aligned = {}
+#     for mod in MODALITIES:
+#         d = (dfs[mod][dfs[mod]["segment"].isin(common_segments)]
+#              .sort_values("segment").reset_index(drop=True))
+#         aligned[mod] = {
+#             "dev": pd.to_numeric(d["dev_resp_rate_mean"], errors="coerce").values,
+#             "ref": pd.to_numeric(d["ref_resp_rate_mean"], errors="coerce").values,
+#         }
+
+#     # -- Build output ---------------------------------------------------------
+#     out = (dfs["impedance_pneumography"]
+#            [dfs["impedance_pneumography"]["segment"].isin(common_segments)]
+#            .sort_values("segment").reset_index(drop=True)
+#            [["segment", "start_sec", "end_sec"]].copy())
+
+#     for mod in MODALITIES:
+#         out[f"dev_rr_{mod}"] = aligned[mod]["dev"]
+#         out[f"ref_rr_{mod}"] = aligned[mod]["ref"]
+#         out[f"AE_rr_{mod}"]  = np.abs(aligned[mod]["dev"] - aligned[mod]["ref"])
+
+#     # -- Weighted average (device only) ---------------------------------------
+#     w_ip,  w_gy  = weights["impedance_pneumography"], weights["gyry_ribs_imu"]
+#     dev_ip, dev_gy = aligned["impedance_pneumography"]["dev"], aligned["gyry_ribs_imu"]["dev"]
+
+#     fused_dev = (w_ip * dev_ip + w_gy * dev_gy) / (w_ip + w_gy)
+
+#     # -- Reference: use directly (same physical device across modalities) -----
+#     fused_ref = aligned["impedance_pneumography"]["ref"]
+
+#     out["dev_rr_mean_fused"] = fused_dev
+#     out["ref_rr_mean_fused"] = fused_ref
+#     out["AE_rr_mean_fused"]  = np.abs(fused_dev - fused_ref)
+
+#     return out
+
+
+
 def _fuse_respiration_rate(comparison_results, output_dir, activity=None):
     """
-    Fuse device respiration rate from IP and GYR via weighted average.
+    Fuse device respiration rate from available modalities via weighted average.
+    If only one modality is available, it is used directly as the fused result.
     Reference is taken as-is (identical across modalities).
     """
-    MODALITIES = ["impedance_pneumography", "gyry_ribs_imu"]
+    MODALITIES = ["impedance_pneumography", "gyry_ribs_imu", "accy_ribs_imu"]
     ACTIVITY_WEIGHTS = {
-    "laying":  {"impedance_pneumography": 1.0, "gyry_ribs_imu": 1.5},
-    "walking": {"impedance_pneumography": 1.0, "gyry_ribs_imu": 2.0},
-    "unknown": {"impedance_pneumography": 1.0, "gyry_ribs_imu": 1.0},
-}
+        "laying": {
+            "impedance_pneumography": 1.0,
+            "gyry_ribs_imu":          1.5,
+            "accy_ribs_imu":          1.5,
+        },
+        "walking": {
+            "impedance_pneumography": 1.0,
+            "gyry_ribs_imu":          2.0,
+            "accy_ribs_imu":          0.5,
+        },
+        "unknown": {
+            "impedance_pneumography": 1.0,
+            "gyry_ribs_imu":          1.0,
+            "accy_ribs_imu":          1.0,
+        },
+    }
     weights = ACTIVITY_WEIGHTS.get(activity, ACTIVITY_WEIGHTS["unknown"])
     print(f"[FUSE RESP] Weights: {weights}")
 
@@ -486,22 +585,41 @@ def _fuse_respiration_rate(comparison_results, output_dir, activity=None):
         if len(pdf) and "dev_resp_rate_mean" in pdf.columns:
             dfs[mod] = pdf.copy()
 
-    if len(dfs) < 2:
-        print(f"  [FUSE RESP] Need both modalities, found {list(dfs.keys())} — skipping.")
+    available_mods = list(dfs.keys())
+
+    if not available_mods:
+        print("  [FUSE RESP] No modalities available — skipping.")
         return pd.DataFrame()
 
-    # -- Intersection of segments ---------------------------------------------
-    common_segments = sorted(
-        set(dfs["impedance_pneumography"]["segment"].values)
-        & set(dfs["gyry_ribs_imu"]["segment"].values)
-    )
+    # -- Single modality: use directly as fused result ------------------------
+    if len(available_mods) == 1:
+        mod = available_mods[0]
+        print(f"  [FUSE RESP] Only '{mod}' available — using directly as fused result.")
+        d = dfs[mod].sort_values("segment").reset_index(drop=True)
+        out = d[["segment", "start_sec", "end_sec"]].copy()
+        dev = pd.to_numeric(d["dev_resp_rate_mean"], errors="coerce").values
+        ref = pd.to_numeric(d["ref_resp_rate_mean"], errors="coerce").values
+        out[f"dev_rr_{mod}"] = dev
+        out[f"ref_rr_{mod}"] = ref
+        out[f"AE_rr_{mod}"]  = np.abs(dev - ref)
+        out["dev_rr_mean_fused"] = dev
+        out["ref_rr_mean_fused"] = ref
+        out["AE_rr_mean_fused"]  = np.abs(dev - ref)
+        return out
+
+    # -- Intersection of segments across all available modalities -------------
+    common_segments = set(dfs[available_mods[0]]["segment"].values)
+    for mod in available_mods[1:]:
+        common_segments &= set(dfs[mod]["segment"].values)
+    common_segments = sorted(common_segments)
+
     if not common_segments:
         print("  [FUSE RESP] No common segments — skipping.")
         return pd.DataFrame()
 
-    # -- Align both modalities to common segments -----------------------------
+    # -- Align all modalities to common segments ------------------------------
     aligned = {}
-    for mod in MODALITIES:
+    for mod in available_mods:
         d = (dfs[mod][dfs[mod]["segment"].isin(common_segments)]
              .sort_values("segment").reset_index(drop=True))
         aligned[mod] = {
@@ -509,30 +627,29 @@ def _fuse_respiration_rate(comparison_results, output_dir, activity=None):
             "ref": pd.to_numeric(d["ref_resp_rate_mean"], errors="coerce").values,
         }
 
-    # -- Build output ---------------------------------------------------------
-    out = (dfs["impedance_pneumography"]
-           [dfs["impedance_pneumography"]["segment"].isin(common_segments)]
+    # -- Build output using the first available modality as base --------------
+    base_mod = available_mods[0]
+    out = (dfs[base_mod][dfs[base_mod]["segment"].isin(common_segments)]
            .sort_values("segment").reset_index(drop=True)
            [["segment", "start_sec", "end_sec"]].copy())
 
-    for mod in MODALITIES:
+    for mod in available_mods:
         out[f"dev_rr_{mod}"] = aligned[mod]["dev"]
         out[f"ref_rr_{mod}"] = aligned[mod]["ref"]
         out[f"AE_rr_{mod}"]  = np.abs(aligned[mod]["dev"] - aligned[mod]["ref"])
 
-    # -- Weighted average (device only) ---------------------------------------
-    w_ip,  w_gy  = weights["impedance_pneumography"], weights["gyry_ribs_imu"]
-    dev_ip, dev_gy = aligned["impedance_pneumography"]["dev"], aligned["gyry_ribs_imu"]["dev"]
+    # -- Weighted average across all available modalities (device only) -------
+    total_weight = sum(weights[mod] for mod in available_mods)
+    fused_dev = sum(weights[mod] * aligned[mod]["dev"] for mod in available_mods) / total_weight
 
-    fused_dev = (w_ip * dev_ip + w_gy * dev_gy) / (w_ip + w_gy)
-
-    # -- Reference: use directly (same physical device across modalities) -----
-    fused_ref = aligned["impedance_pneumography"]["ref"]
+    # -- Reference: use directly (same physical signal across modalities) -----
+    fused_ref = aligned[base_mod]["ref"]
 
     out["dev_rr_mean_fused"] = fused_dev
     out["ref_rr_mean_fused"] = fused_ref
     out["AE_rr_mean_fused"]  = np.abs(fused_dev - fused_ref)
 
+    print(f"  [FUSE RESP] Fused from modalities: {available_mods}")
     return out
 
 # ═══════════════════════════════════════════════════════════════

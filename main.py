@@ -49,7 +49,7 @@ def main():
 
     # print(f"\nDev. Data shape:       {dev_data_raw.shape}")
     signals = extract_signals(dev_data_raw, cut_starting_samples=1000, cut_ending_samples=0)
-    
+
     signals_clean = remove_dc_offset(signals, exclude=['body_temperature'])
     preprocessed_signals, spike_masks = preprocess_signals(signals_clean, activity=activity)
 
@@ -150,15 +150,25 @@ def main():
     #     lbl="Armpit", lgd_loc="lower"
     # )
 
-    plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
-    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
-    plt.legend()
-    plt.show()
+    # plt.plot(preprocessed_signals['lead2'], label="lead2")
+    # plt.plot(ref_preprocessed['ref_lead2'], label="ref_lead2")
+    # plt.legend()
+    # plt.show()
     
     plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
     plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
     plt.legend()
     plt.show()
+
+    plt.plot(preprocessed_signals['gyry_ribs_imu'], label="gyry_ribs_imu")
+    plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
+    plt.legend()
+    plt.show()
+    
+    # plt.plot(preprocessed_signals['impedance_pneumography'], label="impedance_pneumography")
+    # plt.plot(ref_preprocessed['ref_respiration'], label="ref_respiration")
+    # plt.legend()
+    # plt.show()
     # ═════════════════════════════════════════════════════════
     #  SEGMENT-BASED COMPARISON (New)
     # ═════════════════════════════════════════════════════════
