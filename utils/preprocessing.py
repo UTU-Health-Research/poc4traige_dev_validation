@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 from vitalwave.basic_algos import butter_filter, moving_average_filter
-from scipy.signal import correlate
+from scipy.signal import correlate, correlation_lags, firwin, filtfilt, hilbert
+from sklearn.preprocessing import MaxAbsScaler
 
 SIGNAL_MAP = {
     # ECG channels
@@ -146,6 +147,37 @@ def remove_dc_offset(signals, exclude=None):
     return dc_removed
 
 
+def soft_fir_bandpass(data, lowcut=0.15, highcut=0.75, fs=250.0, numtaps=2001):
+    # numtaps must be odd for a bandpass filter
+    if numtaps % 2 == 0:
+        numtaps += 1
+
+    # Design an FIR filter using a Hann or Blackman window for soft attenuation
+    fir_coeff = firwin(
+    numtaps,
+    [lowcut, highcut],
+    pass_zero='bandpass',
+    fs=fs,
+    window='hann'
+    )
+
+    filt = filtfilt(fir_coeff, 1.0, data)
+    filt = filt - np.mean(filt)
+    transformer = MaxAbsScaler()
+    normfilt = transformer.fit_transform(filt.reshape(-1, 1)).flatten()
+    #normfilt = filt.astype(float) / np.max(np.abs(filt.astype(float)))
+
+    # Filter with zero-phase shift shift using filtfilt
+    return normfilt
+
+def hilbert_equal(sig):
+    analytic_signal = hilbert(sig)
+    amplitude_envelope = np.abs(analytic_signal)
+    epsilon = 1e-8
+    equalized_sig = sig/(amplitude_envelope + epsilon)
+
+    return equalized_sig
+
 def preprocess_respiration(signal, fs=250, activity='unknown'):
     sig = np.asarray(signal, dtype=np.float64).ravel()
 
@@ -160,9 +192,11 @@ def preprocess_respiration(signal, fs=250, activity='unknown'):
     order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
     # print(f"order: {order}, hp: {hp}, lp: {lp}")
 
-    sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
-    sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
+    # sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
+    # sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
+    sig = soft_fir_bandpass(sig)
     sig = moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg")
+    sig = hilbert_equal(sig)
 
     # sig = butter_filter(arr=sig, n=2, wn=np.array([0.15]), filter_type='high', fs=fs)
     # sig = butter_filter(arr=sig, n=2, wn=np.array([0.8]), filter_type='low',  fs=fs)
@@ -175,10 +209,12 @@ def preprocess_ecg(signal, fs=250, activity="unknown"):
 
     hp_freq = 5.0 if activity != "walking" else 8.0  # stricter for motion
     lp_freq = 40.0
-    order   = 3 if activity == "walking" else 2       # steeper rolloff
+    # order   = 3 if activity == "walking" else 2       # steeper rolloff
 
-    sig = butter_filter(arr=sig, n=order, wn=hp_freq,  filter_type='high', fs=fs)
-    sig = butter_filter(arr=sig, n=order, wn=lp_freq, filter_type='low',  fs=fs)
+    # sig = butter_filter(arr=sig, n=order, wn=hp_freq,  filter_type='high', fs=fs)
+    # sig = butter_filter(arr=sig, n=order, wn=lp_freq, filter_type='low',  fs=fs)
+
+    sig = soft_fir_bandpass(sig, lowcut=hp_freq, highcut=lp_freq, numtaps=301)
     return sig
 
 
@@ -205,14 +241,17 @@ def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='u
     # plt.legend()
 
     order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
-    sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
-    sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
+    # sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
+    # sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
+
+    sig = soft_fir_bandpass(sig)
 
     # plt.figure()
     # plt.plot(sig, label="imu_before_MA")
     # plt.legend()
 
     sig = moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg")
+    sig = hilbert_equal(sig)
 
     # plt.figure()
     # plt.plot(sig, label="imu_after_MA")
@@ -322,11 +361,18 @@ RESP_SIGNAL_PAIRS = {
     "impedance_pneumography": "ref_respiration",
 }
 
+# def normalize_signal(sig):
+#     if np.max(np.abs(sig)) > 0:
+#         return (sig - np.min(sig)) / (np.max(sig) - np.min(sig))
+#     else:
+#         return sig
+
 def normalize_signal(sig):
     if np.max(np.abs(sig)) > 0:
         return sig / np.max(np.abs(sig))
     else:
         return sig
+    
 
 def align_signals(dev_sig, bit_sig, fs):
     """
@@ -344,9 +390,10 @@ def align_signals(dev_sig, bit_sig, fs):
     bit_norm    = bit_norm[:min_samples]
 
     # ─── Cross-correlate ──────────────────────────────────────
-    correlation = correlate(dev_norm, bit_norm, mode='full')
-    lags        = np.arange(-len(dev_norm)+1, len(dev_norm))
-    best_lag    = lags[np.argmax(correlation)]
+    correlation = correlate(dev_norm - np.mean(dev_norm), bit_norm - np.mean(bit_norm), mode='full')
+    # lags        = np.arange(-len(dev_norm)+1, len(dev_norm))
+    lags = correlation_lags(len(dev_norm), len(bit_norm))
+    best_lag    = lags[np.argmax(np.abs(correlation))]
 
     if best_lag > 10000 or best_lag < -10000:
 

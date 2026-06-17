@@ -131,8 +131,8 @@ def _get_clean_r_peaks(seg, fs, activity="unknown"):
     #     return
 
     r_peaks, method = _detect_r_peaks_robust(seg, fs)
-    if len(r_peaks) < 4:
-        return r_peaks, method
+    # if len(r_peaks) < 4:
+    #     return [], None
     # r_peaks = _filter_peaks_gentle(r_peaks, fs)
     valid_r_peaks, valid_hr_mean = filter_hr_peaks(peaks=r_peaks, fs=fs,
                                     hr_min=30, hr_max=220,
@@ -246,53 +246,15 @@ def extract_segment_ecg_features(segment, fs=250, activity="unknown"):
 
     # ── R-peaks ───────────────────────────────────────────────
     valid_r_peaks, valid_hr = _get_clean_r_peaks(sig, fs, activity=activity)
-    base['mean_hr'] = valid_hr
-    # if len(r_peaks) < 2:
-    #     return base
-
-    # rr   = np.diff(r_peaks) / fs * 1000.0                    # ms
-    # hr   = 60000.0 / np.where(rr > 0, rr, np.inf)
-    # mask = (hr >= 30) & (hr <= 220)
-
-
-    # rr_ms_valid = rr[mask]
-    # if len(rr_ms_valid) == 0:
-    #     return base
-
-    # # if not mask.any():
-    # #     return base
-
-    # # ── Mean HR ───────────────────────────────────────────────
-    # # base['mean_hr'] = float(np.mean(hr[mask]))
-    # hr_valid = 60000.0 / rr_ms_valid
-    # base['mean_hr'] = float(np.mean(hr_valid))
-
-    # # ── RMSSD — gap-safe (both neighbours must pass mask) ─────
-    # if len(rr) > 1:
-    #     both_valid = mask[:-1] & mask[1:]
-    # #     diff_rr    = np.diff(rr)[both_valid]
-    # #     base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2))) if len(diff_rr) else 0.0
-    # # else:
-    # #     base['rmssd'] = 0.0
-
-    #     diff_rr_raw = np.diff(rr)
-    #     diff_rr     = diff_rr_raw[both_valid]
-
-
-    #     if len(diff_rr) > 0:
-    #         base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2)))
-    #     else:
-    #         base['rmssd'] = 0.0
-
-    # else:
-    #     base['rmssd'] = 0.0
-
-    rr   = np.diff(valid_r_peaks) / fs * 1000.0
-    diff_rr = np.diff(rr)
-    if len(diff_rr) > 0:
-        base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2)))
-    else:
-        base['rmssd'] = 0.0
+    # print(f"valid_r_peaks {valid_r_peaks} and valid_hr: {valid_hr}")
+    if len(valid_r_peaks) > 0 and valid_hr is not None:
+        base['mean_hr'] = valid_hr
+        rr   = np.diff(valid_r_peaks) / fs * 1000.0
+        diff_rr = np.diff(rr)
+        if len(diff_rr) > 0:
+            base['rmssd'] = float(np.sqrt(np.mean(diff_rr ** 2)))
+        else:
+            base['rmssd'] = 0.0
 
 
     return base
@@ -356,34 +318,116 @@ def compute_resp_sqi(segment):
 #  6. PAIRED SEGMENTATION ENGINE
 # ═══════════════════════════════════════════════════════════════
 
+# def segment_and_extract(dev_signal, ref_signal, fs=250,
+#                         window_sec=10, signal_type="ecg",
+#                         sig_name="signal", activity="unknown"):
+#     dev_sig = np.array(dev_signal, dtype=np.float64).flatten()
+#     ref_sig = np.array(ref_signal, dtype=np.float64).flatten()
+#     min_len = min(len(dev_sig), len(ref_sig))
+#     dev_sig, ref_sig = dev_sig[:min_len], ref_sig[:min_len]
+
+#     W = int(window_sec * fs)
+#     n = min_len // W
+
+#     if n == 0:
+#         print(f"  [WARNING] Too short ({min_len/fs:.1f}s) for {window_sec}s windows")
+#         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+#     # print(f"  {sig_name}: {n} segments × {window_sec}s")
+
+#     fn = (extract_segment_ecg_features if signal_type == "ecg"
+#           else extract_segment_resp_features)
+
+#     dev_rows, ref_rows = [], []
+#     for i in range(n):
+#         s, e = i * W, i * W + W
+#         info = dict(segment=i, start_sec=s / fs, end_sec=e / fs)
+#         for sig, rows in ((dev_sig, dev_rows), (ref_sig, ref_rows)):
+#             # seg_snr = float(Absolute_Signal_to_noise_Ratio(sig[s:e]))
+#             # if seg_snr < 0.5:
+#             #     continue
+#             r = fn(sig[s:e], fs, activity=activity)
+#             if r is not None:
+#                 r.update(info); rows.append(r)
+
+#     dev_df, ref_df = pd.DataFrame(dev_rows), pd.DataFrame(ref_rows)
+#     if not len(dev_df) or not len(ref_df):
+#         return dev_df, ref_df, pd.DataFrame()
+
+#     common = set(dev_df['segment']) & set(ref_df['segment'])
+#     dev_p  = (dev_df[dev_df['segment'].isin(common)]
+#               .sort_values('segment').reset_index(drop=True))
+#     ref_p  = (ref_df[ref_df['segment'].isin(common)]
+#               .sort_values('segment').reset_index(drop=True))
+
+#     paired = pd.DataFrame({'segment':   dev_p['segment'].values,
+#                            'start_sec': dev_p['start_sec'].values,
+#                            'end_sec':   dev_p['end_sec'].values})
+#     meta = {'segment', 'start_sec', 'end_sec'}
+#     for col in (c for c in dev_p.columns if c not in meta and c in ref_p.columns):
+#         dv = pd.to_numeric(dev_p[col], errors='coerce').values
+#         rv = pd.to_numeric(ref_p[col], errors='coerce').values
+#         paired[f'dev_{col}'] = dv
+#         paired[f'ref_{col}'] = rv
+#         paired[f'AE_{col}']  = np.abs(dv - rv)
+
+#     # print(f"    Paired: {len(paired)} segments")
+#     return dev_df, ref_df, paired
+
+
 def segment_and_extract(dev_signal, ref_signal, fs=250,
                         window_sec=10, signal_type="ecg",
-                        sig_name="signal", activity="unknown"):
+                        sig_name="signal", activity="unknown",
+                        resp_window_sec=30, step_sec=10):
     dev_sig = np.array(dev_signal, dtype=np.float64).flatten()
     ref_sig = np.array(ref_signal, dtype=np.float64).flatten()
     min_len = min(len(dev_sig), len(ref_sig))
     dev_sig, ref_sig = dev_sig[:min_len], ref_sig[:min_len]
 
-    W = int(window_sec * fs)
-    n = min_len // W
+    # ------------------------------------------------------------------ #
+    #  Windowing strategy: non-overlapping for ECG, sliding for resp      #
+    # ------------------------------------------------------------------ #
+    if signal_type == "ecg":
+        W    = int(window_sec * fs)
+        step = W                                  # non-overlapping
+        n    = min_len // W
 
-    if n == 0:
-        print(f"  [WARNING] Too short ({min_len/fs:.1f}s) for {window_sec}s windows")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        if n == 0:
+            print(f"  [WARNING] Too short ({min_len/fs:.1f}s) "
+                  f"for {window_sec}s ECG windows")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    # print(f"  {sig_name}: {n} segments × {window_sec}s")
+        segments = [(i * step, i * step + W) for i in range(n)]
 
+    else:                                         # respiration – sliding
+        W    = int(resp_window_sec * fs)
+        step = int(step_sec * fs)
+
+        if min_len < W:
+            print(f"  [WARNING] Too short ({min_len/fs:.1f}s) "
+                  f"for {resp_window_sec}s respiration windows")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+        segments = [(s, s + W)
+                    for s in range(0, min_len - W + 1, step)]
+
+        if not segments:
+            print(f"  [WARNING] No valid respiration segments found")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    # print(f"  {sig_name}: {len(segments)} segments "
+    #       f"({'sliding' if signal_type != 'ecg' else 'non-overlapping'})")
+
+    # ------------------------------------------------------------------ #
+    #  Feature extraction (shared for both signal types)                  #
+    # ------------------------------------------------------------------ #
     fn = (extract_segment_ecg_features if signal_type == "ecg"
           else extract_segment_resp_features)
 
     dev_rows, ref_rows = [], []
-    for i in range(n):
-        s, e = i * W, i * W + W
+    for i, (s, e) in enumerate(segments):
         info = dict(segment=i, start_sec=s / fs, end_sec=e / fs)
         for sig, rows in ((dev_sig, dev_rows), (ref_sig, ref_rows)):
-            seg_snr = float(Absolute_Signal_to_noise_Ratio(sig[s:e]))
-            if seg_snr < 0.5:
-                continue
             r = fn(sig[s:e], fs, activity=activity)
             if r is not None:
                 r.update(info); rows.append(r)

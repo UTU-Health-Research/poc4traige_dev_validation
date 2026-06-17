@@ -62,11 +62,11 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
             dev['gyry_ribs_imu'], ref['ref_respiration'], fs=fs
         )
     
-    plt.figure()
-    plt.plot(dev["impedance_pneumography"], label="impedance_pneumography_aligned")
-    plt.plot(ref["ref_respiration"], label="ref_respiration_aligned")
-    plt.legend()
-    plt.show()
+    # plt.figure()
+    # plt.plot(dev["impedance_pneumography"], label="impedance_pneumography_aligned")
+    # plt.plot(ref["ref_respiration"], label="ref_respiration_aligned")
+    # plt.legend()
+    # plt.show()
 
     # import matplotlib.pyplot as plt
     # plt.plot(dev["lead2"], label="lead_2")
