@@ -25,7 +25,7 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
     signals = extract_signals(convert_binary_data(raw),
                               cut_starting_samples=cut_starting_samples,
                               cut_ending_samples=cut_ending_samples)
-    dev = preprocess_signals(remove_dc_offset(signals, exclude=['body_temperature']), activity=activity)[0]
+    dev = preprocess_signals(remove_dc_offset(signals, exclude=['body_temperature']), activity=activity)
 
     # Reference signals
     ref_raw, _ = read_all_references(bitt_path=bitt_path, bpc_path=bpc_path,
@@ -37,6 +37,12 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
         if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs=fs, activity=activity)
         elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=fs, activity=activity)
         else:                             ref[name] = sig
+
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(dev["impedance_pneumography"], label="impedance_pneumography_filtered")
+    plt.plot(ref["ref_respiration"], label="ref_respiration_filtered")
+    plt.legend()
 
     # Alignment — ECG
     if "lead2" in dev and "ref_lead2" in ref:
@@ -55,7 +61,19 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
         dev['gyry_ribs_imu'], _, _ = align_signals(
             dev['gyry_ribs_imu'], ref['ref_respiration'], fs=fs
         )
+    
+    plt.figure()
+    plt.plot(dev["impedance_pneumography"], label="impedance_pneumography_aligned")
+    plt.plot(ref["ref_respiration"], label="ref_respiration_aligned")
+    plt.legend()
+    plt.show()
 
+    # import matplotlib.pyplot as plt
+    # plt.plot(dev["lead2"], label="lead_2")
+    # plt.plot(ref["ref_lead2"], label="ref_lead2")
+    # plt.legend()
+    # plt.show()
+    
     # Comparison (make compare_features accept subject/activity/configuration if you want a grand file)
     results = compare_features(dev_preprocessed=dev, ref_preprocessed=ref,
                      fs=fs, window_sec=window_sec, output_dir=out_dir,

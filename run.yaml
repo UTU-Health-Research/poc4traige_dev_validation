@@ -8,7 +8,7 @@ cut_ending_samples: 0
 bin_frame_len: 88
 
 # run only these; omit list to run all discovered subjects
-subjects: ["subject_1", "subject_2", "subject_3", "subject_4", "subject_5"]
+subjects: ["subject_5", "subject_1", "subject_3", "subject_2", "subject_4"]
 
 # each subject has these configurations (folders under subject)
 configurations: ["patch", "wire"]

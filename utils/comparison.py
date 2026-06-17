@@ -131,8 +131,8 @@ def _get_clean_r_peaks(seg, fs, activity="unknown"):
     #     return
 
     r_peaks, method = _detect_r_peaks_robust(seg, fs)
-    # if len(r_peaks) < 2:
-    #     return r_peaks, method
+    if len(r_peaks) < 4:
+        return r_peaks, method
     # r_peaks = _filter_peaks_gentle(r_peaks, fs)
     valid_r_peaks, valid_hr_mean = filter_hr_peaks(peaks=r_peaks, fs=fs,
                                     hr_min=30, hr_max=220,
@@ -438,8 +438,8 @@ def _fuse_respiration_rate(comparison_results, output_dir,
     MODALITIES   = ["impedance_pneumography", "gyry_ribs_imu"]
     # BASE_WEIGHTS = {"impedance_pneumography": 1.0, "gyry_ribs_imu": 2.0}
     ACTIVITY_WEIGHTS = {
-    "laying":  {"impedance_pneumography": 1.5, "gyry_ribs_imu": 1.0},
-    "walking": {"impedance_pneumography": 0.6, "gyry_ribs_imu": 1.8},
+    "laying":  {"impedance_pneumography": 1.0, "gyry_ribs_imu": 1.8},
+    "walking": {"impedance_pneumography": 1.0, "gyry_ribs_imu": 1.8},
     "unknown": {"impedance_pneumography": 1.0, "gyry_ribs_imu": 1.0},
     }
 
@@ -486,12 +486,15 @@ def _fuse_respiration_rate(comparison_results, output_dir,
             .sort_values("segment").reset_index(drop=True))
     out  = base[["segment", "start_sec", "end_sec"]].copy()
 
+    
+
     for mod in MODALITIES:
         dev_rr = aligned[mod]["dev"]
         ref_rr = aligned[mod]["ref"]
         out[f"dev_rr_{mod}"] = dev_rr
         out[f"ref_rr_{mod}"] = ref_rr
         out[f"AE_rr_{mod}"]  = np.abs(dev_rr - ref_rr)
+        print(f"individual: {out}")
 
     # ── Per-segment fusion (device only) ──────────────────────────────────────
     imp_dev   = aligned["impedance_pneumography"]["dev"]
@@ -531,6 +534,7 @@ def _fuse_respiration_rate(comparison_results, output_dir,
     out["dev_rr_mean_fused"] = fused_dev
     out["ref_rr_mean_fused"] = fused_ref
     out["AE_rr_mean_fused"]  = np.abs(fused_dev - fused_ref)
+    print(f"fused_resp: {out}")
 
     # ── Save ──────────────────────────────────────────────────────────────────
     # path = os.path.join(tables_dir, "fused_respiration_rate.csv")

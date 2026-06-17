@@ -151,9 +151,9 @@ def preprocess_respiration(signal, fs=250, activity='unknown'):
 
     PROFILES = {
         #              order   hp_hz   lp_hz   ma_window_s
-        'laying':      (2,      0.1,    0.7,    0.25),
-        'walking':    (3,      0.15,    0.8,    0.25),
-        'unknown':    (2,      0.15,   0.8,    0.25),
+        'laying':      (2,      0.1,    0.7,    1),
+        'walking':    (3,      0.15,    0.8,    1),
+        'unknown':    (2,      0.15,   0.8,    1),
     }
     
     # print(f"activity: {activity}")
@@ -162,7 +162,7 @@ def preprocess_respiration(signal, fs=250, activity='unknown'):
 
     sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
     sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
-    sig = moving_average_filter(sig, window=int(fs * ma_win))
+    sig = moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg")
 
     # sig = butter_filter(arr=sig, n=2, wn=np.array([0.15]), filter_type='high', fs=fs)
     # sig = butter_filter(arr=sig, n=2, wn=np.array([0.8]), filter_type='low',  fs=fs)
@@ -187,24 +187,43 @@ def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='u
 
     PROFILES = {
         #              order   hp_hz   lp_hz   ma_window_s
-        'laying':     (2,      0.1,    0.7,    0.25),
-        'walking':    (3,      0.15,    0.8,    0.25),
-        'unknown':    (2,      0.15,   0.8,    0.25),
+        'laying':     (2,      0.1,    0.7,    1),
+        'walking':    (3,      0.15,    0.8,    1),
+        'unknown':    (2,      0.15,   0.8,    1),
     }
 
-    spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
-    idx = np.arange(len(sig), dtype=np.float64)
-    sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask]) #
+    import matplotlib.pyplot as plt
+    # plt.figure()
+    # plt.plot(sig, label="imu_before_spike_removal")
+    # plt.legend()
+    # spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
+    # idx = np.arange(len(sig), dtype=np.float64)
+    # sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask]) #
+
+    # plt.figure()
+    # plt.plot(sig, label="imu_after_spike_removal")
+    # plt.legend()
 
     order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
     sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
     sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
-    sig = moving_average_filter(sig, window=int(fs * ma_win))
+
+    # plt.figure()
+    # plt.plot(sig, label="imu_before_MA")
+    # plt.legend()
+
+    sig = moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg")
+
+    # plt.figure()
+    # plt.plot(sig, label="imu_after_MA")
+    # plt.legend()
+    # plt.show()
 
     # sig = butter_filter(arr=sig, n=2, wn=np.array([0.15]), filter_type='high',  fs=fs)
     # sig = butter_filter(arr=sig, n=2, wn=np.array([0.8]), filter_type='low', fs=fs)
     # sig = moving_average_filter(sig, window=int(fs * 0.25))
-    return sig, spike_mask
+    # return sig, spike_mask
+    return sig
 
 
 
@@ -273,9 +292,10 @@ def preprocess_signals(signals, fs=250, activity='unknown'):
     for name in IMU_SIGNALS:
         if name in signals:
             # print(f"  Processing {name}:")
-            sig_clean, mask = preprocess_imu(signals[name], fs=fs, activity=activity)
+            # sig_clean, mask = preprocess_imu(signals[name], fs=fs, activity=activity)
+            sig_clean = preprocess_imu(signals[name], fs=fs, activity=activity)
             preprocessed[name] = sig_clean
-            spike_masks[name]  = mask
+            # spike_masks[name]  = mask
 
     # ─── Temperature (pass through — no filtering) ────────
     # print("\n[PREPROCESSING] Temperature")
@@ -287,7 +307,8 @@ def preprocess_signals(signals, fs=250, activity='unknown'):
 
     # print(f"\n[OK] Preprocessed {len(preprocessed)}/{len(signals)} signals")
 
-    return preprocessed, spike_masks
+    # return preprocessed, spike_masks
+    return preprocessed
 
 
 # ECG feature mapping: device_signal → reference_signal
@@ -302,7 +323,10 @@ RESP_SIGNAL_PAIRS = {
 }
 
 def normalize_signal(sig):
-    return sig / np.max(np.abs(sig))
+    if np.max(np.abs(sig)) > 0:
+        return sig / np.max(np.abs(sig))
+    else:
+        return sig
 
 def align_signals(dev_sig, bit_sig, fs):
     """
