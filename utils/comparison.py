@@ -495,9 +495,11 @@ def weighted_median(values, weights):
 
 def _fuse_respiration_rate(comparison_results, output_dir, activity=None):
     """
-    Fuse device respiration rate from available modalities via weighted median.
+    Fuse device respiration rate from available modalities via weighted average.
     If only one modality is available, it is used directly as the fused result.
     Reference is taken as-is (identical across modalities).
+    Modalities reporting RR == 0 for a given segment are excluded from that
+    segment's fusion to avoid dragging the estimate toward zero.
     """
     MODALITIES = ["impedance_pneumography", "gyry_ribs_imu", "accy_ribs_imu"]
     ACTIVITY_WEIGHTS = {
@@ -539,12 +541,28 @@ def _fuse_respiration_rate(comparison_results, output_dir, activity=None):
         print("  [FUSE RESP] No modalities available — skipping.")
         return pd.DataFrame()
 
+    # -- Single modality: use directly as fused result ------------------------
+    if len(available_mods) == 1:
+        mod = available_mods[0]
+        print(f"  [FUSE RESP] Only '{mod}' available — using directly as fused result.")
+        d = dfs[mod].sort_values("segment").reset_index(drop=True)
+
+        out = d[["segment", "start_sec", "end_sec"]].copy()
+        dev = pd.to_numeric(d["dev_resp_rate_mean"], errors="coerce").values
+        ref = pd.to_numeric(d["ref_resp_rate_mean"], errors="coerce").values
+        out[f"dev_rr_{mod}"] = dev
+        out[f"ref_rr_{mod}"] = ref
+        out[f"AE_rr_{mod}"]  = np.abs(dev - ref)
+        out["dev_rr_mean_fused"] = dev
+        out["ref_rr_mean_fused"] = ref
+        out["AE_rr_mean_fused"]  = np.abs(dev - ref)
+        return out
+
     # -- Intersection of segments across all available modalities -------------
     common_segments = set(dfs[available_mods[0]]["segment"].values)
     for mod in available_mods[1:]:
         common_segments &= set(dfs[mod]["segment"].values)
     common_segments = sorted(common_segments)
-    print("common segments", common_segments)
 
     if not common_segments:
         print("  [FUSE RESP] No common segments — skipping.")
@@ -566,15 +584,36 @@ def _fuse_respiration_rate(comparison_results, output_dir, activity=None):
            .sort_values("segment").reset_index(drop=True)
            [["segment", "start_sec", "end_sec"]].copy())
 
-    # -- Weighted median across all available modalities (device only) --------
-    # aligned[mod]["dev"] is shape (n_segments,) — apply weighted median per segment
-    dev_matrix = np.stack([aligned[mod]["dev"] for mod in available_mods], axis=1)  # (n_segments, n_mods)
-    w_list     = [weights[mod] for mod in available_mods]
+    for mod in available_mods:
+        out[f"dev_rr_{mod}"] = aligned[mod]["dev"]
+        out[f"ref_rr_{mod}"] = aligned[mod]["ref"]
+        out[f"AE_rr_{mod}"]  = np.abs(aligned[mod]["dev"] - aligned[mod]["ref"])
 
-    fused_dev = np.array([
-        weighted_median(dev_matrix[i].tolist(), w_list)
-        for i in range(len(dev_matrix))
-    ])
+    # -- Weighted average per segment, skipping modalities with RR == 0 -------
+    n_segments = len(common_segments)
+    fused_dev = np.full(n_segments, np.nan)
+
+    for i in range(n_segments):
+        # Only include modalities with a non-zero, non-NaN device RR for this segment
+        valid_mods = [
+            mod for mod in available_mods
+            if not np.isnan(aligned[mod]["dev"][i]) and aligned[mod]["dev"][i] != 0.0
+        ]
+
+        if not valid_mods:
+            print(f"  [FUSE RESP] Segment {common_segments[i]}: "
+                  f"all modalities are zero/NaN — fused set to NaN.")
+            continue  # fused_dev[i] remains NaN
+
+        seg_total_weight = sum(weights[mod] for mod in valid_mods)
+        fused_dev[i] = sum(
+            weights[mod] * aligned[mod]["dev"][i] for mod in valid_mods
+        ) / seg_total_weight
+
+        if len(valid_mods) < len(available_mods):
+            excluded = [m for m in available_mods if m not in valid_mods]
+            print(f"  [FUSE RESP] Segment {common_segments[i]}: "
+                  f"excluded {excluded} (RR=0 or NaN).")
 
     # -- Reference: use directly (same physical signal across modalities) -----
     fused_ref = aligned[base_mod]["ref"]
