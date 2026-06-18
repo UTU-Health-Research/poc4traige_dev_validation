@@ -228,7 +228,7 @@ subject_5,laying,wire,lead2,rmssd,12.858201014657274,14.60593486680443
 subject_5,laying,wire,lead2,rmssd,9.614803401237305,10.327955589886445
 subject_5,laying,wire,lead2,rmssd,11.925695879998878,11.623730516108463
 subject_5,laying,wire,lead2,rmssd,15.5492050529208,14.727148022916348
-subject_5,laying,wire,lead2,rmssd,,19.4593593591019
+subject_5,laying,wire,lead2,rmssd,0.0,19.4593593591019
 subject_5,laying,wire,lead2,rmssd,28.751811537130433,28.81357704663241
 subject_5,laying,wire,lead2,rmssd,35.175749222061114,34.35759660460033
 subject_5,laying,wire,lead2,rmssd,27.8408173570948,27.584214487436267
@@ -559,6 +559,7 @@ subject_1,laying,patch,lead2,snr,0.8796392504254743,0.8793779163941052
 subject_1,laying,patch,lead2,snr,0.8826753339544214,0.8808124472213049
 subject_1,laying,patch,lead2,snr,0.8863249756295432,0.8845941276882594
 subject_1,laying,patch,lead2,snr,0.8721838734148938,0.8697816768294274
+subject_1,laying,patch,impedance_pneumography,resp_rate_mean,14.423922029493253,9.983778404831035
 subject_1,laying,patch,impedance_pneumography,resp_rate_mean,13.727364021970004,10.27453479176355
 subject_1,laying,patch,impedance_pneumography,resp_rate_mean,13.011997808210904,10.709692054952987
 subject_1,laying,patch,impedance_pneumography,resp_rate_mean,11.159769691231562,12.1327137894517
@@ -568,6 +569,7 @@ subject_1,laying,patch,impedance_pneumography,resp_rate_mean,16.149492440192006,
 subject_1,laying,patch,impedance_pneumography,resp_rate_mean,13.910532427803002,14.01760082718038
 subject_1,laying,patch,impedance_pneumography,resp_rate_mean,12.9288474459062,13.109338941320157
 subject_1,laying,patch,impedance_pneumography,resp_rate_mean,14.407183110573332,10.14130779181018
+subject_1,laying,patch,impedance_pneumography,spi,0.5645878228105928,0.07348881412723232
 subject_1,laying,patch,impedance_pneumography,spi,0.563780453751136,0.1344178104243957
 subject_1,laying,patch,impedance_pneumography,spi,0.525008969261244,0.20832424172668956
 subject_1,laying,patch,impedance_pneumography,spi,0.5583995227510442,0.26189761296556896
@@ -595,6 +597,7 @@ subject_1,laying,patch,gyry_ribs_imu,spi,0.0,0.36617801361716057
 subject_1,laying,patch,gyry_ribs_imu,spi,0.0,0.47527436857673844
 subject_1,laying,patch,gyry_ribs_imu,spi,0.0,0.4392798022525068
 subject_1,laying,patch,gyry_ribs_imu,spi,0.0,0.18250935821227426
+subject_1,laying,patch,resp_modality,rr_impedance_pneumography,14.423922029493253,9.983778404831035
 subject_1,laying,patch,resp_modality,rr_impedance_pneumography,13.727364021970004,10.27453479176355
 subject_1,laying,patch,resp_modality,rr_impedance_pneumography,13.011997808210904,10.709692054952987
 subject_1,laying,patch,resp_modality,rr_impedance_pneumography,11.159769691231562,12.1327137894517
@@ -603,6 +606,7 @@ subject_1,laying,patch,resp_modality,rr_impedance_pneumography,16.16368297421068
 subject_1,laying,patch,resp_modality,rr_impedance_pneumography,16.149492440192006,16.068311996530888
 subject_1,laying,patch,resp_modality,rr_impedance_pneumography,13.910532427803002,14.01760082718038
 subject_1,laying,patch,resp_modality,rr_impedance_pneumography,12.9288474459062,13.109338941320157
+subject_1,laying,patch,resp_modality,rr_gyry_ribs_imu,,9.983778404831035
 subject_1,laying,patch,resp_modality,rr_gyry_ribs_imu,,10.27453479176355
 subject_1,laying,patch,resp_modality,rr_gyry_ribs_imu,,10.709692054952987
 subject_1,laying,patch,resp_modality,rr_gyry_ribs_imu,,12.1327137894517
@@ -611,6 +615,7 @@ subject_1,laying,patch,resp_modality,rr_gyry_ribs_imu,,15.77990149548447
 subject_1,laying,patch,resp_modality,rr_gyry_ribs_imu,,16.068311996530888
 subject_1,laying,patch,resp_modality,rr_gyry_ribs_imu,,14.01760082718038
 subject_1,laying,patch,resp_modality,rr_gyry_ribs_imu,,13.109338941320157
+subject_1,laying,patch,resp_modality,rr_mean_fused,14.423922029493253,9.983778404831035
 subject_1,laying,patch,resp_modality,rr_mean_fused,13.727364021970004,10.27453479176355
 subject_1,laying,patch,resp_modality,rr_mean_fused,13.011997808210904,10.709692054952987
 subject_1,laying,patch,resp_modality,rr_mean_fused,11.159769691231562,12.1327137894517
@@ -1408,8 +1413,8 @@ subject_3,walking,wire,lead1,mean_hr,56.63048607833885,67.3989016475287
 subject_3,walking,wire,lead1,mean_hr,64.4699140401146,69.93006993006993
 subject_3,walking,wire,lead1,mean_hr,,69.12442396313364
 subject_3,walking,wire,lead1,mean_hr,68.6324351804779,67.94162053346753
-subject_3,walking,wire,lead1,rmssd,,33.67491648096547
-subject_3,walking,wire,lead1,rmssd,,41.44072071445348
+subject_3,walking,wire,lead1,rmssd,0.0,33.67491648096547
+subject_3,walking,wire,lead1,rmssd,0.0,41.44072071445348
 subject_3,walking,wire,lead1,rmssd,0.0,27.616420236277303
 subject_3,walking,wire,lead1,rmssd,206.8012795675337,32.0
 subject_3,walking,wire,lead1,rmssd,306.44412214953644,31.721006008987516
@@ -1419,7 +1424,7 @@ subject_3,walking,wire,lead1,rmssd,305.6087464101002,46.85675570881488
 subject_3,walking,wire,lead1,rmssd,47.62352359916263,23.108440016582687
 subject_3,walking,wire,lead1,rmssd,283.331204473795,31.52776554086889
 subject_3,walking,wire,lead1,rmssd,300.22658110167396,40.68305680637962
-subject_3,walking,wire,lead1,rmssd,,38.4360941477322
+subject_3,walking,wire,lead1,rmssd,0.0,38.4360941477322
 subject_3,walking,wire,lead1,rmssd,279.4673505080692,53.51635264103861
 subject_3,walking,wire,lead1,snr,0.7205868746860987,0.8658627857230287
 subject_3,walking,wire,lead1,snr,0.8757203910519521,0.8664957083352506

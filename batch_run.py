@@ -4,7 +4,7 @@ import pandas as pd
 
 from utils import (
     read_binary_samples_hex, convert_binary_data, extract_signals, remove_dc_offset,
-    preprocess_signals, preprocess_ecg, preprocess_respiration, align_signals, apply_lag,
+    preprocess_signals, preprocess_ecg, preprocess_respiration, align_signals,
     read_all_references, compare_features
 )
 
@@ -38,43 +38,20 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
         elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=fs, activity=activity)
         else:                             ref[name] = sig
 
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.plot(dev["impedance_pneumography"], label="impedance_pneumography_filtered")
-    plt.plot(ref["ref_respiration"], label="ref_respiration_filtered")
-    plt.legend()
-
     # Alignment — ECG
     if "lead2" in dev and "ref_lead2" in ref:
         dev['lead2'], ref['ref_lead2'], _ = align_signals(dev['lead2'], ref['ref_lead2'], fs=fs)
 
     # Alignment — Respiration
     if "impedance_pneumography" in dev and "ref_respiration" in ref:
-        dev['impedance_pneumography'], ref['ref_respiration'], resp_lag = align_signals(
+        dev['impedance_pneumography'], ref['ref_respiration'], _ = align_signals(
             dev['impedance_pneumography'], ref['ref_respiration'], fs=fs
         )
-        # master_len = len(dev['impedance_pneumography'])
-        # for key in RESP_DEVICE_ONLY:
-        #     if key in dev:
-        #         dev[key] = apply_lag(dev[key], resp_lag)
-        #         dev[key] = dev[key][:master_len]
         dev['gyry_ribs_imu'], _, _ = align_signals(
             dev['gyry_ribs_imu'], ref['ref_respiration'], fs=fs
         )
     
-    # plt.figure()
-    # plt.plot(dev["impedance_pneumography"], label="impedance_pneumography_aligned")
-    # plt.plot(ref["ref_respiration"], label="ref_respiration_aligned")
-    # plt.legend()
-    # plt.show()
-
-    # import matplotlib.pyplot as plt
-    # plt.plot(dev["lead2"], label="lead_2")
-    # plt.plot(ref["ref_lead2"], label="ref_lead2")
-    # plt.legend()
-    # plt.show()
-    
-    # Comparison (make compare_features accept subject/activity/configuration if you want a grand file)
+    # Comparison
     results = compare_features(dev_preprocessed=dev, ref_preprocessed=ref,
                      fs=fs, window_sec=window_sec, output_dir=out_dir,
                      subject=subject, activity=activity, configuration=configuration)
@@ -123,13 +100,10 @@ def run_batch_from_yaml(yaml_path):
                 continue
 
             for dev_path in bin_files:
-                fname = os.path.basename(dev_path)  # e.g. "laying_dev.BIN"
-                activity = fname.rsplit("_dev.", 1)[0]  # robust vs BIN/bin
+                fname = os.path.basename(dev_path) 
+                activity = fname.rsplit("_dev.", 1)[0] 
                 if activity not in KEEP_ACTIVITIES:
                     continue
-                # reference naming you actually have:
-                #   <activity>_ecg.EDF (or .edf)
-                #   <activity>_resp.acq
                 bitt_candidates = (
                     glob.glob(os.path.join(ref_dir, f"{activity}_ecg.edf")) +
                     glob.glob(os.path.join(ref_dir, f"{activity}_ecg.EDF"))
@@ -156,7 +130,6 @@ def run_batch_from_yaml(yaml_path):
                 grand = pd.concat(grand_rows, ignore_index=True) if grand_rows else pd.DataFrame()
                 out_path = os.path.join(out_root, "grand_all_subjects.csv")
                 grand.to_csv(out_path, index=False)
-                # print(f"[WROTE] {out_path}")
 
 
 def results_to_grand_rows(results, subject, activity, configuration):

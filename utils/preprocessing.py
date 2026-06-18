@@ -1,9 +1,11 @@
-import pandas as pd
 import numpy as np
-from vitalwave.basic_algos import butter_filter, moving_average_filter
+import pandas as pd
 from scipy.signal import correlate, correlation_lags, firwin, filtfilt, hilbert
 from sklearn.preprocessing import MaxAbsScaler
+from vitalwave.basic_algos import butter_filter, moving_average_filter
 
+
+# ─── Signal Name Mapping: raw DataFrame column names → standardized names ─────
 SIGNAL_MAP = {
     # ECG channels
     "impedance_pneumography": "ecg_ch1",
@@ -14,7 +16,6 @@ SIGNAL_MAP = {
     "c3":                     "ecg_ch6",
     "c4":                     "ecg_ch7",
     "c5":                     "ecg_ch8",
-
     # IMU 1 — Ribs
     "accx_ribs_imu":          "imu1_acc_x",
     "accy_ribs_imu":          "imu1_acc_y",
@@ -22,7 +23,6 @@ SIGNAL_MAP = {
     "gyrx_ribs_imu":          "imu1_gyr_x",
     "gyry_ribs_imu":          "imu1_gyr_y",
     "gyrz_ribs_imu":          "imu1_gyr_z",
-
     # IMU 2 — Chest
     "accx_chest_imu":         "imu2_acc_x",
     "accy_chest_imu":         "imu2_acc_y",
@@ -30,11 +30,29 @@ SIGNAL_MAP = {
     "gyrx_chest_imu":         "imu2_gyr_x",
     "gyry_chest_imu":         "imu2_gyr_y",
     "gyrz_chest_imu":         "imu2_gyr_z",
-
     # Temperature
     "body_temperature":       "temperature",
 }
 
+# ─── Signal Type Groups ────────────────────────────────────────────────────────
+ECG_SIGNALS         = ["lead1", "lead2", "c1", "c2", "c3", "c4", "c5"]
+RESPIRATION_SIGNALS = ["impedance_pneumography"]
+IMU_SIGNALS         = [
+    "accx_ribs_imu",  "accy_ribs_imu",  "accz_ribs_imu",
+    "gyrx_ribs_imu",  "gyry_ribs_imu",  "gyrz_ribs_imu",
+    "accx_chest_imu", "accy_chest_imu", "accz_chest_imu",
+    "gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu",
+]
+TEMPERATURE_SIGNALS = ["body_temperature"]
+
+# ─── Signal Pair Mappings: device signal → reference signal ───────────────────
+ECG_SIGNAL_PAIRS  = {"lead1": "ref_lead1", "lead2": "ref_lead2"}
+RESP_SIGNAL_PAIRS = {"impedance_pneumography": "ref_respiration"}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# EXTRACTION & CLEANING
+# ──────────────────────────────────────────────────────────────────────────────
 
 def extract_signals(df, cut_starting_samples=0, cut_ending_samples=0):
     """
@@ -52,45 +70,35 @@ def extract_signals(df, cut_starting_samples=0, cut_ending_samples=0):
     Returns
     -------
     dict
-        Dictionary with signal names as keys and trimmed
-        pd.Series (reset index) as values.
+        Dictionary with signal names as keys and trimmed pd.Series (reset index) as values.
 
     Raises
     ------
+    ValueError
         If cut_starting_samples or cut_ending_samples exceeds DataFrame length.
     KeyError
         If expected columns are missing from the DataFrame.
     """
-
-    # --- Validation ---
     if cut_starting_samples >= len(df) or cut_ending_samples >= len(df):
         raise ValueError(
-            f"cut_starting_samples ({cut_starting_samples}) or cut_ending_samples ({cut_ending_samples}) "
-            f"exceeds DataFrame length ({len(df)}). Nothing left to extract."
+            f"cut_starting_samples ({cut_starting_samples}) or cut_ending_samples "
+            f"({cut_ending_samples}) exceeds DataFrame length ({len(df)}). "
+            f"Nothing left to extract."
         )
 
-    # Check for missing columns
-    expected_cols = set(SIGNAL_MAP.values())
-    actual_cols   = set(df.columns)
-    missing       = expected_cols - actual_cols
-
+    missing = set(SIGNAL_MAP.values()) - set(df.columns)
     if missing:
         raise KeyError(
             f"Missing columns in DataFrame: {missing}\n"
-            f"Available columns: {sorted(actual_cols)}"
+            f"Available columns: {sorted(df.columns)}"
         )
 
-    # --- Extraction ---
-    signals = {}
-
-    for signal_name, col_name in SIGNAL_MAP.items():
-        signals[signal_name] = df[col_name][cut_starting_samples:-1*cut_ending_samples if cut_ending_samples > 0 else None].reset_index(drop=True)
-
-    # print(f"[OK] Extracted {len(signals)} signals")
-    # print(f"[OK] Discarded first {cut_starting_samples} samples and last {cut_ending_samples} samples from each signal")
-    # print(f"[OK] Samples per signal: {len(df) - cut_starting_samples - cut_ending_samples}, {((len(df) - cut_starting_samples - cut_ending_samples) / 250):.2f}s")
-
-    return signals
+    # Use None as end index when cut_ending_samples=0 to avoid slicing off the last element
+    end_idx = -cut_ending_samples if cut_ending_samples > 0 else None
+    return {
+        name: df[col][cut_starting_samples:end_idx].reset_index(drop=True)
+        for name, col in SIGNAL_MAP.items()
+    }
 
 
 def remove_dc_offset(signals, exclude=None):
@@ -101,189 +109,110 @@ def remove_dc_offset(signals, exclude=None):
     ----------
     signals : dict
         Dictionary with signal names as keys and pd.Series/np.ndarray as values.
-        (Output of extract_signals)
     exclude : list of str, optional
-        Signal names to skip from DC removal.
-        e.g., ['body_temperature'] if you want to preserve absolute temperature.
+        Signal names to skip (e.g., ['body_temperature']).
 
     Returns
     -------
     dict
-        New dictionary with DC-offset-removed signals.
-        Excluded signals are returned as unchanged copies.
-
-    Example
-    -------
-    >>> dc_removed = remove_dc_offset(signals)
-    >>> dc_removed = remove_dc_offset(signals, exclude=['body_temperature'])
+        New dictionary with DC-offset-removed signals; excluded signals are unchanged copies.
     """
-
     if exclude is None:
         exclude = []
 
-    # Validate exclusion list
     invalid_keys = set(exclude) - set(signals.keys())
     if invalid_keys:
         print(f"[WARNING] These exclude keys not found in signals: {invalid_keys}")
 
-    dc_removed = {}
-    removed_count = 0
-    skipped_count = 0
+    return {
+        name: signal.copy() if name in exclude else signal.copy() - np.mean(signal)
+        for name, signal in signals.items()
+    }
 
-    for name, signal in signals.items():
 
-        if name in exclude:
-            dc_removed[name] = signal.copy()
-            skipped_count += 1
-        else:
-            dc_offset = np.mean(signal)
-            dc_removed[name] = signal.copy() - dc_offset
-            removed_count += 1
-
-    # print(f"[OK] DC offset removed from {removed_count} signals")
-    # if skipped_count > 0:
-    #     print(f"[OK] Skipped {skipped_count} signals: {exclude}")
-
-    return dc_removed
-
+# ──────────────────────────────────────────────────────────────────────────────
+# FILTER PRIMITIVES
+# ──────────────────────────────────────────────────────────────────────────────
 
 def soft_fir_bandpass(data, lowcut=0.15, highcut=0.75, fs=250.0, numtaps=2001):
-    # numtaps must be odd for a bandpass filter
+    """
+    FIR bandpass filter using a Hann window for soft attenuation,
+    zero-phase filtering (filtfilt), DC removal, and MaxAbs normalization to [-1, 1].
+    """
     if numtaps % 2 == 0:
-        numtaps += 1
+        numtaps += 1  # numtaps must be odd for FIR bandpass
 
-    # Design an FIR filter using a Hann or Blackman window for soft attenuation
-    fir_coeff = firwin(
-    numtaps,
-    [lowcut, highcut],
-    pass_zero='bandpass',
-    fs=fs,
-    window='hann'
-    )
+    fir_coeff = firwin(numtaps, [lowcut, highcut], pass_zero='bandpass', fs=fs, window='hann')
 
-    filt = filtfilt(fir_coeff, 1.0, data)
-    filt = filt - np.mean(filt)
-    transformer = MaxAbsScaler()
-    normfilt = transformer.fit_transform(filt.reshape(-1, 1)).flatten()
-    #normfilt = filt.astype(float) / np.max(np.abs(filt.astype(float)))
+    filt  = filtfilt(fir_coeff, 1.0, data)
+    filt -= np.mean(filt)  # Remove residual DC after filtering
 
-    # Filter with zero-phase shift shift using filtfilt
-    return normfilt
+    # Scale to [-1, 1] using MaxAbsScaler
+    return MaxAbsScaler().fit_transform(filt.reshape(-1, 1)).flatten()
+
 
 def hilbert_equal(sig):
-    analytic_signal = hilbert(sig)
-    amplitude_envelope = np.abs(analytic_signal)
-    epsilon = 1e-8
-    equalized_sig = sig/(amplitude_envelope + epsilon)
+    """
+    Amplitude equalization via the Hilbert envelope.
+    Divides the signal by its instantaneous amplitude to produce
+    a roughly uniform amplitude across the signal.
+    """
+    amplitude_envelope = np.abs(hilbert(sig))
+    return sig / (amplitude_envelope + 1e-8)  # epsilon prevents division by zero
 
-    return equalized_sig
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SIGNAL-TYPE PREPROCESSORS
+# ──────────────────────────────────────────────────────────────────────────────
+
+def preprocess_ecg(signal, fs=250, activity="unknown"):
+    """
+    Preprocesses an ECG signal.
+    Pipeline: FIR bandpass (HP cutoff tightened for walking to suppress motion noise).
+    """
+    sig     = np.asarray(signal, dtype=np.float64).ravel()
+    hp_freq = 8.0 if activity == "walking" else 5.0  # Stricter HP cutoff for motion
+    return soft_fir_bandpass(sig, lowcut=hp_freq, highcut=40.0, numtaps=301)
+
 
 def preprocess_respiration(signal, fs=250, activity='unknown'):
+    """
+    Preprocesses a respiration signal.
+    Pipeline: FIR bandpass → moving average smoothing → Hilbert amplitude equalization.
+    """
     sig = np.asarray(signal, dtype=np.float64).ravel()
 
     PROFILES = {
-        #              order   hp_hz   lp_hz   ma_window_s
-        'laying':      (2,      0.1,    0.7,    1),
-        'walking':    (3,      0.15,    0.8,    1),
-        'unknown':    (2,      0.15,   0.8,    1),
+        'laying':  (2, 0.1,  0.7, 1),
+        'walking': (3, 0.15, 0.8, 1),
+        'unknown': (2, 0.15, 0.8, 1),
     }
-    
-    # print(f"activity: {activity}")
     order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
-    # print(f"order: {order}, hp: {hp}, lp: {lp}")
 
-    # sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
-    # sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
     sig = soft_fir_bandpass(sig)
     sig = moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg")
     sig = hilbert_equal(sig)
-
-    # sig = butter_filter(arr=sig, n=2, wn=np.array([0.15]), filter_type='high', fs=fs)
-    # sig = butter_filter(arr=sig, n=2, wn=np.array([0.8]), filter_type='low',  fs=fs)
-    # sig = moving_average_filter(sig, window=int(fs * 0.25))
-    return sig
-
-
-def preprocess_ecg(signal, fs=250, activity="unknown"):
-    sig = np.asarray(signal, dtype=np.float64).ravel()
-
-    hp_freq = 5.0 if activity != "walking" else 8.0  # stricter for motion
-    lp_freq = 40.0
-    # order   = 3 if activity == "walking" else 2       # steeper rolloff
-
-    # sig = butter_filter(arr=sig, n=order, wn=hp_freq,  filter_type='high', fs=fs)
-    # sig = butter_filter(arr=sig, n=order, wn=lp_freq, filter_type='low',  fs=fs)
-
-    sig = soft_fir_bandpass(sig, lowcut=hp_freq, highcut=lp_freq, numtaps=301)
     return sig
 
 
 def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='unknown'):
+    """
+    Preprocesses an IMU signal.
+    Pipeline: FIR bandpass → moving average smoothing → Hilbert amplitude equalization.
+    """
     sig = np.asarray(signal, dtype=np.float64).ravel()
 
     PROFILES = {
-        #              order   hp_hz   lp_hz   ma_window_s
-        'laying':     (2,      0.1,    0.7,    1),
-        'walking':    (3,      0.15,    0.8,    1),
-        'unknown':    (2,      0.15,   0.8,    1),
+        'laying':  (2, 0.1,  0.7, 1),
+        'walking': (3, 0.15, 0.8, 1),
+        'unknown': (2, 0.15, 0.8, 1),
     }
-
-    import matplotlib.pyplot as plt
-    # plt.figure()
-    # plt.plot(sig, label="imu_before_spike_removal")
-    # plt.legend()
-    # spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
-    # idx = np.arange(len(sig), dtype=np.float64)
-    # sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask]) #
-
-    # plt.figure()
-    # plt.plot(sig, label="imu_after_spike_removal")
-    # plt.legend()
-
     order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
-    # sig = butter_filter(arr=sig, n=order, wn=hp, filter_type='high', fs=fs)
-    # sig = butter_filter(arr=sig, n=order, wn=lp, filter_type='low',  fs=fs)
 
     sig = soft_fir_bandpass(sig)
-
-    # plt.figure()
-    # plt.plot(sig, label="imu_before_MA")
-    # plt.legend()
-
     sig = moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg")
     sig = hilbert_equal(sig)
-
-    # plt.figure()
-    # plt.plot(sig, label="imu_after_MA")
-    # plt.legend()
-    # plt.show()
-
-    # sig = butter_filter(arr=sig, n=2, wn=np.array([0.15]), filter_type='high',  fs=fs)
-    # sig = butter_filter(arr=sig, n=2, wn=np.array([0.8]), filter_type='low', fs=fs)
-    # sig = moving_average_filter(sig, window=int(fs * 0.25))
-    # return sig, spike_mask
     return sig
-
-
-
-ECG_SIGNALS = [
-    "lead1", "lead2", "c1", "c2", "c3", "c4", "c5"
-]
-
-RESPIRATION_SIGNALS = [
-    "impedance_pneumography"
-]
-
-IMU_SIGNALS = [
-    "accx_ribs_imu", "accy_ribs_imu", "accz_ribs_imu",
-    "gyrx_ribs_imu", "gyry_ribs_imu", "gyrz_ribs_imu",
-    "accx_chest_imu", "accy_chest_imu", "accz_chest_imu",
-    "gyrx_chest_imu", "gyry_chest_imu", "gyrz_chest_imu",
-]
-
-TEMPERATURE_SIGNALS = [
-    "body_temperature"
-]
 
 
 def preprocess_signals(signals, fs=250, activity='unknown'):
@@ -296,125 +225,90 @@ def preprocess_signals(signals, fs=250, activity='unknown'):
         Dictionary from extract_signals (after DC offset removal).
     fs : int
         Sampling frequency in Hz (default: 250).
+    activity : str
+        Activity type for profile selection (default: 'unknown').
 
     Returns
     -------
-    preprocessed : dict
+    dict
         Dictionary of preprocessed signals.
-    spike_masks : dict
-        Dictionary of spike masks for IMU signals only.
     """
-
-    # print(f"activity in preprocessing: {activity}")
     preprocessed = {}
-    spike_masks  = {}
 
-    # ─── ECG Channels ──────────────────────────────────────
-    # print("\n[PREPROCESSING] ECG Signals")
-    # print("-" * 40)
     for name in ECG_SIGNALS:
         if name in signals:
             preprocessed[name] = preprocess_ecg(signals[name], fs=fs, activity=activity)
-            # print(f"  ✓ {name}")
 
-    # ─── Respiration ───────────────────────────────────────
-    # print("\n[PREPROCESSING] Respiration Signals")
-    # print("-" * 40)
     for name in RESPIRATION_SIGNALS:
         if name in signals:
             preprocessed[name] = preprocess_respiration(signals[name], fs=fs, activity=activity)
-            # print(f"  ✓ {name}")
 
-    # ─── IMU Channels ──────────────────────────────────────
-    # print("\n[PREPROCESSING] IMU Signals")
-    # print("-" * 40)
     for name in IMU_SIGNALS:
         if name in signals:
-            # print(f"  Processing {name}:")
-            # sig_clean, mask = preprocess_imu(signals[name], fs=fs, activity=activity)
-            sig_clean = preprocess_imu(signals[name], fs=fs, activity=activity)
-            preprocessed[name] = sig_clean
-            # spike_masks[name]  = mask
+            preprocessed[name] = preprocess_imu(signals[name], fs=fs, activity=activity)
 
-    # ─── Temperature (pass through — no filtering) ────────
-    # print("\n[PREPROCESSING] Temperature")
-    # print("-" * 40)
     for name in TEMPERATURE_SIGNALS:
         if name in signals:
             preprocessed[name] = np.array(signals[name], dtype=np.float64).copy()
-            # print(f"  ✓ {name} (no filtering applied)")
 
-    # print(f"\n[OK] Preprocessed {len(preprocessed)}/{len(signals)} signals")
-
-    # return preprocessed, spike_masks
     return preprocessed
 
 
-# ECG feature mapping: device_signal → reference_signal
-ECG_SIGNAL_PAIRS = {
-    "lead1": "ref_lead1",
-    "lead2": "ref_lead2",
-}
-
-# Respiration mapping
-RESP_SIGNAL_PAIRS = {
-    "impedance_pneumography": "ref_respiration",
-}
-
-# def normalize_signal(sig):
-#     if np.max(np.abs(sig)) > 0:
-#         return (sig - np.min(sig)) / (np.max(sig) - np.min(sig))
-#     else:
-#         return sig
+# ──────────────────────────────────────────────────────────────────────────────
+# SIGNAL ALIGNMENT UTILITIES
+# ──────────────────────────────────────────────────────────────────────────────
 
 def normalize_signal(sig):
-    if np.max(np.abs(sig)) > 0:
-        return sig / np.max(np.abs(sig))
-    else:
-        return sig
-    
+    """MaxAbs normalization: scales signal to [-1, 1] without centering."""
+    max_abs = np.max(np.abs(sig))
+    return MaxAbsScaler().fit_transform(sig.reshape(-1, 1)).flatten() if max_abs > 0 else sig
+
 
 def align_signals(dev_sig, bit_sig, fs):
     """
-    Normalize and align two signals using cross-correlation
-    Returns aligned signals of equal length
-    """
-    dev_norm = normalize_signal(
-                   np.array(dev_sig, dtype=np.float64).flatten())
-    bit_norm = normalize_signal(
-                   np.array(bit_sig, dtype=np.float64).flatten())
+    Normalize and align two signals using cross-correlation.
 
-    # ─── Trim to same length ──────────────────────────────────
+    Parameters
+    ----------
+    dev_sig : array-like
+        Device signal.
+    bit_sig : array-like
+        Reference signal.
+    fs : float
+        Sampling frequency in Hz.
+
+    Returns
+    -------
+    dev_aligned, bit_aligned : np.ndarray
+        Aligned signals of equal length.
+    best_lag : int
+        Lag in samples applied to align the signals.
+    """
+    dev_norm = normalize_signal(np.array(dev_sig, dtype=np.float64).flatten())
+    bit_norm = normalize_signal(np.array(bit_sig, dtype=np.float64).flatten())
+
+    # Trim both signals to equal length before correlating
     min_samples = min(len(dev_norm), len(bit_norm))
     dev_norm    = dev_norm[:min_samples]
     bit_norm    = bit_norm[:min_samples]
 
-    # ─── Cross-correlate ──────────────────────────────────────
-    correlation = correlate(dev_norm - np.mean(dev_norm), bit_norm - np.mean(bit_norm), mode='full')
-    # lags        = np.arange(-len(dev_norm)+1, len(dev_norm))
-    lags = correlation_lags(len(dev_norm), len(bit_norm))
-    best_lag    = lags[np.argmax(np.abs(correlation))]
+    # Cross-correlate mean-subtracted signals for robust lag estimation
+    correlation = correlate(
+        dev_norm - np.mean(dev_norm),
+        bit_norm - np.mean(bit_norm),
+        mode='full'
+    )
+    lags     = correlation_lags(len(dev_norm), len(bit_norm))
+    best_lag = lags[np.argmax(np.abs(correlation))]
 
+    # If lag is unrealistically large, constrain the search to ±5 s and recompute
     if best_lag > 10000 or best_lag < -10000:
-
-        print(f"  [WARNING] Large lag detected: {best_lag} samples ({best_lag/fs:.2f}s). Check signal quality and timestamps.")
+        print(f"  [WARNING] Large lag detected: {best_lag} samples ({best_lag/fs:.2f}s). "
+              f"Check signal quality and timestamps.")
         correlation[np.abs(lags) > int(5 * fs)] = -np.inf
         best_lag = lags[np.argmax(correlation)]
-        # ─── Align ────────────────────────────────────────────────
-        if best_lag > 0:
-            dev_aligned = dev_norm[best_lag:]
-            bit_aligned = bit_norm[:len(dev_aligned)]
-        elif best_lag < 0:
-            bit_aligned = bit_norm[-best_lag:]
-            dev_aligned = dev_norm[:len(bit_aligned)]
-        else:
-            dev_aligned = dev_norm
-            bit_aligned = bit_norm
 
-        min_len = min(len(dev_aligned), len(bit_aligned))
-        return dev_aligned[:min_len], bit_aligned[:min_len], best_lag
-
-    # ─── Align ────────────────────────────────────────────────
+    # Apply the lag shift
     if best_lag > 0:
         dev_aligned = dev_norm[best_lag:]
         bit_aligned = bit_norm[:len(dev_aligned)]
@@ -422,13 +316,17 @@ def align_signals(dev_sig, bit_sig, fs):
         bit_aligned = bit_norm[-best_lag:]
         dev_aligned = dev_norm[:len(bit_aligned)]
     else:
-        dev_aligned = dev_norm
-        bit_aligned = bit_norm
+        dev_aligned, bit_aligned = dev_norm, bit_norm
 
     min_len = min(len(dev_aligned), len(bit_aligned))
     return dev_aligned[:min_len], bit_aligned[:min_len], best_lag
 
+
 def apply_lag(dev_sig, lag):
+    """Shifts a signal by the given lag (in samples)."""
     dev = np.asarray(dev_sig, dtype=np.float64).ravel()
-    dev = dev[lag:] if lag > 0 else (dev[:len(dev) - abs(lag)] if lag < 0 else dev)
+    if lag > 0:
+        return dev[lag:]
+    elif lag < 0:
+        return dev[:len(dev) - abs(lag)]
     return dev
