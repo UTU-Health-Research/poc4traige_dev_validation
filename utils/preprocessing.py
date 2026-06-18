@@ -320,13 +320,3 @@ def align_signals(dev_sig, bit_sig, fs):
 
     min_len = min(len(dev_aligned), len(bit_aligned))
     return dev_aligned[:min_len], bit_aligned[:min_len], best_lag
-
-
-def apply_lag(dev_sig, lag):
-    """Shifts a signal by the given lag (in samples)."""
-    dev = np.asarray(dev_sig, dtype=np.float64).ravel()
-    if lag > 0:
-        return dev[lag:]
-    elif lag < 0:
-        return dev[:len(dev) - abs(lag)]
-    return dev
