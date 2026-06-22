@@ -756,7 +756,12 @@ class read_and_process:
         lags     = correlation_lags(len(dev_norm), len(bit_norm))
         best_lag = lags[np.argmax(np.abs(correlation))]
 
-        # If lag is unrealistically large, constrain the search to ±5 s and recompute
+        '''
+        If lag is unrealistically large, constrain the search to ±5 s and recompute. The following
+        condition sets a criterion where only those signals fall that have comparitively bad respiration
+        signals. So, 10000 (40 seconds) is just a very large window to identify those edge cases in the 
+        dataset. Usually, the signals don't quality for this condition except a few.
+        ''' 
         if best_lag > 10000 or best_lag < -10000:
             print(f"  [WARNING] Large lag detected: {best_lag} samples "
                   f"({best_lag / fs:.2f}s). Check signal quality and timestamps.")
