@@ -18,6 +18,12 @@ def parse_arguments():
     parser.add_argument('-f2', '--bitt', type=str, help="Path to reference ECG .edf")
     parser.add_argument('-f3', '--bpc',  type=str, help="Path to reference resp .acq")
 
+    # optional single-run metadata (used for HDF5 filename / grand table)
+    parser.add_argument('--subject', type=str, default=None,
+                        help="Subject identifier, e.g. subject_3  (optional)")
+    parser.add_argument('--conf',    type=str, default=None,
+                        help="Electrode configuration, e.g. patch or wire  (optional)")
+
     args = parser.parse_args()
 
     # ----- if batch mode, only validate YAML and return
@@ -36,9 +42,9 @@ def parse_arguments():
         parser.error("Single-run mode requires --dev, --bitt, and --bpc")
 
     files = {
-        'dev': os.path.abspath(args.dev),
+        'dev':  os.path.abspath(args.dev),
         'bitt': os.path.abspath(args.bitt),
-        'bpc': os.path.abspath(args.bpc),
+        'bpc':  os.path.abspath(args.bpc),
     }
 
     supported_extensions = ['.csv', '.edf', '.acq', '.bin', '.mat', '.hdf5', '.h5', '.parquet', '.txt']
@@ -56,14 +62,14 @@ def parse_arguments():
             print(f"[ERROR] {key} — File is empty: {file_path}")
             sys.exit(1)
 
-        # print(f"[OK] {key}: {file_path} ({file_ext}, {os.path.getsize(file_path)/1024:.2f} KB)")
-
     return {
-        "yaml_path": None,
-        'dev_path': files['dev'],
-        'dev_ext': os.path.splitext(files['dev'])[1].lower(),
-        'bitt_path': files['bitt'],
-        'bitt_ext': os.path.splitext(files['bitt'])[1].lower(),
-        'bpc_path': files['bpc'],
-        'bpc_ext': os.path.splitext(files['bpc'])[1].lower(),
+        "yaml_path":    None,
+        'dev_path':     files['dev'],
+        'dev_ext':      os.path.splitext(files['dev'])[1].lower(),
+        'bitt_path':    files['bitt'],
+        'bitt_ext':     os.path.splitext(files['bitt'])[1].lower(),
+        'bpc_path':     files['bpc'],
+        'bpc_ext':      os.path.splitext(files['bpc'])[1].lower(),
+        'subject':      args.subject,   # None if not supplied → S_unknown in HDF5
+        'configuration': args.conf,     # None if not supplied → unknown in HDF5
     }

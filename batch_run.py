@@ -624,15 +624,6 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
         )
         aligned_dev['gyry_ribs_imu'] = dev['gyry_ribs_imu']
 
-        # gyry_chest_imu (IMU 2)
-        # NOTE: not present in the original alignment block; added here
-        #       to populate ``alligned_gyrY_imu2`` in the signal record.
-        if "gyry_chest_imu" in dev:
-            dev['gyry_chest_imu'], _, _ = pipeline.align_signals(
-                dev['gyry_chest_imu'], ref['ref_respiration'], fs=fs
-            )
-            aligned_dev['gyry_chest_imu'] = dev['gyry_chest_imu']
-
     # ── Feature comparison (logic unchanged) ──────────────────────────────────
     results = algo.compare_features(
         dev_preprocessed=dev,
