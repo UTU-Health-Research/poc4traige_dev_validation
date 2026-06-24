@@ -1,10 +1,10 @@
 from .arg_parser import parse_arguments
 from .read_and_convert import read_binary_samples_hex, convert_binary_data
-from .preprocessing import extract_signals, remove_dc_offset, preprocess_signals, preprocess_ecg, preprocess_respiration, align_signals, apply_lag, normalize_signal
+from .preprocessing import extract_signals, preprocess_signals, preprocess_ecg, preprocess_respiration, align_signals_resp, align_signals_ecg, normalize_signal
 from .feature_extraction import extract_all_features, extract_ecg_features, extract_respiration_features
 from .feature_export import export_all
 from .visualization import visualize_all
-from .reference_reader import read_all_references, inspect_edf, inspect_acq
+from .reference_reader import read_all_references
 from .comparison import compare_features, plot_resp_signal_overlay, plot_ecg_signal_overlay, plot_temperature
 from .signal_quality import (
     assess_all_quality, assess_ecg_quality, assess_respiration_quality,

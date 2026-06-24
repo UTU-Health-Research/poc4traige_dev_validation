@@ -8,10 +8,10 @@ cut_ending_samples: 0
 bin_frame_len: 88
 
 # run only these; omit list to run all discovered subjects
-subjects: ["subject_5", "subject_1", "subject_3", "subject_2", "subject_4"]
+subjects: ["subject_4", "subject_1", "subject_5", "subject_2", "subject_3"]
 
 # each subject has these configurations (folders under subject)
-configurations: ["patch", "wire"]
+configurations: ["wire", "patch"]
 
 # activity label will be derived from filename unless you hardcode it here
 # activities: ["laying", "sitting"]  # optional

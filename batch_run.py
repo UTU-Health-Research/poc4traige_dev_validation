@@ -3,8 +3,8 @@ import yaml
 import pandas as pd
 
 from utils import (
-    read_binary_samples_hex, convert_binary_data, extract_signals, remove_dc_offset,
-    preprocess_signals, preprocess_ecg, preprocess_respiration, align_signals, apply_lag,
+    read_binary_samples_hex, convert_binary_data, extract_signals,
+    preprocess_signals, preprocess_ecg, preprocess_respiration, align_signals_ecg, align_signals_resp, normalize_signal,
     read_all_references, compare_features
 )
 
@@ -17,62 +17,26 @@ RESP_DEVICE_ONLY = [
 
 
 def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
-                 cut_starting_samples=1000, cut_ending_samples=0, bin_frame_len=88,
+                 cut_starting_samples=None, cut_ending_samples=None, bin_frame_len=88,
                  window_sec=10, subject=None, activity=None, configuration=None):
 
     # Device signals
     _, raw = read_binary_samples_hex(dev_path, bin_frame_len)
-    signals = extract_signals(convert_binary_data(raw),
-                              cut_starting_samples=cut_starting_samples,
-                              cut_ending_samples=cut_ending_samples)
-    dev = preprocess_signals(remove_dc_offset(signals, exclude=['body_temperature']), activity=activity)
+    signals = extract_signals(convert_binary_data(raw), subject, activity, configuration)
+    dev = preprocess_signals(signals, fs, activity)
 
     # Reference signals
-    ref_raw, _ = read_all_references(bitt_path=bitt_path, bpc_path=bpc_path,
-                                     target_fs=fs,
-                                     cut_starting_samples=cut_starting_samples,
-                                     cut_ending_samples=cut_ending_samples)
+    ref_raw = read_all_references(bitt_path, bpc_path, subject, activity, configuration)
     ref = {}
-    for name, sig in remove_dc_offset(ref_raw).items():
-        if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs=fs, activity=activity)
-        elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs=fs, activity=activity)
-        else:                             ref[name] = sig
-
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.plot(dev["impedance_pneumography"], label="impedance_pneumography_filtered")
-    plt.plot(ref["ref_respiration"], label="ref_respiration_filtered")
-    plt.legend()
+    for name, sig in ref_raw.items():
+        if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs, activity=activity)
+        elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs, activity=activity)
 
     # Alignment — ECG
-    if "lead2" in dev and "ref_lead2" in ref:
-        dev['lead2'], ref['ref_lead2'], _ = align_signals(dev['lead2'], ref['ref_lead2'], fs=fs)
+    ref['ref_lead2'], dev['lead2'] = align_signals_ecg(ref['ref_lead2'], dev['lead2'], fs)
 
     # Alignment — Respiration
-    if "impedance_pneumography" in dev and "ref_respiration" in ref:
-        dev['impedance_pneumography'], ref['ref_respiration'], resp_lag = align_signals(
-            dev['impedance_pneumography'], ref['ref_respiration'], fs=fs
-        )
-        # master_len = len(dev['impedance_pneumography'])
-        # for key in RESP_DEVICE_ONLY:
-        #     if key in dev:
-        #         dev[key] = apply_lag(dev[key], resp_lag)
-        #         dev[key] = dev[key][:master_len]
-        dev['gyry_ribs_imu'], _, _ = align_signals(
-            dev['gyry_ribs_imu'], ref['ref_respiration'], fs=fs
-        )
-    
-    # plt.figure()
-    # plt.plot(dev["impedance_pneumography"], label="impedance_pneumography_aligned")
-    # plt.plot(ref["ref_respiration"], label="ref_respiration_aligned")
-    # plt.legend()
-    # plt.show()
-
-    # import matplotlib.pyplot as plt
-    # plt.plot(dev["lead2"], label="lead_2")
-    # plt.plot(ref["ref_lead2"], label="ref_lead2")
-    # plt.legend()
-    # plt.show()
+    ref['ref_respiration'], dev['impedance_pneumography'],dev['gyry_ribs_imu'] = align_signals_resp(ref['ref_resp'], dev['impedance_pneumography'], dev['gyry_ribs_imu'], fs)
     
     # Comparison (make compare_features accept subject/activity/configuration if you want a grand file)
     results = compare_features(dev_preprocessed=dev, ref_preprocessed=ref,
