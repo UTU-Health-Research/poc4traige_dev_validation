@@ -3,9 +3,10 @@ import numpy as np
 import pandas as pd
 import mne
 import bioread
-from scipy.signal import correlate, correlation_lags
+from scipy.signal import correlate, correlation_lags, firwin, filtfilt, hilbert
 from vitalwave.basic_algos import butter_filter, moving_average_filter, resample, min_max_normalize
 from dataclasses import dataclass
+from sklearn.preprocessing import MaxAbsScaler
 
 
 @dataclass
@@ -163,12 +164,22 @@ def convert_binary_data(raw_samples):
     return out_df
 
 
-def extract_signals(df):
+def extract_signals(df, subject=None, activity=None, conf=None):
 
-    return {
-        name: df[col][1000:-500].reset_index(drop=True)
-        for name, col in SIGNAL_MAP.items()
-    }
+    if subject=="subject_3" and activity=="walking" and conf=="wire":
+        print(f"executing artifact removal for device subject_{subject}_{conf}_{activity}")
+
+        return {
+            name: df[col][10000:-500].reset_index(drop=True)
+            for name, col in SIGNAL_MAP.items()
+        }
+
+    else:
+        return {
+            name: df[col][1000:-500].reset_index(drop=True)
+            for name, col in SIGNAL_MAP.items()
+        }
+
 
 def read_acq(filepath):
 
@@ -201,6 +212,42 @@ def read_edf(filepath):
     sig = sig[1000:-500]
 
     return sig
+
+
+def soft_fir_bandpass(data, lowcut=0.1, highcut=0.5, fs=250.0, numtaps=2001):
+    # numtaps must be odd for a bandpass filter
+    if numtaps % 2 == 0:
+        numtaps += 1
+
+    # Design an FIR filter using a Hann or Blackman window for soft attenuation
+    fir_coeff = firwin(
+    numtaps,
+    [lowcut, highcut],
+    pass_zero='bandpass',
+    fs=fs,
+    window='hann'
+    )
+    filt = filtfilt(fir_coeff, 1.0, data)
+    filt = filt - np.mean(filt)
+
+    normfilt = min_max_normalize(filt)
+
+    # transformer = MaxAbsScaler()
+    # normfilt = transformer.fit_transform(filt.reshape(-1, 1)).flatten()
+    #normfilt = filt.astype(float) / np.max(np.abs(filt.astype(float)))
+
+    # Filter with zero-phase shift shift using filtfilt
+    return normfilt
+
+
+def hilbert_equal(sig):
+    analytic_signal = hilbert(sig)
+    amplitude_envelope = np.abs(analytic_signal)
+    epsilon = 1e-8
+    equalized_sig = sig/(amplitude_envelope + epsilon)
+
+    return equalized_sig
+
 
 
 def preprocess_ecg(sig):
@@ -288,7 +335,7 @@ def align_signals_ecg(ref_sig, dev_sig):
 
 
 
-def read_and_clean(dev, ref_ecg, ref_resp) -> DeviceData:
+def read_and_clean(dev, ref_ecg, ref_resp, subject=None, activity=None, configuration=None) -> DeviceData:
 
     _, raw_chunks = read_binary_samples_hex(dev, 88)
     raw_dev = extract_signals(convert_binary_data(raw_chunks))
