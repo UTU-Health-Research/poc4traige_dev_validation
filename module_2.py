@@ -36,7 +36,9 @@ def segment_spi(segment, window_duration=4.0, warmup_fraction=0.25):
 
 def compute_resp_features_(sig):
 
-    if np.max(sig) > 0:
+    if np.max(sig) == 0:
+        return float('nan'), np.array([]), float('nan')
+    else:
         p = np.array(ampd(sig, fs), dtype=int)
         p = p[(p >= 0) & (p < len(sig))]
         peaks = p if len(p) >= 2 else np.array([], dtype=int)
@@ -49,9 +51,8 @@ def compute_resp_features_(sig):
 
         spi= segment_spi(sig)
         
-        return rr, spi
-    else:
-        return float('nan'), float('nan')
+        return rr, peaks, spi
+         
 
 
 
