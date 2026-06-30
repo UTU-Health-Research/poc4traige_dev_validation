@@ -1,2 +1,3 @@
 "__pycache__/" 
 "*.pyc" 
+all_device_data.pkl
