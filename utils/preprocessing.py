@@ -62,7 +62,7 @@ def extract_signals(df, subject=None, activity=None, conf=None, cut_starting_sam
         }
 
 
-def soft_fir_bandpass(data, lowcut=0.15, highcut=0.75, fs=250.0, numtaps=2001):
+def soft_fir_bandpass(data, lowcut=0.1, highcut=0.5, fs=250.0, numtaps=2001):
     # numtaps must be odd for a bandpass filter
     if numtaps % 2 == 0:
         numtaps += 1
@@ -92,7 +92,7 @@ def hilbert_equal(sig):
 
     return equalized_sig
 
-def preprocess_respiration(signal, fs=250, activity='unknown'):
+def preprocess_respiration(signal, fs=250, activity='unknown', configuration=None):
     sig = np.asarray(signal, dtype=np.float64).ravel()
 
     PROFILES = {
@@ -104,9 +104,13 @@ def preprocess_respiration(signal, fs=250, activity='unknown'):
     
     # print(f"activity: {activity}")
     order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
-    sig = normalize_signal(soft_fir_bandpass(sig))
+    if activity=='walking':
+        sig = normalize_signal(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
+    else:
+        sig = normalize_signal(soft_fir_bandpass(sig))
     sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg"))
-    sig = normalize_signal(hilbert_equal(sig))
+    if configuration=="patch":
+        sig = normalize_signal(hilbert_equal(sig))
     return sig
 
 
@@ -119,7 +123,7 @@ def preprocess_ecg(signal, fs=250, activity="unknown"):
     return sig
 
 
-def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='unknown'):
+def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='unknown', configuration=None):
     sig = np.asarray(signal, dtype=np.float64).ravel()
 
     PROFILES = {
@@ -137,7 +141,7 @@ def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='u
 
     sig = normalize_signal(soft_fir_bandpass(sig))
     sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg"))
-    sig = normalize_signal(hilbert_equal(sig))
+    # sig = normalize_signal(hilbert_equal(sig))
     return sig
 
 

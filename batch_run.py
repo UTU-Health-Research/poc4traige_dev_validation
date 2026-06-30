@@ -23,20 +23,40 @@ def run_one_case(dev_path, bitt_path, bpc_path, out_dir, fs=250,
     # Device signals
     _, raw = read_binary_samples_hex(dev_path, bin_frame_len)
     signals = extract_signals(convert_binary_data(raw), subject, activity, configuration)
-    dev = preprocess_signals(signals, fs, activity)
 
-    # Reference signals
-    ref_raw = read_all_references(bitt_path, bpc_path, subject, activity, configuration)
-    ref = {}
-    for name, sig in ref_raw.items():
-        if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs, activity=activity)
-        elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs, activity=activity)
 
-    # Alignment — ECG
-    ref['ref_lead2'], dev['lead2'] = align_signals_ecg(ref['ref_lead2'], dev['lead2'], fs)
+    if activity == 'walking':
+        print(f"walking detected!")
+        ref_raw = read_all_references(bitt_path, bpc_path, subject, activity, configuration)
+        dev={}
+        ref = {}
 
-    # Alignment — Respiration
-    ref['ref_respiration'], dev['impedance_pneumography'],dev['gyry_ribs_imu'] = align_signals_resp(ref['ref_resp'], dev['impedance_pneumography'], dev['gyry_ribs_imu'], fs)
+        resp_aligned, ip_aligned, gyr_aligned = align_signals_resp(ref_raw['ref_resp'], signals['impedance_pneumography'], signals['gyry_ribs_imu'], fs)
+
+        dev['impedance_pneumography'] = preprocess_respiration(ip_aligned, fs, activity=activity, configuration=configuration)
+        dev['gyry_ribs_imu'] = preprocess_respiration(gyr_aligned, fs, activity=activity, configuration=configuration)
+        ref['ref_respiration'] = preprocess_respiration(resp_aligned, fs, activity=activity, configuration=configuration)
+
+        dev['lead2'] = preprocess_ecg(signals['lead2'], fs, activity=activity)
+        ref['ref_lead2'] = preprocess_ecg(ref_raw['ref_lead2'], fs, activity=activity)
+
+        ref['ref_lead2'], dev['lead2'] = align_signals_ecg(ref['ref_lead2'], dev['lead2'], fs)
+
+    else:
+        print("laying detected!")
+        dev = preprocess_signals(signals, fs, activity)
+        # Reference signals
+        ref_raw = read_all_references(bitt_path, bpc_path, subject, activity, configuration)
+        ref = {}
+        for name, sig in ref_raw.items():
+            if name.startswith('ref_lead'):   ref[name] = preprocess_ecg(sig, fs, activity=activity)
+            elif name.startswith('ref_resp'): ref[name] = preprocess_respiration(sig, fs, activity=activity, configuration=configuration)
+
+        # Alignment — ECG
+        ref['ref_lead2'], dev['lead2'] = align_signals_ecg(ref['ref_lead2'], dev['lead2'], fs)
+
+        # Alignment — Respiration
+        ref['ref_respiration'], dev['impedance_pneumography'],dev['gyry_ribs_imu'] = align_signals_resp(ref['ref_resp'], dev['impedance_pneumography'], dev['gyry_ribs_imu'], fs)
     
     # Comparison (make compare_features accept subject/activity/configuration if you want a grand file)
     results = compare_features(dev_preprocessed=dev, ref_preprocessed=ref,

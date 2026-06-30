@@ -181,11 +181,11 @@ def extract_segment_ecg_features(sig, fs=250, activity="unknown"):
 
 def extract_segment_resp_features(sig, fs=250, activity="unknown"):
 
-    if len(sig) < 2 * fs:
-        return None
+    # if len(sig) < 2 * fs:
+    #     return None
 
     base = dict(resp_rate_mean=float('nan'), spi=float('nan'))
-
+    peaks = np.array([])
     # ── Respiration rate ──────────────────────────────────────
     try:
         peaks              = _get_resp_peaks(sig, fs)
@@ -199,7 +199,7 @@ def extract_segment_resp_features(sig, fs=250, activity="unknown"):
     except Exception:
         pass
 
-    return base
+    return base, peaks
 
 def segment_and_extract(dev_sig, ref_sig, fs=250,
                         window_sec=20, signal_type="ecg",
@@ -272,8 +272,8 @@ def segment_and_extract(dev_sig, ref_sig, fs=250,
     return dev_df, ref_df, paired
 
 def segment_and_extract_resp_fused(dev_signals, ref_sig, fs=250,
-                                   resp_window_sec=30, step_sec=10,
-                                   activity="unknown"):
+                                   resp_window_sec=30, step_sec=25,
+                                   activity="unknown", configuration=None):
     
     if activity == "laying":
         MODALITY_WEIGHTS = {
@@ -305,21 +305,24 @@ def segment_and_extract_resp_fused(dev_signals, ref_sig, fs=250,
         info = dict(segment=i, start_sec=s / fs, end_sec=e / fs)
 
         # ── Reference features (computed ONCE per segment) ────
-        ref_feats = extract_segment_resp_features(ref_sig[s:e], fs,
+        ref_feats, ref_peaks = extract_segment_resp_features(ref_sig[s:e], fs,
                                                   activity=activity)
         if ref_feats is None:
             ref_feats = _nan_feats.copy()
         ref_rr = ref_feats['resp_rate_mean']
+        # print(f"RR for ref seg-{s}-{e}: {ref_rr}")
 
         # ── Device features — both modalities, one after the other ──
         dev_rrs = {}
         for mod in MODALITIES:
-            dev_feats = extract_segment_resp_features(
+            dev_feats, peaks = extract_segment_resp_features(
                 dev_signals[mod][s:e], fs, activity=activity)
             if dev_feats is None:
                 dev_feats = _nan_feats.copy()
 
             dev_rrs[mod] = dev_feats['resp_rate_mean']
+
+            # print(f"RR for {mod} and seg-{s}-{e}: {dev_rrs[mod]}")
 
             # keep per-modality rows (same shape your old loop produced)
             dev_row = {**info, **{f"dev_{k}": v for k, v in dev_feats.items()}}
@@ -329,6 +332,29 @@ def segment_and_extract_resp_fused(dev_signals, ref_sig, fs=250,
             mod_dev_rows[mod].append(dev_row)
             mod_ref_rows[mod].append(ref_row)
             mod_paired_rows[mod].append(paired_row)
+
+            # if activity=='laying' and configuration=='patch':
+            #     # plt.figure()
+            #     # plt.plot(dev_signals['impedance_pneumography'][s:e], label='IP')
+            #     # plt.plot(dev_signals['gyry_ribs_imu'][s:e], label='GYR')
+            #     # plt.plot(ref_sig[s:e], label='ref')
+            #     # plt.title(f"segment: {s}-{e}")
+            #     # plt.legend()
+            #     # plt.show()
+                
+            #     fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+            #     axes[0].plot(dev_signals['impedance_pneumography'][s:e],  label="IP")
+            #     axes[0].scatter(peaks,  dev_signals['impedance_pneumography'][s:e][peaks],  color="red", zorder=5, label="peaks")
+            #     axes[0].legend()
+
+            #     axes[1].plot(ref_sig[s:e], label="ref_resp")
+            #     axes[1].scatter(ref_peaks, ref_sig[s:e][ref_peaks], color="red", zorder=5, label="peaks")
+            #     axes[1].legend()
+
+            #     fig.suptitle(f"Segment {i}  |  rr_ip={dev_rrs[mod]:.2f}  rr_ref={ref_rr:.2f}")
+            #     plt.tight_layout()
+            #     plt.show()
+
 
         # ── Fuse device rates (mean of available) ─────────────
         # available = [float(v) for v in dev_rrs.values()
@@ -342,6 +368,8 @@ def segment_and_extract_resp_fused(dev_signals, ref_sig, fs=250,
             fused_rr = float(np.average(vals, weights=weights))
         else:
             fused_rr = float('nan')
+        
+        # print(f"fused RR seg-{s}-{e}: {fused_rr}")
 
         # ── Build fused row ───────────────────────────────────
         fused_row = {**info}
@@ -484,6 +512,7 @@ def compare_features(dev_preprocessed, ref_preprocessed,
         fs=fs,
         resp_window_sec=resp_win,
         activity=activity,
+        configuration=configuration
     )
 
     # ── Store per-modality results (same keys as before) ──────────
