@@ -368,22 +368,22 @@ def segment_and_extract_resp_fused(dev_signals, ref_sig, fs=250,
         
         # print(f"fused RR seg-{s}-{e}: {fused_rr}")
 
-        fig, axes = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
-        axes[0].plot(dev_signals['impedance_pneumography'][s:e],  label="IP")
-        axes[0].scatter(peaks[0],  dev_signals['impedance_pneumography'][s:e][peaks[0]],  color="red", zorder=5, label="peaks")
-        axes[0].legend()
+        # fig, axes = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+        # axes[0].plot(dev_signals['impedance_pneumography'][s:e],  label="IP")
+        # axes[0].scatter(peaks[0],  dev_signals['impedance_pneumography'][s:e][peaks[0]],  color="red", zorder=5, label="peaks")
+        # axes[0].legend()
 
-        axes[1].plot(dev_signals['gyry_ribs_imu'][s:e],  label="GYR")
-        axes[1].scatter(peaks[1],  dev_signals['gyry_ribs_imu'][s:e][peaks[1]],  color="red", zorder=5, label="peaks")
-        axes[1].legend()
+        # axes[1].plot(dev_signals['gyry_ribs_imu'][s:e],  label="GYR")
+        # axes[1].scatter(peaks[1],  dev_signals['gyry_ribs_imu'][s:e][peaks[1]],  color="red", zorder=5, label="peaks")
+        # axes[1].legend()
 
-        axes[2].plot(ref_sig[s:e], label="ref_resp")
-        axes[2].scatter(ref_peaks, ref_sig[s:e][ref_peaks], color="red", zorder=5, label="peaks")
-        axes[2].legend()
+        # axes[2].plot(ref_sig[s:e], label="ref_resp")
+        # axes[2].scatter(ref_peaks, ref_sig[s:e][ref_peaks], color="red", zorder=5, label="peaks")
+        # axes[2].legend()
 
-        fig.suptitle(f"Segment {i}  |  fused_rr={fused_rr}  rr_ref={ref_rr}")
-        plt.tight_layout()
-        plt.show()
+        # fig.suptitle(f"Segment {i}  |  fused_rr={fused_rr}  rr_ref={ref_rr}")
+        # plt.tight_layout()
+        # plt.show()
 
         # ── Build fused row ───────────────────────────────────
         fused_row = {**info}

@@ -6,7 +6,6 @@ from vitalwave.basic_algos import resample
 def read_bittium_edf(filepath, subject=None, activity=None, conf=None, cut_starting_samples=1000):
 
     edf_file = mne.io.read_raw_edf(filepath, preload=True, verbose=False)
-    print(edf_file.info)
     fs = edf_file.info['sfreq']
     available_channels = edf_file.ch_names
     data, _ = edf_file['ECG_2']

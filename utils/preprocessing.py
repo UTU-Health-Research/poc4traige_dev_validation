@@ -95,7 +95,7 @@ def hilbert_equal(sig):
 def preprocess_respiration(signal, fs=250, activity='unknown', configuration=None):
     sig = np.asarray(signal, dtype=np.float64).ravel()
 
-    ma_win = 1.5
+    ma_win = 1.0
     if activity=='walking':
         sig = normalize_signal(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
     else:
@@ -221,9 +221,11 @@ def align_signals_resp(ref_sig, dev_sig, dev_sig2, fs):
 
     # If lag is unrealistically large, constrain search to ±5 s and recompute
     if best_lag > 10000 or best_lag < -10000:
+        print(f"Respiration fell into trap!")
         correlation[np.abs(lags) > int(5 * fs)] = -np.inf
         best_lag = lags[np.argmax(correlation)]
 
+    print(f"best_lag for respiration: {best_lag/250} seconds")
     # Apply the lag shift
     # best_lag > 0: dev_sig lags behind ref_sig → trim start of ref_sig
     # best_lag < 0: dev_sig is ahead of ref_sig → trim start of dev_sig
@@ -255,9 +257,11 @@ def align_signals_ecg(ref_sig, dev_sig, fs):
 
     # If lag is unrealistically large, constrain search to ±5 s and recompute
     if best_lag > 10000 or best_lag < -10000:
+        print(f"ECG fell into trap!")
         correlation[np.abs(lags) > int(5 * fs)] = -np.inf
         best_lag = lags[np.argmax(correlation)]
 
+    print(f"best_lag for ecg: {best_lag/250} seconds")
     # Apply the lag shift
     # best_lag > 0: dev_sig lags behind ref_sig → trim start of ref_sig
     # best_lag < 0: dev_sig is ahead of ref_sig → trim start of dev_sig
