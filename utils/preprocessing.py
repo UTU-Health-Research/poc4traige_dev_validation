@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from vitalwave.basic_algos import butter_filter, moving_average_filter
+from vitalwave.basic_algos import butter_filter, moving_average_filter, min_max_normalize
 from scipy.signal import correlate, correlation_lags, firwin, filtfilt, hilbert
 from sklearn.preprocessing import MaxAbsScaler
 
@@ -95,20 +95,12 @@ def hilbert_equal(sig):
 def preprocess_respiration(signal, fs=250, activity='unknown', configuration=None):
     sig = np.asarray(signal, dtype=np.float64).ravel()
 
-    PROFILES = {
-        #              order   hp_hz   lp_hz   ma_window_s
-        'laying':      (2,      0.1,    0.7,    1),
-        'walking':    (3,      0.15,    0.8,    1),
-        'unknown':    (2,      0.15,   0.8,    1),
-    }
-    
-    # print(f"activity: {activity}")
-    order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
+    ma_win = 1.5
     if activity=='walking':
         sig = normalize_signal(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
     else:
         sig = normalize_signal(soft_fir_bandpass(sig))
-    sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg"))
+    sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win)))
     if configuration=="patch":
         sig = normalize_signal(hilbert_equal(sig))
     return sig
@@ -201,8 +193,18 @@ RESP_SIGNAL_PAIRS = {
 
 
 def normalize_signal(sig):
+    # if np.max(np.abs(sig)) > 0:
+    #     return sig / np.max(np.abs(sig))
+    # else:
+    #     return sig
+    # if np.max(np.abs(sig)) == 0:
+    #     return sig
+    # else:
+    #     return min_max_normalize(sig)
     if np.max(np.abs(sig)) > 0:
-        return sig / np.max(np.abs(sig))
+        transformer = MaxAbsScaler()
+        norm_sig = transformer.fit_transform(sig.reshape(-1, 1)).flatten()
+        return norm_sig
     else:
         return sig
     

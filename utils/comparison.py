@@ -8,6 +8,7 @@ import matplotlib.gridspec as gridspec
 from datetime import datetime
 from scipy.stats import pearsonr, spearmanr, kurtosis, skew
 from itertools import combinations
+from scipy.signal import peak_prominences
 
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd, msptd, find_peaks
 from vitalwave.basic_algos import butter_filter, filter_hr_peaks, min_max_normalize
@@ -97,14 +98,19 @@ def _resp_rate_from_peaks(peaks, fs):
     if len(peaks) < 2:
         return float('nan')
     
+    # print(f"peaks: {peaks}")
     bbi = np.diff(peaks) / fs
+    # print(f"bbi np.diff: {bbi}")
     bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
+    # print(f"bbi_valid: {bbi_valid}")
     
     # DO NOT fall back to garbage — return NaN instead
     if len(bbi_valid) == 0:
         return float('nan') 
+    # print(f"mean RR: {np.mean(bbi_valid)}")
+    # print(f"mean RR per minute: {60.0 / np.mean(bbi_valid)}")
     
-    return float(np.mean(60.0 / bbi_valid))
+    return 60.0 / np.mean(bbi_valid)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -185,7 +191,7 @@ def extract_segment_resp_features(sig, fs=250, activity="unknown"):
     #     return None
 
     base = dict(resp_rate_mean=float('nan'), spi=float('nan'))
-    peaks = np.array([])
+    peaks = np.array([], dtype=int)
     # ── Respiration rate ──────────────────────────────────────
     try:
         peaks              = _get_resp_peaks(sig, fs)
@@ -314,9 +320,11 @@ def segment_and_extract_resp_fused(dev_signals, ref_sig, fs=250,
 
         # ── Device features — both modalities, one after the other ──
         dev_rrs = {}
+        peaks=[]
         for mod in MODALITIES:
-            dev_feats, peaks = extract_segment_resp_features(
+            dev_feats, mod_peaks = extract_segment_resp_features(
                 dev_signals[mod][s:e], fs, activity=activity)
+            peaks.append(mod_peaks)
             if dev_feats is None:
                 dev_feats = _nan_feats.copy()
 
@@ -342,18 +350,7 @@ def segment_and_extract_resp_fused(dev_signals, ref_sig, fs=250,
             #     # plt.legend()
             #     # plt.show()
                 
-            #     fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-            #     axes[0].plot(dev_signals['impedance_pneumography'][s:e],  label="IP")
-            #     axes[0].scatter(peaks,  dev_signals['impedance_pneumography'][s:e][peaks],  color="red", zorder=5, label="peaks")
-            #     axes[0].legend()
-
-            #     axes[1].plot(ref_sig[s:e], label="ref_resp")
-            #     axes[1].scatter(ref_peaks, ref_sig[s:e][ref_peaks], color="red", zorder=5, label="peaks")
-            #     axes[1].legend()
-
-            #     fig.suptitle(f"Segment {i}  |  rr_ip={dev_rrs[mod]:.2f}  rr_ref={ref_rr:.2f}")
-            #     plt.tight_layout()
-            #     plt.show()
+        
 
 
         # ── Fuse device rates (mean of available) ─────────────
@@ -370,6 +367,23 @@ def segment_and_extract_resp_fused(dev_signals, ref_sig, fs=250,
             fused_rr = float('nan')
         
         # print(f"fused RR seg-{s}-{e}: {fused_rr}")
+
+        fig, axes = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+        axes[0].plot(dev_signals['impedance_pneumography'][s:e],  label="IP")
+        axes[0].scatter(peaks[0],  dev_signals['impedance_pneumography'][s:e][peaks[0]],  color="red", zorder=5, label="peaks")
+        axes[0].legend()
+
+        axes[1].plot(dev_signals['gyry_ribs_imu'][s:e],  label="GYR")
+        axes[1].scatter(peaks[1],  dev_signals['gyry_ribs_imu'][s:e][peaks[1]],  color="red", zorder=5, label="peaks")
+        axes[1].legend()
+
+        axes[2].plot(ref_sig[s:e], label="ref_resp")
+        axes[2].scatter(ref_peaks, ref_sig[s:e][ref_peaks], color="red", zorder=5, label="peaks")
+        axes[2].legend()
+
+        fig.suptitle(f"Segment {i}  |  fused_rr={fused_rr}  rr_ref={ref_rr}")
+        plt.tight_layout()
+        plt.show()
 
         # ── Build fused row ───────────────────────────────────
         fused_row = {**info}
