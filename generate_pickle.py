@@ -5,9 +5,12 @@ import numpy as np
 from pathlib import Path
 from module_1 import read_and_clean
 
+# Default location of the dataset relative to this script
+DATASET_DIR = "../dataset"
+
 
 # ──────────────────────── discover available subjects ──────────────────────────
-def discover_subjects(base_dir: str = ".") -> list[int]:
+def discover_subjects(base_dir: str = DATASET_DIR) -> list[int]:
     subjects = []
     for entry in sorted(Path(base_dir).iterdir()):
         if entry.is_dir() and entry.name.startswith("subject_"):
@@ -19,11 +22,12 @@ def discover_subjects(base_dir: str = ".") -> list[int]:
 
 
 # ───────────────────── check that all 3 files exist for a case ─────────────────
-def case_paths(subject: int, config: str, activity: str) -> dict[str, str] | None:
+def case_paths(subject: int, config: str, activity: str, base_dir: str = DATASET_DIR) -> dict[str, str] | None:
+    base = Path(base_dir)
     paths = {
-        "dev":      f"subject_{subject}/{config}/dev/{activity}_dev.bin",
-        "ref_ecg":  f"subject_{subject}/{config}/reference/{activity}_ecg.EDF",
-        "ref_resp": f"subject_{subject}/{config}/reference/{activity}_resp.acq",
+        "dev":      str(base / f"subject_{subject}" / config / "dev" / f"{activity}_dev.bin"),
+        "ref_ecg":  str(base / f"subject_{subject}" / config / "reference" / f"{activity}_ecg.EDF"),
+        "ref_resp": str(base / f"subject_{subject}" / config / "reference" / f"{activity}_resp.acq"),
     }
     missing = [k for k, v in paths.items() if not os.path.isfile(v)]
     if missing:
@@ -37,14 +41,16 @@ def run_all(
     configs: list[str] | None = None,
     activities: list[str] | None = None,
     subjects: list[int] | None = None,
+    base_dir: str = DATASET_DIR,
 ):
     if configs is None:
         configs = ["wire", "patch"]
     if activities is None:
         activities = ["laying", "walking"]
     if subjects is None:
-        subjects = discover_subjects()
+        subjects = discover_subjects(base_dir)
 
+    print(f"Dataset dir    : {base_dir}")
     print(f"Subjects found : {subjects}")
     print(f"Configs        : {configs}")
     print(f"Activities     : {activities}")
@@ -57,7 +63,7 @@ def run_all(
         for config in configs:
             for activity in activities:
                 key = f"subject_{subject}/{config}/{activity}"
-                paths = case_paths(subject, config, activity)
+                paths = case_paths(subject, config, activity, base_dir)
 
                 if paths is None:
                     print(f"  SKIP  {key}  (missing files)")

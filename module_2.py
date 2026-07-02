@@ -34,26 +34,59 @@ def segment_spi(segment, window_duration=4.0, warmup_fraction=0.25):
 
 
 
+def _get_resp_peaks(sig):
+
+    p = np.array(ampd(sig, fs), dtype=int)
+    p = p[(p >= 0) & (p < len(sig))]
+    if len(p) >= 2:
+        return p
+
+    return np.array([], dtype=int)
+
+
+def _resp_rate_from_peaks(peaks):
+    if len(peaks) < 2:
+        return float('nan')
+    
+    bbi = np.diff(peaks) / fs
+    bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
+    if len(bbi_valid) == 0:
+        return float('nan') 
+    
+    return 60.0 / np.mean(bbi_valid)
+
+
 def compute_resp_features_(sig):
 
-    if np.max(sig) == 0:
-        return float('nan'), np.array([]), float('nan')
-    else:
-        p = np.array(ampd(sig, fs), dtype=int)
-        p = p[(p >= 0) & (p < len(sig))]
-        peaks = p if len(p) >= 2 else np.array([], dtype=int)
-        if len(peaks) < 2:
-            return float('nan')
-        bbi       = np.diff(peaks) / fs
-        bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]   # 6–30 bpm physiological window
+    peaks = _get_resp_peaks(sig)
 
-        rr = float(np.mean(60.0 / bbi_valid)) if len(bbi_valid) > 0 else float('nan')
+    rr = _resp_rate_from_peaks(peaks)
 
-        spi= segment_spi(sig)
-        
-        return rr, peaks, spi
+    spi= segment_spi(sig)
+    
+    return peaks, rr, spi
          
 
+
+def _detect_r_peaks_robust(sig):
+    
+    p = ecg_modified_pan_tompkins(sig, fs)
+    p = p[(p >= 0) & (p < len(sig))]
+    if len(p) >= 2:
+        return p
+    return np.array([], dtype=int)
+
+def _get_clean_r_peaks(seg):
+    """Detect → gentle filter → vitalwave filter."""
+
+    r_peaks = _detect_r_peaks_robust(seg, fs)
+    if len(r_peaks) < 4:
+        return [], []
+    valid_r_peaks, valid_hr_mean = filter_hr_peaks(
+        peaks=r_peaks, fs=fs, hr_min=30, hr_max=220,
+        kernel_size=3, sdsd_max=0.35,
+    )
+    return valid_r_peaks, valid_hr_mean
 
 
 def compute_ecg_features(sig):
@@ -61,15 +94,7 @@ def compute_ecg_features(sig):
 
     snr= float(Absolute_Signal_to_noise_Ratio(sig))
 
-    p = ecg_modified_pan_tompkins(sig, fs)
-    r_peaks = p[(p >= 0) & (p < len(sig))]
-
-    if len(r_peaks) < 4:
-        return [], []
-    valid_r_peaks, valid_hr = filter_hr_peaks(
-        peaks=r_peaks, fs=fs, hr_min=30, hr_max=220,
-        kernel_size=3, sdsd_max=0.35,
-    )
+    valid_r_peaks, valid_hr = _get_clean_r_peaks(sig)
 
     rr   = np.diff(valid_r_peaks) / fs * 1000.0
     diff_rr = np.diff(rr)
