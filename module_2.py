@@ -3,7 +3,7 @@ from vitalwave.basic_algos import filter_hr_peaks
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd
 from vitalwave.signal_quality import Absolute_Signal_to_noise_Ratio
 
-fs=250
+FS=250
 
 def _spectral_moment(x, order, L):
     """Running spectral moment via cumulative-sum trick."""
@@ -20,7 +20,7 @@ def segment_spi(segment, window_duration=4.0, warmup_fraction=0.25):
     """Signal Purity Index via Hjorth-style spectral moments."""
     x = np.asarray(segment, dtype=float).ravel()
     x = (x - x.mean()) / (x.std() + 1e-12)
-    L = max(1, int(round(fs * window_duration)))
+    L = max(1, int(round(FS * window_duration)))
     if len(x) < L:
         raise ValueError(f"Segment ({len(x)}) shorter than window ({L}).")
     w0, w2, w4 = (_spectral_moment(x, o, L) for o in (0, 2, 4))
@@ -36,7 +36,7 @@ def segment_spi(segment, window_duration=4.0, warmup_fraction=0.25):
 
 def _get_resp_peaks(sig):
 
-    p = np.array(ampd(sig, fs), dtype=int)
+    p = np.array(ampd(sig, FS), dtype=int)
     p = p[(p >= 0) & (p < len(sig))]
     if len(p) >= 2:
         return p
@@ -48,7 +48,7 @@ def _resp_rate_from_peaks(peaks):
     if len(peaks) < 2:
         return float('nan')
     
-    bbi = np.diff(peaks) / fs
+    bbi = np.diff(peaks) / FS
     bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
     if len(bbi_valid) == 0:
         return float('nan') 
@@ -70,7 +70,7 @@ def compute_resp_features_(sig):
 
 def _detect_r_peaks_robust(sig):
     
-    p = ecg_modified_pan_tompkins(sig, fs)
+    p = ecg_modified_pan_tompkins(sig, FS)
     p = p[(p >= 0) & (p < len(sig))]
     if len(p) >= 2:
         return p
@@ -79,11 +79,11 @@ def _detect_r_peaks_robust(sig):
 def _get_clean_r_peaks(seg):
     """Detect → gentle filter → vitalwave filter."""
 
-    r_peaks = _detect_r_peaks_robust(seg, fs)
+    r_peaks = _detect_r_peaks_robust(seg)
     if len(r_peaks) < 4:
         return [], []
     valid_r_peaks, valid_hr_mean = filter_hr_peaks(
-        peaks=r_peaks, fs=fs, hr_min=30, hr_max=220,
+        peaks=r_peaks, fs=FS, hr_min=30, hr_max=220,
         kernel_size=3, sdsd_max=0.35,
     )
     return valid_r_peaks, valid_hr_mean
@@ -96,7 +96,7 @@ def compute_ecg_features(sig):
 
     valid_r_peaks, valid_hr = _get_clean_r_peaks(sig)
 
-    rr   = np.diff(valid_r_peaks) / fs * 1000.0
+    rr   = np.diff(valid_r_peaks) / FS * 1000.0
     diff_rr = np.diff(rr)
     if len(diff_rr) > 0:
         rmssd = float(np.sqrt(np.mean(diff_rr ** 2)))

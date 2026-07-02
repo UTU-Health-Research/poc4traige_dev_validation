@@ -40,7 +40,7 @@ class DeviceData:
 
 
 
-fs=250
+FS=250
 
 SIGNAL_MAP = {
     # ECG channels
@@ -190,7 +190,7 @@ def read_edf(filepath, subject=None, activity=None, conf=None):
     return sig
 
 
-def soft_fir_bandpass(data, lowcut=0.1, highcut=0.5, fs=250.0, numtaps=2001):
+def soft_fir_bandpass(data, lowcut=0.1, highcut=0.5, numtaps=2001):
     # numtaps must be odd for a bandpass filter
     if numtaps % 2 == 0:
         numtaps += 1
@@ -200,7 +200,7 @@ def soft_fir_bandpass(data, lowcut=0.1, highcut=0.5, fs=250.0, numtaps=2001):
     numtaps,
     [lowcut, highcut],
     pass_zero='bandpass',
-    fs=fs,
+    fs=FS,
     window='hann'
     )
     filt = filtfilt(fir_coeff, 1.0, data)
@@ -211,7 +211,7 @@ def soft_fir_bandpass(data, lowcut=0.1, highcut=0.5, fs=250.0, numtaps=2001):
     return normfilt
 
 
-def preprocess_ecg(sig, fs=250, activity="unknown"):
+def preprocess_ecg(sig, activity="unknown"):
 
     hp_freq = 5.0 if activity != "walking" else 8.0  # stricter for motion
     lp_freq = 40.0
@@ -220,13 +220,13 @@ def preprocess_ecg(sig, fs=250, activity="unknown"):
     return sig
 
 
-def preprocess_respiration(sig, fs=250, activity='unknown', configuration=None):
+def preprocess_respiration(sig, activity='unknown', configuration=None):
     ma_win = 1.0
     if activity=='walking':
         sig = normalize_signal(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
     else:
         sig = normalize_signal(soft_fir_bandpass(sig))
-    sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win)))
+    sig = normalize_signal(moving_average_filter(sig, window=int(FS * ma_win)))
 
     return sig
 
