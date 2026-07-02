@@ -69,6 +69,6 @@ def read_all_references(bitt_path, bpc_path, subject=None, activity=None, conf=N
 
     # ─── Biopac (Respiration) ─────────────────────────────
     ref_resp_resampled = read_biopac_acq(bpc_path, subject, activity, conf)
-    ref_signals['ref_resp'] = ref_resp_resampled
+    ref_signals['ref_respiration'] = ref_resp_resampled
 
     return ref_signals

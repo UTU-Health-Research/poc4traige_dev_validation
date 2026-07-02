@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from vitalwave.basic_algos import butter_filter, moving_average_filter, min_max_normalize
 from scipy.signal import correlate, correlation_lags, firwin, filtfilt, hilbert
 from sklearn.preprocessing import MaxAbsScaler
@@ -101,8 +102,8 @@ def preprocess_respiration(signal, fs=250, activity='unknown', configuration=Non
     else:
         sig = normalize_signal(soft_fir_bandpass(sig))
     sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win)))
-    if configuration=="patch":
-        sig = normalize_signal(hilbert_equal(sig))
+    # if configuration=="patch":
+    #     sig = normalize_signal(hilbert_equal(sig))
     return sig
 
 
@@ -193,14 +194,6 @@ RESP_SIGNAL_PAIRS = {
 
 
 def normalize_signal(sig):
-    # if np.max(np.abs(sig)) > 0:
-    #     return sig / np.max(np.abs(sig))
-    # else:
-    #     return sig
-    # if np.max(np.abs(sig)) == 0:
-    #     return sig
-    # else:
-    #     return min_max_normalize(sig)
     if np.max(np.abs(sig)) > 0:
         transformer = MaxAbsScaler()
         norm_sig = transformer.fit_transform(sig.reshape(-1, 1)).flatten()
@@ -216,16 +209,38 @@ def align_signals_resp(ref_sig, dev_sig, dev_sig2, fs):
         dev_sig - np.mean(dev_sig),
         mode='full'
     )
-    lags     = correlation_lags(len(ref_sig), len(dev_sig))
-    best_lag = lags[np.argmax(np.abs(correlation))]
+    lags = correlation_lags(len(ref_sig), len(dev_sig))
+
+    idx = np.argmax(correlation)      # max positive correlation, not abs()
+    best_lag = lags[idx]
 
     # If lag is unrealistically large, constrain search to ±5 s and recompute
-    if best_lag > 10000 or best_lag < -10000:
-        print(f"Respiration fell into trap!")
-        correlation[np.abs(lags) > int(5 * fs)] = -np.inf
-        best_lag = lags[np.argmax(correlation)]
+    if abs(best_lag) > 10000:
+        print("Respiration fell into trap!")
+        search = correlation.copy()               # don't destroy original
+        search[np.abs(lags) > int(5 * fs)] = -np.inf
+        idx = np.argmax(search)
+        best_lag = lags[idx]
 
-    print(f"best_lag for respiration: {best_lag/250} seconds")
+    print(f"best_lag for respiration: {best_lag/fs} seconds or {best_lag} samples")
+
+    plt.figure()
+    plt.plot(ref_sig, label='Reference respiration Signal')
+    plt.plot(dev_sig, label='Device respiration Signal')
+    plt.xlabel('Samples')
+    plt.ylabel('Amplitude')
+    plt.title('Signal Alignment Respiration')
+    plt.legend()
+
+    plt.figure()
+    plt.plot(lags, correlation, label='Cross-correlation')   # x-axis = lags
+    plt.scatter(best_lag, correlation[idx], color="red", zorder=5, label="peak")
+    plt.xlabel('Lag (samples)')
+    plt.ylabel('Correlation')
+    plt.title('Signal Alignment Respiration')
+    plt.legend()
+    plt.show()
+
     # Apply the lag shift
     # best_lag > 0: dev_sig lags behind ref_sig → trim start of ref_sig
     # best_lag < 0: dev_sig is ahead of ref_sig → trim start of dev_sig
@@ -246,22 +261,18 @@ def align_signals_resp(ref_sig, dev_sig, dev_sig2, fs):
 
 
 def align_signals_ecg(ref_sig, dev_sig, fs):
-    # Cross-correlate mean-subtracted signals for robust lag estimation
     correlation = correlate(
         ref_sig - np.mean(ref_sig),
         dev_sig - np.mean(dev_sig),
         mode='full'
     )
-    lags     = correlation_lags(len(ref_sig), len(dev_sig))
-    best_lag = lags[np.argmax(np.abs(correlation))]
+    lags = correlation_lags(len(ref_sig), len(dev_sig))
 
-    # If lag is unrealistically large, constrain search to ±5 s and recompute
-    if best_lag > 10000 or best_lag < -10000:
-        print(f"ECG fell into trap!")
-        correlation[np.abs(lags) > int(5 * fs)] = -np.inf
-        best_lag = lags[np.argmax(correlation)]
+    idx = np.argmax(correlation)      # max positive correlation, not abs()
+    best_lag = lags[idx]
 
-    print(f"best_lag for ecg: {best_lag/250} seconds")
+    # print(f"best_lag for ecg: {best_lag/fs} seconds or {best_lag} samples")
+
     # Apply the lag shift
     # best_lag > 0: dev_sig lags behind ref_sig → trim start of ref_sig
     # best_lag < 0: dev_sig is ahead of ref_sig → trim start of dev_sig
