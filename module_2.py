@@ -1,7 +1,7 @@
 import numpy as np
 from vitalwave.basic_algos import filter_hr_peaks
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd
-from vitalwave.signal_quality import Absolute_Signal_to_noise_Ratio
+import neurokit2 as nk
 
 FS=250
 
@@ -56,7 +56,7 @@ def _resp_rate_from_peaks(peaks):
     return 60.0 / np.mean(bbi_valid)
 
 
-def compute_resp_features_(sig):
+def compute_resp_features(sig):
 
     peaks = _get_resp_peaks(sig)
 
@@ -76,7 +76,7 @@ def _detect_r_peaks_robust(sig):
         return p
     return np.array([], dtype=int)
 
-def _get_clean_r_peaks(seg):
+def get_hr(seg):
     """Detect → gentle filter → vitalwave filter."""
 
     r_peaks = _detect_r_peaks_robust(seg)
@@ -89,18 +89,44 @@ def _get_clean_r_peaks(seg):
     return valid_r_peaks, valid_hr_mean
 
 
-def compute_ecg_features(sig):
-    """Detect → gentle filter → vitalwave filter."""
+# threshold comes from the Orphanidou et al. (2015).
+def get_beat_quality_scores(ecg_signal, r_peaks, threshold=0.66):
 
-    snr= float(Absolute_Signal_to_noise_Ratio(sig))
+    ecg_cleaned = nk.ecg_clean(ecg_signal, sampling_rate=FS)
 
-    valid_r_peaks, valid_hr = _get_clean_r_peaks(sig)
+    # Per-sample quality index via template matching
+    quality = nk.ecg_quality(
+        ecg_cleaned,
+        rpeaks=r_peaks,
+        sampling_rate=FS,
+        method="templatematch"   # <-- Orphanidou et al. (2015)
+    )
 
-    rr   = np.diff(valid_r_peaks) / FS * 1000.0
+    beat_scores = np.array(quality)[r_peaks]
+    valid_mask = beat_scores >= threshold
+    clean_peaks = r_peaks[valid_mask]
+    mean_tm_sqi = float(np.nanmean(beat_scores))
+
+    return mean_tm_sqi, clean_peaks
+
+def get_rmssd(r_peaks):
+
+    rr   = np.diff(r_peaks) / FS * 1000.0
     diff_rr = np.diff(rr)
     if len(diff_rr) > 0:
         rmssd = float(np.sqrt(np.mean(diff_rr ** 2)))
     else:
         rmssd = 0.0
+    return rmssd
 
-    return snr, valid_hr, rmssd
+
+# def compute_ecg_features(sig):
+#     """Detect → gentle filter → vitalwave filter."""
+
+#     snr= float(Absolute_Signal_to_noise_Ratio(sig))
+
+#     valid_r_peaks, valid_hr = _get_peaks_and_hr(sig)
+
+#     rmssd = _get_rmssd_from_r_peaks(valid_r_peaks)
+
+#     return snr, valid_hr, rmssd
