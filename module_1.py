@@ -39,9 +39,6 @@ class DeviceData:
     ecg: ECGData
 
 
-
-FS=250
-
 SIGNAL_MAP = {
     # ECG channels
     "impedance_pneumography": "ecg_ch1",
@@ -190,7 +187,7 @@ def read_edf(filepath, subject=None, activity=None, conf=None):
     return sig
 
 
-def soft_fir_bandpass(data, lowcut=0.1, highcut=0.5, numtaps=2001):
+def soft_fir_bandpass(data, fs=250, lowcut=0.1, highcut=0.5, numtaps=2001):
     # numtaps must be odd for a bandpass filter
     if numtaps % 2 == 0:
         numtaps += 1
@@ -200,7 +197,7 @@ def soft_fir_bandpass(data, lowcut=0.1, highcut=0.5, numtaps=2001):
     numtaps,
     [lowcut, highcut],
     pass_zero='bandpass',
-    fs=FS,
+    fs=fs,
     window='hann'
     )
     filt = filtfilt(fir_coeff, 1.0, data)
@@ -220,13 +217,13 @@ def preprocess_ecg(sig, activity="unknown"):
     return sig
 
 
-def preprocess_respiration(sig, activity='unknown', configuration=None):
+def preprocess_respiration(sig, fs=250, activity='unknown', configuration=None):
     ma_win = 1.0
     if activity=='walking':
-        sig = normalize_signal(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
+        sig = normalize_signal(soft_fir_bandpass(sig, fs=fs, lowcut=0.15, highcut=0.7))
     else:
         sig = normalize_signal(soft_fir_bandpass(sig))
-    sig = normalize_signal(moving_average_filter(sig, window=int(FS * ma_win)))
+    sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win)))
 
     return sig
 
@@ -266,12 +263,12 @@ def read_and_clean(dev, ref_ecg, ref_resp, subject=None, activity=None, configur
     raw_ref_ecg = read_edf(ref_ecg, subject, activity, configuration)
     raw_ref_respiration = read_acq(ref_resp, subject, activity, configuration)
 
-    prep_ip = preprocess_respiration(raw_dev["impedance_pneumography"])
-    prep_gyr = preprocess_respiration(raw_dev["gyry_ribs_imu"])
-    prep_ref_resp = preprocess_respiration(raw_ref_respiration)
+    prep_ip = normalize_signal(preprocess_respiration(raw_dev["impedance_pneumography"]))
+    prep_gyr = normalize_signal(preprocess_respiration(raw_dev["gyry_ribs_imu"]))
+    prep_ref_resp = normalize_signal(preprocess_respiration(raw_ref_respiration))
 
-    prep_lead2 = preprocess_ecg(raw_dev["lead2"])
-    prep_ref_ecg = preprocess_ecg(raw_ref_ecg)
+    prep_lead2 = normalize_signal(preprocess_ecg(raw_dev["lead2"]))
+    prep_ref_ecg = normalize_signal(preprocess_ecg(raw_ref_ecg))
 
     ref_lead2, dev_lead2 = align_signals_ecg(prep_ref_ecg, prep_lead2)
 

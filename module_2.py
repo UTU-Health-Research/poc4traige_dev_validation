@@ -3,8 +3,6 @@ from vitalwave.basic_algos import filter_hr_peaks
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd
 import neurokit2 as nk
 
-FS=250
-
 def _spectral_moment(x, order, L):
     """Running spectral moment via cumulative-sum trick."""
     dx = x.copy()
@@ -16,11 +14,11 @@ def _spectral_moment(x, order, L):
     return (2.0 * np.pi / L) * w
 
 
-def segment_spi(segment, window_duration=4.0, warmup_fraction=0.25):
+def segment_spi(segment, fs=250, window_duration=4.0, warmup_fraction=0.25):
     """Signal Purity Index via Hjorth-style spectral moments."""
     x = np.asarray(segment, dtype=float).ravel()
     x = (x - x.mean()) / (x.std() + 1e-12)
-    L = max(1, int(round(FS * window_duration)))
+    L = max(1, int(round(fs * window_duration)))
     if len(x) < L:
         raise ValueError(f"Segment ({len(x)}) shorter than window ({L}).")
     w0, w2, w4 = (_spectral_moment(x, o, L) for o in (0, 2, 4))
@@ -34,9 +32,9 @@ def segment_spi(segment, window_duration=4.0, warmup_fraction=0.25):
 
 
 
-def _get_resp_peaks(sig):
+def _get_resp_peaks(sig, fs=250):
 
-    p = np.array(ampd(sig, FS), dtype=int)
+    p = np.array(ampd(sig, fs), dtype=int)
     p = p[(p >= 0) & (p < len(sig))]
     if len(p) >= 2:
         return p
@@ -44,11 +42,11 @@ def _get_resp_peaks(sig):
     return np.array([], dtype=int)
 
 
-def _resp_rate_from_peaks(peaks):
+def _resp_rate_from_peaks(peaks, fs=250):
     if len(peaks) < 2:
         return float('nan')
     
-    bbi = np.diff(peaks) / FS
+    bbi = np.diff(peaks) / fs
     bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
     if len(bbi_valid) == 0:
         return float('nan') 
@@ -70,7 +68,7 @@ def compute_resp_features(sig):
 
 def _detect_r_peaks_robust(sig):
     
-    p = ecg_modified_pan_tompkins(sig, FS)
+    p = ecg_modified_pan_tompkins(sig, fs=250)
     p = p[(p >= 0) & (p < len(sig))]
     if len(p) >= 2:
         return p
@@ -83,22 +81,22 @@ def get_hr(seg):
     if len(r_peaks) < 4:
         return [], []
     valid_r_peaks, valid_hr_mean = filter_hr_peaks(
-        peaks=r_peaks, fs=FS, hr_min=30, hr_max=220,
+        peaks=r_peaks, fs=250, hr_min=30, hr_max=220,
         kernel_size=3, sdsd_max=0.35,
     )
     return valid_r_peaks, valid_hr_mean
 
 
 # threshold comes from the Orphanidou et al. (2015).
-def get_beat_quality_scores(ecg_signal, r_peaks, threshold=0.66):
+def get_beat_quality_scores(ecg_signal, r_peaks, fs=250, threshold=0.66):
 
-    ecg_cleaned = nk.ecg_clean(ecg_signal, sampling_rate=FS)
+    ecg_cleaned = nk.ecg_clean(ecg_signal, sampling_rate=fs)
 
     # Per-sample quality index via template matching
     quality = nk.ecg_quality(
         ecg_cleaned,
         rpeaks=r_peaks,
-        sampling_rate=FS,
+        sampling_rate=fs,
         method="templatematch"   # <-- Orphanidou et al. (2015)
     )
 
@@ -109,9 +107,9 @@ def get_beat_quality_scores(ecg_signal, r_peaks, threshold=0.66):
 
     return mean_tm_sqi, clean_peaks
 
-def get_rmssd(r_peaks):
+def get_rmssd(r_peaks, fs=250):
 
-    rr   = np.diff(r_peaks) / FS * 1000.0
+    rr   = np.diff(r_peaks) / fs * 1000.0
     diff_rr = np.diff(rr)
     if len(diff_rr) > 0:
         rmssd = float(np.sqrt(np.mean(diff_rr ** 2)))
