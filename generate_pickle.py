@@ -72,9 +72,12 @@ def run_all(
 
                 try:
                     data = read_and_clean(
-                        paths["dev"],
-                        paths["ref_ecg"],
-                        paths["ref_resp"],
+                        dev=paths["dev"],
+                        ref_ecg=paths["ref_ecg"],
+                        ref_resp=paths["ref_resp"],
+                        subject=f"subject_{subject}",
+                        activity=activity,
+                        configuration=config
                     )
                     results[key] = dataclasses.asdict(data)
                     success += 1

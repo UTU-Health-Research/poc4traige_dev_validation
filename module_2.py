@@ -16,28 +16,33 @@ def _spectral_moment(x, order, L):
 
 def segment_spi(segment, fs=250, window_duration=4.0, warmup_fraction=0.25):
     """Signal Purity Index via Hjorth-style spectral moments."""
-    x = np.asarray(segment, dtype=float).ravel()
-    x = (x - x.mean()) / (x.std() + 1e-12)
-    L = max(1, int(round(fs * window_duration)))
-    if len(x) < L:
-        raise ValueError(f"Segment ({len(x)}) shorter than window ({L}).")
-    w0, w2, w4 = (_spectral_moment(x, o, L) for o in (0, 2, 4))
-    denom  = w0 * w4
-    spi    = np.zeros(len(x))
-    v      = denom > 1e-12
-    spi[v] = (w2 ** 2)[v] / denom[v]
-    spi    = np.clip(spi, 0.0, 1.0)
-    start  = max(0, int(len(spi) * warmup_fraction))
-    return float(np.mean(spi[start:]))
+    if max(abs(segment)) > 0:
+        x = np.asarray(segment, dtype=float).ravel()
+        x = (x - x.mean()) / (x.std() + 1e-12)
+        L = max(1, int(round(fs * window_duration)))
+        if len(x) < L:
+            raise ValueError(f"Segment ({len(x)}) shorter than window ({L}).")
+        w0, w2, w4 = (_spectral_moment(x, o, L) for o in (0, 2, 4))
+        denom  = w0 * w4
+        spi    = np.zeros(len(x))
+        v      = denom > 1e-12
+        spi[v] = (w2 ** 2)[v] / denom[v]
+        spi    = np.clip(spi, 0.0, 1.0)
+        start  = max(0, int(len(spi) * warmup_fraction))
+        return float(np.mean(spi[start:]))
+    
+    else:
+        return float('nan')
 
 
 
 def _get_resp_peaks(sig, fs=250):
 
-    p = np.array(ampd(sig, fs), dtype=int)
-    p = p[(p >= 0) & (p < len(sig))]
-    if len(p) >= 2:
-        return p
+    if max(abs(sig)) > 0:
+        p = np.array(ampd(sig, fs), dtype=int)
+        p = p[(p >= 0) & (p < len(sig))]
+        if len(p) >= 2:
+            return p
 
     return np.array([], dtype=int)
 
@@ -54,15 +59,17 @@ def _resp_rate_from_peaks(peaks, fs=250):
     return 60.0 / np.mean(bbi_valid)
 
 
-def compute_resp_features(sig):
+# def compute_resp_features(sig):
 
-    peaks = _get_resp_peaks(sig)
+#     peaks = _get_resp_peaks(sig)
+#     print(f"Detected {len(peaks)} respiration peaks in compute_resp_features.")
 
-    rr = _resp_rate_from_peaks(peaks)
+#     rr = _resp_rate_from_peaks(peaks)
+#     print(f"Respiration rate: {rr:.2f} bpm in compute_resp_features")
 
-    spi= segment_spi(sig)
-    
-    return peaks, rr, spi
+#     spi= segment_spi(sig)
+#     print(f"Signal Purity Index: {spi:.2f} in compute_resp_features")
+#     return peaks, rr, spi
          
 
 
@@ -92,17 +99,26 @@ def get_beat_quality_scores(ecg_signal, r_peaks, fs=250, threshold=0.66):
 
     ecg_cleaned = nk.ecg_clean(ecg_signal, sampling_rate=fs)
 
-    # Per-sample quality index via template matching
+    # Beat template needs a full window around each peak;
+    # peaks too close to edges get dropped internally by neurokit,
+    # which causes the "at least one detected peak" error
+    half_window = int(0.35 * fs)  # ~350ms each side, adjust if needed
+    sig_len = len(ecg_cleaned)
+    valid_peaks = r_peaks[(r_peaks >= half_window) & (r_peaks <= sig_len - half_window)]
+
+    if len(valid_peaks) == 0:
+        return float('nan'), np.array([])
+
     quality = nk.ecg_quality(
         ecg_cleaned,
-        rpeaks=r_peaks,
+        rpeaks=valid_peaks,
         sampling_rate=fs,
-        method="templatematch"   # <-- Orphanidou et al. (2015)
+        method="templatematch"
     )
 
-    beat_scores = np.array(quality)[r_peaks]
+    beat_scores = np.array(quality)[valid_peaks]
     valid_mask = beat_scores >= threshold
-    clean_peaks = r_peaks[valid_mask]
+    clean_peaks = valid_peaks[valid_mask]
     mean_tm_sqi = float(np.nanmean(beat_scores))
 
     return mean_tm_sqi, clean_peaks

@@ -98,7 +98,7 @@ FRAME_COLUMNS = [col for col, _, _ in FRAME_LAYOUT]
 
 # Makes the maximum values of the signal equal to 1 no restriction on the minimum values.
 def normalize_signal(sig):
-    if np.max(np.abs(sig)) > 0:
+    if max(abs(sig)) > 0:
         transformer = MaxAbsScaler()
         norm_sig = transformer.fit_transform(sig.reshape(-1, 1)).flatten()
         return norm_sig
@@ -132,7 +132,7 @@ def convert_binary_data(raw_samples):
 def extract_signals(df, subject=None, activity=None, conf=None):
 
     if subject=="subject_3" and activity=="walking" and conf=="wire":
-        print(f"executing artifact removal for device subject_{subject}_{conf}_{activity}")
+        print(f"executing artifact removal for device {subject}_{conf}_{activity}")
 
         return {
             name: df[col][10000:-500].reset_index(drop=True)
@@ -161,7 +161,7 @@ def read_acq(filepath, subject=None, activity=None, conf=None):
         dt=1/250
     )
     if subject=="subject_3" and activity=="walking" and conf=="wire":
-        print(f"executing artifact removal for resp_reference subject_{subject}_{conf}_{activity}")
+        print(f"executing artifact removal for resp_reference {subject}_{conf}_{activity}")
         ref_resp_resampled = ref_resp_resampled[10000:-500]
     else:
         ref_resp_resampled = ref_resp_resampled[1000:-500]
@@ -178,7 +178,7 @@ def read_edf(filepath, subject=None, activity=None, conf=None):
     sig = data[0]
 
     if subject=="subject_3" and activity=="walking" and conf=="wire":
-        print(f"executing artifact removal for ecg_reference subject_{subject}_{conf}_{activity}")
+        print(f"executing artifact removal for ecg_reference {subject}_{conf}_{activity}")
         sig = sig[10000:-500]
 
     else:
@@ -187,7 +187,27 @@ def read_edf(filepath, subject=None, activity=None, conf=None):
     return sig
 
 
-def soft_fir_bandpass(data, fs=250, lowcut=0.1, highcut=0.5, numtaps=2001):
+# def soft_fir_bandpass(data, fs=250, lowcut=0.1, highcut=0.5, numtaps=2001):
+#     # numtaps must be odd for a bandpass filter
+#     if numtaps % 2 == 0:
+#         numtaps += 1
+
+#     # Design an FIR filter using a Hann or Blackman window for soft attenuation
+#     fir_coeff = firwin(
+#     numtaps,
+#     [lowcut, highcut],
+#     pass_zero='bandpass',
+#     fs=fs,
+#     window='hann'
+#     )
+#     filt = filtfilt(fir_coeff, 1.0, data)
+#     filt = filt - np.mean(filt)
+#     transformer = MaxAbsScaler()
+#     normfilt = transformer.fit_transform(filt.reshape(-1, 1)).flatten()
+
+#     return normfilt
+
+def soft_fir_bandpass(data, lowcut=0.1, highcut=0.5, fs=250.0, numtaps=2001):
     # numtaps must be odd for a bandpass filter
     if numtaps % 2 == 0:
         numtaps += 1
@@ -204,27 +224,72 @@ def soft_fir_bandpass(data, fs=250, lowcut=0.1, highcut=0.5, numtaps=2001):
     filt = filt - np.mean(filt)
     transformer = MaxAbsScaler()
     normfilt = transformer.fit_transform(filt.reshape(-1, 1)).flatten()
+    #normfilt = filt.astype(float) / np.max(np.abs(filt.astype(float)))
 
+    # Filter with zero-phase shift shift using filtfilt
     return normfilt
 
 
-def preprocess_ecg(sig, activity="unknown"):
+# def preprocess_ecg(sig, activity="unknown"):
+
+#     hp_freq = 5.0 if activity != "walking" else 8.0  # stricter for motion
+#     lp_freq = 40.0
+#     sig = normalize_signal(soft_fir_bandpass(sig, lowcut=hp_freq, highcut=lp_freq, numtaps=301))
+    
+#     return sig
+
+def preprocess_ecg(signal, fs=250, activity="unknown"):
+    sig = np.asarray(signal, dtype=np.float64).ravel()
 
     hp_freq = 5.0 if activity != "walking" else 8.0  # stricter for motion
     lp_freq = 40.0
     sig = normalize_signal(soft_fir_bandpass(sig, lowcut=hp_freq, highcut=lp_freq, numtaps=301))
-    
     return sig
 
 
-def preprocess_respiration(sig, fs=250, activity='unknown', configuration=None):
+# def preprocess_respiration(sig, fs=250, activity='unknown', configuration=None):
+#     ma_win = 1.0
+#     if activity=='walking':
+#         sig = normalize_signal(soft_fir_bandpass(sig, fs=fs, lowcut=0.15, highcut=0.7))
+#     else:
+#         sig = normalize_signal(soft_fir_bandpass(sig))
+#     sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win)))
+
+#     return sig
+
+def preprocess_respiration(signal, fs=250, activity='unknown', configuration=None):
+    sig = np.asarray(signal, dtype=np.float64).ravel()
+
     ma_win = 1.0
     if activity=='walking':
-        sig = normalize_signal(soft_fir_bandpass(sig, fs=fs, lowcut=0.15, highcut=0.7))
+        sig = normalize_signal(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
     else:
         sig = normalize_signal(soft_fir_bandpass(sig))
     sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win)))
+    # if configuration=="patch":
+    #     sig = normalize_signal(hilbert_equal(sig))
+    return sig
 
+
+def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='unknown', configuration=None):
+    sig = np.asarray(signal, dtype=np.float64).ravel()
+
+    PROFILES = {
+        #              order   hp_hz   lp_hz   ma_window_s
+        'laying':     (2,      0.1,    0.7,    1),
+        'walking':    (3,      0.15,    0.8,    1),
+        'unknown':    (2,      0.15,   0.8,    1),
+    }
+
+    spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
+    idx = np.arange(len(sig), dtype=np.float64)
+    sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask]) #
+
+    order, hp, lp, ma_win = PROFILES.get(activity, PROFILES['unknown'])
+
+    sig = normalize_signal(soft_fir_bandpass(sig))
+    sig = normalize_signal(moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg"))
+    # sig = normalize_signal(hilbert_equal(sig))
     return sig
 
 
@@ -263,12 +328,13 @@ def read_and_clean(dev, ref_ecg, ref_resp, subject=None, activity=None, configur
     raw_ref_ecg = read_edf(ref_ecg, subject, activity, configuration)
     raw_ref_respiration = read_acq(ref_resp, subject, activity, configuration)
 
-    prep_ip = normalize_signal(preprocess_respiration(raw_dev["impedance_pneumography"]))
-    prep_gyr = normalize_signal(preprocess_respiration(raw_dev["gyry_ribs_imu"]))
-    prep_ref_resp = normalize_signal(preprocess_respiration(raw_ref_respiration))
+    prep_ip = preprocess_respiration(signal=raw_dev["impedance_pneumography"], activity=activity)
+    # prep_gyr = preprocess_respiration(sig=raw_dev["gyry_ribs_imu"], activity=activity)
+    prep_gyr = preprocess_imu(signal=raw_dev["gyry_ribs_imu"], activity=activity)
+    prep_ref_resp = preprocess_respiration(signal=raw_ref_respiration, activity=activity)
 
-    prep_lead2 = normalize_signal(preprocess_ecg(raw_dev["lead2"]))
-    prep_ref_ecg = normalize_signal(preprocess_ecg(raw_ref_ecg))
+    prep_lead2 = preprocess_ecg(signal=raw_dev["lead2"], activity=activity)
+    prep_ref_ecg = preprocess_ecg(signal=raw_ref_ecg, activity=activity)
 
     ref_lead2, dev_lead2 = align_signals_ecg(prep_ref_ecg, prep_lead2)
 
