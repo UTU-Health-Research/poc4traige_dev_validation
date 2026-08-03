@@ -1,5 +1,6 @@
 import struct
 import numpy as np
+# import cupy as np
 import pandas as pd
 import mne
 import bioread
@@ -218,10 +219,13 @@ def preprocess_respiration(signal, fs=250, activity='unknown', configuration=Non
     sig = np.asarray(signal, dtype=np.float64).ravel()
 
     ma_win = 1.0
-    if activity=='walking':
-        sig = min_max_normalize(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
-    else:
-        sig = min_max_normalize(soft_fir_bandpass(sig))
+    sig = min_max_normalize(butter_filter(arr=sig, n=4, wn=[0.1, 1.0], filter_type='bandpass', fs=250))
+
+    # if activity=='walking':
+    #     sig = min_max_normalize(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
+    # else:
+    #     sig = min_max_normalize(soft_fir_bandpass(sig))
+
     sig = min_max_normalize(moving_average_filter(sig, window=int(fs * ma_win)))
 
     return sig
@@ -237,7 +241,8 @@ def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='u
 
         ma_win = 1
 
-        sig = min_max_normalize(soft_fir_bandpass(sig))
+        # sig = min_max_normalize(soft_fir_bandpass(sig))
+        sig = min_max_normalize(butter_filter(arr=sig, n=4, wn=[0.1, 1.0], filter_type='bandpass', fs=250))
         sig = min_max_normalize(moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg"))
 
         return sig

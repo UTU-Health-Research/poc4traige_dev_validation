@@ -59,19 +59,6 @@ def _resp_rate_from_peaks(peaks, fs=250):
     return 60.0 / np.mean(bbi_valid)
 
 
-# def compute_resp_features(sig):
-
-#     peaks = _get_resp_peaks(sig)
-#     print(f"Detected {len(peaks)} respiration peaks in compute_resp_features.")
-
-#     rr = _resp_rate_from_peaks(peaks)
-#     print(f"Respiration rate: {rr:.2f} bpm in compute_resp_features")
-
-#     spi= segment_spi(sig)
-#     print(f"Signal Purity Index: {spi:.2f} in compute_resp_features")
-#     return peaks, rr, spi
-         
-
 
 def _detect_r_peaks_robust(sig):
     
@@ -132,15 +119,3 @@ def get_rmssd(r_peaks, fs=250):
     else:
         rmssd = 0.0
     return rmssd
-
-
-# def compute_ecg_features(sig):
-#     """Detect → gentle filter → vitalwave filter."""
-
-#     snr= float(Absolute_Signal_to_noise_Ratio(sig))
-
-#     valid_r_peaks, valid_hr = _get_peaks_and_hr(sig)
-
-#     rmssd = _get_rmssd_from_r_peaks(valid_r_peaks)
-
-#     return snr, valid_hr, rmssd
