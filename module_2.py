@@ -99,15 +99,12 @@ def _resp_rate_from_peaks(peaks, fs=250):
     # if len(peaks) < 2:
     #     return float('nan')
     
-    # bbi = np.diff(peaks) / fs
-    # bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
-    # if len(bbi_valid) == 0:
-    #     return float('nan') 
-
-    # return 60.0 / np.median(bbi_valid)
-
-    valid_peaks, valid_rr_mean = filter_resp_peaks(peaks, fs=fs)
-    return valid_rr_mean
+    bbi = np.diff(peaks) / fs
+    bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
+    if len(bbi_valid) == 0:
+        return float('nan') 
+    
+    return 60.0 / np.mean(bbi_valid)
 
 
 # def compute_resp_features(sig):
@@ -183,15 +180,3 @@ def get_rmssd(r_peaks, fs=250):
     else:
         rmssd = 0.0
     return rmssd
-
-
-# def compute_ecg_features(sig):
-#     """Detect → gentle filter → vitalwave filter."""
-
-#     snr= float(Absolute_Signal_to_noise_Ratio(sig))
-
-#     valid_r_peaks, valid_hr = _get_peaks_and_hr(sig)
-
-#     rmssd = _get_rmssd_from_r_peaks(valid_r_peaks)
-
-#     return snr, valid_hr, rmssd

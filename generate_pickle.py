@@ -7,7 +7,7 @@ from module_1 import read_and_clean
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Default location of the dataset relative to this script
-DATASET_DIR = "../dataset"
+DATASET_DIR = "/mnt/d/POC4TRIAGE-usman/dataset-multimodal-patch/Data/dataset"
 
 
 # ──────────────────────── discover available subjects ──────────────────────────
@@ -108,12 +108,6 @@ def run_all_parallel(
     size_mb = os.path.getsize(output_pkl) / (1024 * 1024)
     print(f"\nDone – {size_mb:.1f} MB  |  ✓ {success}  SKIP {skipped}  ✗ {failed}")
     return results
-
-
-# ─────────────────────── loading helper (for later use) ────────────────────────
-def load_results(path: str = "all_device_data.pkl") -> dict:
-    with open(path, "rb") as f:
-        return pickle.load(f)
 
 
 # ───────────────────────────────── entry point ─────────────────────────────────
