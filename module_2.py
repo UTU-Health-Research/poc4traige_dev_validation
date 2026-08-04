@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import signal
 from vitalwave.basic_algos import filter_hr_peaks
 from vitalwave.peak_detectors import ecg_modified_pan_tompkins, ampd
 import neurokit2 as nk
@@ -35,6 +36,53 @@ def segment_spi(segment, fs=250, window_duration=4.0, warmup_fraction=0.25):
         return float('nan')
 
 
+def filter_resp_peaks(
+    peaks,
+    fs: int = 250,
+    rr_min: float = 4,
+    rr_max: float = 30,
+    kernel_size: int = 5,
+    sdsd_max: float = 1.3,
+):
+    """
+    Usage: 
+    valid_peaks, rr_mean = filter_resp_peaks(resp_peaks, fs=250,
+    ...     rr_min=4, rr_max=30, kernel_size=5, sdsd_max=1.3)
+    """
+
+    # need at least 3 peaks (2 intervals) for any meaningful check
+    if len(peaks) < 3:
+        return np.array([], dtype=int), np.nan
+
+    bbi_samples = np.diff(peaks)                 # in samples
+    bbi = bbi_samples / fs                       # in seconds
+    rr = 60.0 / bbi                              # in breaths-per-minute
+
+    rr_med = signal.medfilt(rr, kernel_size=kernel_size)
+
+    bbi_diff = np.diff(bbi)
+    sdsd = np.std(bbi_diff)
+
+    if sdsd_max is not None and sdsd > sdsd_max:
+        return np.array([], dtype=int), np.nan
+
+    valid_interval_mask = (rr_med >= rr_min) & (rr_med <= rr_max)
+
+    valid_bbi = bbi[valid_interval_mask]
+
+    if len(valid_bbi) == 0:
+        return np.array([], dtype=int), np.nan
+
+    valid_rr_mean = 60.0 / np.median(valid_bbi)
+
+    valid_peak_mask = np.zeros(len(peaks), dtype=bool)
+    valid_peak_mask[:-1] |= valid_interval_mask  # interval to the RIGHT
+    valid_peak_mask[1:]  |= valid_interval_mask  # interval to the LEFT
+
+    valid_peaks = peaks[valid_peak_mask]
+
+    return valid_peaks, valid_rr_mean
+
 
 def _get_resp_peaks(sig, fs=250):
 
@@ -48,15 +96,18 @@ def _get_resp_peaks(sig, fs=250):
 
 
 def _resp_rate_from_peaks(peaks, fs=250):
-    if len(peaks) < 2:
-        return float('nan')
+    # if len(peaks) < 2:
+    #     return float('nan')
     
-    bbi = np.diff(peaks) / fs
-    bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
-    if len(bbi_valid) == 0:
-        return float('nan') 
-    
-    return 60.0 / np.mean(bbi_valid)
+    # bbi = np.diff(peaks) / fs
+    # bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
+    # if len(bbi_valid) == 0:
+    #     return float('nan') 
+
+    # return 60.0 / np.median(bbi_valid)
+
+    valid_peaks, valid_rr_mean = filter_resp_peaks(peaks, fs=fs)
+    return valid_rr_mean
 
 
 # def compute_resp_features(sig):
@@ -88,7 +139,7 @@ def get_hr(seg):
     if len(r_peaks) < 4:
         return [], []
     valid_r_peaks, valid_hr_mean = filter_hr_peaks(
-        peaks=r_peaks, fs=250, hr_min=30, hr_max=220,
+        peaks=r_peaks, fs=250, hr_min=30, hr_max=120,
         kernel_size=3, sdsd_max=0.35,
     )
     return valid_r_peaks, valid_hr_mean

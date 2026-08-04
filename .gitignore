@@ -1,3 +1,6 @@
 "__pycache__/" 
 "*.pyc" 
+"*.pkl"
 all_device_data.pkl
+all_device_data_MnF.pkl
+long_term_data.pkl

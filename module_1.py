@@ -214,14 +214,26 @@ def preprocess_ecg(signal, fs=250, activity="unknown"):
     sig = min_max_normalize(butter_filter(arr=sig, n=1, wn=[hp_freq, lp_freq], filter_type='bandpass', fs=250))
     return sig
 
+# def preprocess_respiration(signal, fs=250, activity='unknown', configuration=None):
+#     sig = np.asarray(signal, dtype=np.float64).ravel()
+
+#     ma_win = 1.0
+#     if activity=='walking':
+#         sig = min_max_normalize(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
+#     else:
+#         sig = min_max_normalize(soft_fir_bandpass(sig))
+#     sig = min_max_normalize(moving_average_filter(sig, window=int(fs * ma_win)))
+
+#     return sig
+
 def preprocess_respiration(signal, fs=250, activity='unknown', configuration=None):
     sig = np.asarray(signal, dtype=np.float64).ravel()
 
     ma_win = 1.0
     if activity=='walking':
-        sig = min_max_normalize(soft_fir_bandpass(sig, lowcut=0.15, highcut=0.7))
+        sig = min_max_normalize(butter_filter(arr=sig, n=4, wn=[0.1,  0.8], filter_type='bandpass', fs=250))
     else:
-        sig = min_max_normalize(soft_fir_bandpass(sig))
+        sig = min_max_normalize(butter_filter(arr=sig, n=4, wn=[0.1,  0.7], filter_type='bandpass', fs=250))
     sig = min_max_normalize(moving_average_filter(sig, window=int(fs * ma_win)))
 
     return sig

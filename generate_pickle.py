@@ -58,74 +58,13 @@ def _process_one_case(args):
         return key, "fail", str(exc)
     
 # ──────────────────────────── main batch runner ────────────────────────────────
-# def run_all(
-#     output_pkl: str = "all_device_data.pkl",
-#     configs: list[str] | None = None,
-#     activities: list[str] | None = None,
-#     subjects: list[int] | None = None,
-#     base_dir: str = DATASET_DIR,
-# ):
-#     if configs is None:
-#         configs = ["wire", "patch"]
-#     if activities is None:
-#         activities = ["laying", "walking"]
-#     if subjects is None:
-#         subjects = discover_subjects(base_dir)
-
-#     print(f"Dataset dir    : {base_dir}")
-#     print(f"Subjects found : {subjects}")
-#     print(f"Configs        : {configs}")
-#     print(f"Activities     : {activities}")
-#     print(f"Max combos     : {len(subjects) * len(configs) * len(activities)}\n")
-
-#     results: dict = {}
-#     success, skipped, failed = 0, 0, 0
-
-#     for subject in subjects:
-#         for config in configs:
-#             for activity in activities:
-#                 key = f"subject_{subject}/{config}/{activity}"
-#                 paths = case_paths(subject, config, activity, base_dir)
-
-#                 if paths is None:
-#                     print(f"  SKIP  {key}  (missing files)")
-#                     skipped += 1
-#                     continue
-
-#                 try:
-#                     data = read_and_clean(
-#                         dev=paths["dev"],
-#                         ref_ecg=paths["ref_ecg"],
-#                         ref_resp=paths["ref_resp"],
-#                         subject=f"subject_{subject}",
-#                         activity=activity,
-#                         configuration=config
-#                     )
-#                     results[key] = dataclasses.asdict(data)
-#                     success += 1
-#                     print(f"  ✓     {key}")
-
-#                 except Exception as exc:
-#                     failed += 1
-#                     print(f"  ✗     {key}  → {exc}")
-
-#     # ── write pickle ──
-#     print(f"\nWriting {output_pkl} …")
-#     with open(output_pkl, "wb") as f:
-#         pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-#     size_mb = os.path.getsize(output_pkl) / (1024 * 1024)
-#     print(f"Done  – {size_mb:.1f} MB  |  ✓ {success}  SKIP {skipped}  ✗ {failed}")
-
-#     return results
-
 def run_all_parallel(
-    output_pkl: str = "long_term_data.pkl",
+    output_pkl: str = "all_device_data_MnF.pkl",
     configs: list[str] | None = None,
     activities: list[str] | None = None,
     subjects: list[int] | None = None,
     base_dir: str = DATASET_DIR,
-    max_workers: int | None = None,        # defaults to cpu_count
+    max_workers: int = 20,        # defaults to cpu_count
 ):
     if configs is None:
         configs = ["wire", "patch"]
