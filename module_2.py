@@ -41,13 +41,13 @@ def filter_resp_peaks(
     fs: int = 250,
     rr_min: float = 4,
     rr_max: float = 30,
-    kernel_size: int = 5,
+    kernel_size: int = 3,
     sdsd_max: float = 1.3,
 ):
     """
     Usage: 
     valid_peaks, rr_mean = filter_resp_peaks(resp_peaks, fs=250,
-    ...     rr_min=4, rr_max=30, kernel_size=5, sdsd_max=1.3)
+    ...     rr_min=4, rr_max=30, kernel_size=3, sdsd_max=1.3)
     """
 
     # need at least 3 peaks (2 intervals) for any meaningful check
@@ -57,7 +57,7 @@ def filter_resp_peaks(
     bbi_samples = np.diff(peaks)                 # in samples
     bbi = bbi_samples / fs                       # in seconds
     rr = 60.0 / bbi                              # in breaths-per-minute
-
+    
     rr_med = signal.medfilt(rr, kernel_size=kernel_size)
 
     bbi_diff = np.diff(bbi)
@@ -96,33 +96,8 @@ def _get_resp_peaks(sig, fs=250):
 
 
 def _resp_rate_from_peaks(peaks, fs=250):
-    # if len(peaks) < 2:
-    #     return float('nan')
-    
-    # bbi = np.diff(peaks) / fs
-    # bbi_valid = bbi[(bbi > 2.0) & (bbi < 10.0)]  # 6–30 bpm physiological range
-    # if len(bbi_valid) == 0:
-    #     return float('nan') 
-
-    # return 60.0 / np.median(bbi_valid)
-
     valid_peaks, valid_rr_mean = filter_resp_peaks(peaks, fs=fs)
-    return valid_rr_mean
-
-
-# def compute_resp_features(sig):
-
-#     peaks = _get_resp_peaks(sig)
-#     print(f"Detected {len(peaks)} respiration peaks in compute_resp_features.")
-
-#     rr = _resp_rate_from_peaks(peaks)
-#     print(f"Respiration rate: {rr:.2f} bpm in compute_resp_features")
-
-#     spi= segment_spi(sig)
-#     print(f"Signal Purity Index: {spi:.2f} in compute_resp_features")
-#     return peaks, rr, spi
-         
-
+    return valid_peaks, valid_rr_mean
 
 def _detect_r_peaks_robust(sig):
     
@@ -183,15 +158,3 @@ def get_rmssd(r_peaks, fs=250):
     else:
         rmssd = 0.0
     return rmssd
-
-
-# def compute_ecg_features(sig):
-#     """Detect → gentle filter → vitalwave filter."""
-
-#     snr= float(Absolute_Signal_to_noise_Ratio(sig))
-
-#     valid_r_peaks, valid_hr = _get_peaks_and_hr(sig)
-
-#     rmssd = _get_rmssd_from_r_peaks(valid_r_peaks)
-
-#     return snr, valid_hr, rmssd
