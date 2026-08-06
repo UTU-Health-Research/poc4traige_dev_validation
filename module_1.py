@@ -175,7 +175,7 @@ def read_acq(filepath, subject=None, activity=None, conf=None):
     elif subject=="subject_9" and activity=="walking" and conf=="wire":
         print(f"executing artifact removal for resp_reference {subject}_{conf}_{activity}")
         ref_resp_resampled = ref_resp_resampled[1000:25000]
-
+    
     else:
         ref_resp_resampled = ref_resp_resampled[1000:-500]
 
@@ -213,17 +213,8 @@ def preprocess_ecg(signal, fs=250, activity="unknown"):
     return sig
 
 
-def preprocess_respiration(signal, fs=250, activity='unknown', configuration=None, imu=False, spike_threshold=3.0):
+def preprocess_respiration(signal, fs=250, activity='unknown', configuration=None):
     sig = np.asarray(signal, dtype=np.float64).ravel()
-
-    # Spikes removal code for IMU signals
-    if imu:
-        if max(abs(sig)) > 0:
-            spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
-            idx = np.arange(len(sig), dtype=np.float64)
-            sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask])
-        else:
-            return sig
 
     ma_win = 1.0
     if activity=='walking':
@@ -233,6 +224,26 @@ def preprocess_respiration(signal, fs=250, activity='unknown', configuration=Non
     sig = min_max_normalize(moving_average_filter(sig, window=int(fs * ma_win)))
 
     return sig
+
+
+def preprocess_imu(signal, fs=250, spike_threshold=3.0, highcut=2.0, activity='unknown', configuration=None):
+    sig = np.asarray(signal, dtype=np.float64).ravel()
+
+    if max(abs(sig)) > 0:
+        spike_mask = np.abs(sig - np.mean(sig)) > spike_threshold * np.std(sig)
+        idx = np.arange(len(sig), dtype=np.float64)
+        sig = np.interp(idx, idx[~spike_mask], sig[~spike_mask]) #
+
+        ma_win = 1
+        if activity=='walking':
+            sig = min_max_normalize(butter_filter(arr=sig, n=4, wn=[0.1,  0.8], filter_type='bandpass', fs=250))
+        else:
+            sig = min_max_normalize(butter_filter(arr=sig, n=4, wn=[0.1,  0.7], filter_type='bandpass', fs=250))    
+        sig = min_max_normalize(moving_average_filter(sig, window=int(fs * ma_win), type="moving_avg"))
+
+        return sig
+    else:
+        return sig
 
 
 def align_signals_ecg(ref_sig, dev_sig):
@@ -271,7 +282,7 @@ def read_and_clean(dev, ref_ecg, ref_resp, subject=None, activity=None, configur
     raw_ref_respiration = read_acq(ref_resp, subject, activity, configuration)
 
     prep_ip = preprocess_respiration(signal=raw_dev["impedance_pneumography"], activity=activity)
-    prep_gyr = preprocess_respiration(signal=raw_dev["gyry_ribs_imu"], activity=activity, imu=True)
+    prep_gyr = preprocess_imu(signal=raw_dev["gyry_ribs_imu"], activity=activity)
     prep_ref_resp = preprocess_respiration(signal=raw_ref_respiration, activity=activity)
 
     prep_lead2 = preprocess_ecg(signal=raw_dev["lead2"], activity=activity)

@@ -36,30 +36,16 @@ def segment_spi(segment, fs=250, window_duration=4.0, warmup_fraction=0.25):
         return float('nan')
 
 
-def filter_resp_peaks(
-    peaks,
-    fs: int = 250,
-    rr_min: float = 4,
-    rr_max: float = 30,
-    kernel_size: int = 3,
-    sdsd_max: float = 1.3,
-):
-    """
-    Usage: 
-    valid_peaks, rr_mean = filter_resp_peaks(resp_peaks, fs=250,
-    ...     rr_min=4, rr_max=30, kernel_size=3, sdsd_max=1.3)
-    """
-
-    # need at least 3 peaks (2 intervals) for any meaningful check
+def filter_resp_peaks(peaks,fs: int = 250,rr_min: float = 4,rr_max: float = 30,kernel_size: int = 3,sdsd_max: float = 1.3):
+    # at least 3 peaks for meaningful check
     if len(peaks) < 3:
         return np.array([], dtype=int), np.nan
-
+    
     bbi_samples = np.diff(peaks)                 # in samples
     bbi = bbi_samples / fs                       # in seconds
     rr = 60.0 / bbi                              # in breaths-per-minute
-    
-    rr_med = signal.medfilt(rr, kernel_size=kernel_size)
 
+    rr_med = signal.medfilt(rr, kernel_size=kernel_size)
     bbi_diff = np.diff(bbi)
     sdsd = np.std(bbi_diff)
 
@@ -67,20 +53,16 @@ def filter_resp_peaks(
         return np.array([], dtype=int), np.nan
 
     valid_interval_mask = (rr_med >= rr_min) & (rr_med <= rr_max)
-
     valid_bbi = bbi[valid_interval_mask]
 
     if len(valid_bbi) == 0:
         return np.array([], dtype=int), np.nan
 
     valid_rr_mean = 60.0 / np.median(valid_bbi)
-
     valid_peak_mask = np.zeros(len(peaks), dtype=bool)
     valid_peak_mask[:-1] |= valid_interval_mask  # interval to the RIGHT
     valid_peak_mask[1:]  |= valid_interval_mask  # interval to the LEFT
-
     valid_peaks = peaks[valid_peak_mask]
-
     return valid_peaks, valid_rr_mean
 
 
