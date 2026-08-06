@@ -110,13 +110,6 @@ def run_all_parallel(
     return results
 
 
-# ─────────────────────── loading helper (for later use) ────────────────────────
-def load_results(path: str = "all_device_data.pkl") -> dict:
-    with open(path, "rb") as f:
-        return pickle.load(f)
-
-
 # ───────────────────────────────── entry point ─────────────────────────────────
 if __name__ == "__main__":
-    # run_all()
     run_all_parallel()
