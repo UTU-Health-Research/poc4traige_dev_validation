@@ -131,6 +131,17 @@ def convert_binary_data(raw_samples):
 
 def extract_signals(df, subject=None, activity=None, conf=None):
 
+    # if subject == "subject_1" and activity == "laying" and conf == "wire":
+    #     print(f"executing artifact removal for device {subject}_{conf}_{activity}")
+
+    #     return {
+    #         name: pd.concat(
+    #             [df[col][1000:24000], df[col][29000:-500]],
+    #             ignore_index=True
+    #         )
+    #         for name, col in SIGNAL_MAP.items()
+    #     }
+
     if subject=="subject_3" and activity=="walking" and conf=="wire":
         print(f"executing artifact removal for device {subject}_{conf}_{activity}")
 
@@ -139,6 +150,17 @@ def extract_signals(df, subject=None, activity=None, conf=None):
             for name, col in SIGNAL_MAP.items()
         }
 
+    # elif subject=="subject_6" and activity=="walking" and conf=="wire":
+    #     print(f"executing artifact removal for device {subject}_{conf}_{activity}")
+
+    #     return {
+    #         name: pd.concat(
+    #             [df[col][1000:14000], df[col][19000:-500]],
+    #             ignore_index=True
+    #         )
+    #         for name, col in SIGNAL_MAP.items()
+    #         }
+
     elif subject=="subject_9" and activity=="walking" and conf=="wire":
         print(f"executing artifact removal for device {subject}_{conf}_{activity}")
 
@@ -146,6 +168,14 @@ def extract_signals(df, subject=None, activity=None, conf=None):
             name: df[col][1000:25000].reset_index(drop=True)
             for name, col in SIGNAL_MAP.items()
         }
+
+    # elif subject=="subject_11" and activity=="laying" and conf=="wire":
+    #     print(f"executing artifact removal for device {subject}_{conf}_{activity}")
+
+    #     return {
+    #         name: df[col][4000:-500].reset_index(drop=True)
+    #         for name, col in SIGNAL_MAP.items()
+    #     }
 
     else:
         return {
@@ -168,13 +198,31 @@ def read_acq(filepath, subject=None, activity=None, conf=None):
         arr=sig,
         dt=1/250
     )
+    # if subject=="subject_1" and activity=="laying" and conf=="wire":
+    #         print(f"executing artifact removal for resp_reference {subject}_{conf}_{activity}")
+    #         ref_resp_resampled = np.concatenate([
+    #             ref_resp_resampled[1000:24000],
+    #             ref_resp_resampled[29000:-500]
+    #         ])
+
     if subject=="subject_3" and activity=="walking" and conf=="wire":
         print(f"executing artifact removal for resp_reference {subject}_{conf}_{activity}")
         ref_resp_resampled = ref_resp_resampled[10000:-500]
 
+    # elif subject=="subject_6" and activity=="walking" and conf=="wire":
+    #         print(f"executing artifact removal for resp_reference {subject}_{conf}_{activity}")
+    #         ref_resp_resampled = np.concatenate([
+    #             ref_resp_resampled[1000:14000],
+    #             ref_resp_resampled[19000:-500]
+    #         ])
+
     elif subject=="subject_9" and activity=="walking" and conf=="wire":
         print(f"executing artifact removal for resp_reference {subject}_{conf}_{activity}")
         ref_resp_resampled = ref_resp_resampled[1000:25000]
+
+    # elif subject=="subject_11" and activity=="laying" and conf=="wire":
+    #         print(f"executing artifact removal for resp_reference {subject}_{conf}_{activity}")
+    #         ref_resp_resampled = ref_resp_resampled[4000:-500]
     
     else:
         ref_resp_resampled = ref_resp_resampled[1000:-500]
@@ -190,13 +238,31 @@ def read_edf(filepath, subject=None, activity=None, conf=None):
     data, _ = edf_file['ECG_2']
     sig = data[0]
 
+    # if subject=="subject_1" and activity=="laying" and conf=="wire":
+    #         print(f"executing artifact removal for ecg_reference {subject}_{conf}_{activity}")
+    #         sig = np.concatenate([
+    #             sig[1000:24000],
+    #             sig[29000:-500]
+    #         ])
+
     if subject=="subject_3" and activity=="walking" and conf=="wire":
         print(f"executing artifact removal for ecg_reference {subject}_{conf}_{activity}")
         sig = sig[10000:-500]
 
+    # elif subject=="subject_6" and activity=="walking" and conf=="wire":
+    #         print(f"executing artifact removal for ecg_reference {subject}_{conf}_{activity}")
+    #         sig = np.concatenate([
+    #             sig[1000:14000],
+    #             sig[19000:-500]
+    #         ])
+
     elif subject=="subject_9" and activity=="walking" and conf=="wire":
         print(f"executing artifact removal for ecg_reference {subject}_{conf}_{activity}")
         sig = sig[1000:25000]
+
+    # elif subject=="subject_11" and activity=="laying" and conf=="wire":
+    #     print(f"executing artifact removal for ecg_reference {subject}_{conf}_{activity}")
+    #     sig = sig[4000:-500]
 
     else:
         sig = sig[1000:-500]

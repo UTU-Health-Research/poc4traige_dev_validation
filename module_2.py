@@ -59,10 +59,19 @@ def filter_resp_peaks(peaks,fs: int = 250,rr_min: float = 4,rr_max: float = 30,k
         return np.array([], dtype=int), np.nan
 
     valid_rr_mean = 60.0 / np.median(valid_bbi)
-    valid_peak_mask = np.zeros(len(peaks), dtype=bool)
-    valid_peak_mask[:-1] |= valid_interval_mask  # interval to the RIGHT
-    valid_peak_mask[1:]  |= valid_interval_mask  # interval to the LEFT
-    valid_peaks = peaks[valid_peak_mask]
+
+    valid_peaks = [peaks[0]]
+        # Calculate cumulative sum to find the valid peak indices # JUST USE CUMSUM
+    cumulative_sum = peaks[0]
+    for i in range(len(valid_bbi)):
+        cumulative_sum += valid_bbi[i] * fs
+        valid_peaks.append(int(cumulative_sum))
+
+    # valid_peak_mask = np.zeros(len(peaks), dtype=bool)
+    # valid_peak_mask[:-1] |= valid_interval_mask  # interval to the RIGHT
+    # valid_peak_mask[1:]  |= valid_interval_mask  # interval to the LEFT
+    # valid_peaks = peaks[valid_peak_mask]
+
     return valid_peaks, valid_rr_mean
 
 
