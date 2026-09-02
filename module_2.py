@@ -112,33 +112,51 @@ def get_hr(seg):
 
 
 # threshold comes from the Orphanidou et al. (2015).
-def get_beat_quality_scores(ecg_signal, r_peaks, fs=250, threshold=0.66):
-
-    ecg_cleaned = nk.ecg_clean(ecg_signal, sampling_rate=fs)
-
-    # Beat template needs a full window around each peak;
-    # peaks too close to edges get dropped internally by neurokit,
-    # which causes the "at least one detected peak" error
-    half_window = int(0.35 * fs)  # ~350ms each side, adjust if needed
+def get_beat_quality_scores(ecg_cleaned, r_peaks, fs=250, threshold=0.80):
+    
+    if len(r_peaks) < 2:
+        return 0.0, np.array([])
+    
+    rr_intervals = np.diff(r_peaks) / fs  # seconds
+    hr_bpm = 60.0 / np.median(rr_intervals)
+    
+    # --- Paper's three pre-checks ---
+    if not (40 <= hr_bpm <= 180):
+        return 0.0, np.array([])
+    if np.any(rr_intervals > 3.0):
+        return 0.0, np.array([])
+    if (np.max(rr_intervals) / np.min(rr_intervals)) >= 2.2:
+        return 0.0, np.array([])
+    
+    # --- Template matching with median RR window ---
+    median_rr = int(np.median(np.diff(r_peaks)))  # samples
+    half_window = median_rr // 2
     sig_len = len(ecg_cleaned)
-    valid_peaks = r_peaks[(r_peaks >= half_window) & (r_peaks <= sig_len - half_window)]
+    
+    beats, valid_peaks = [], []
+    for peak in r_peaks:
+        start, end = peak - half_window, peak + half_window
+        if start >= 0 and end <= sig_len:
+            beat = ecg_cleaned[start:end]
+            beats.append(beat)
+            valid_peaks.append(peak)
+    
+    if len(beats) < 2:
+        return 0.0, np.array([])
+    
+    beats = np.array(beats)
+    template = np.mean(beats, axis=0)
+    
+    scores = np.array([np.corrcoef(b, template)[0, 1] for b in beats])
+    valid_peaks = np.array(valid_peaks)
+    
+    mean_sqi = float(np.nanmean(scores))
+    clean_peaks = valid_peaks[scores >= threshold]
 
-    if len(valid_peaks) == 0:
-        return float('nan'), np.array([])
+    retention_rate = len(clean_peaks) / len(r_peaks)
+    print(f"Beat retention: {retention_rate:.1%}")
 
-    quality = nk.ecg_quality(
-        ecg_cleaned,
-        rpeaks=valid_peaks,
-        sampling_rate=fs,
-        method="templatematch"
-    )
-
-    beat_scores = np.array(quality)[valid_peaks]
-    valid_mask = beat_scores >= threshold
-    clean_peaks = valid_peaks[valid_mask]
-    mean_tm_sqi = float(np.nanmean(beat_scores))
-
-    return mean_tm_sqi, clean_peaks
+    return mean_sqi, clean_peaks
 
 def get_rmssd(r_peaks, fs=250):
 
