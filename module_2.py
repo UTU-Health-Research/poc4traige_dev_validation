@@ -29,7 +29,7 @@ def segment_spi(segment, fs=250, window_duration=4.0, warmup_fraction=0.25):
         v      = denom > 1e-12
         spi[v] = (w2 ** 2)[v] / denom[v]
         spi    = np.clip(spi, 0.0, 1.0)
-        start  = max(0, int(len(spi) * warmup_fraction))
+        start  = max(L, int(len(spi) * warmup_fraction))
         return float(np.mean(spi[start:]))
     
     else:
@@ -112,7 +112,7 @@ def get_hr(seg):
 
 
 # threshold comes from the Orphanidou et al. (2015).
-def get_beat_quality_scores(ecg_cleaned, r_peaks, fs=250, threshold=0.80):
+def get_beat_quality_scores(ecg_cleaned, r_peaks, fs=250, threshold=0.50):
     
     if len(r_peaks) < 2:
         return 0.0, np.array([])
@@ -152,9 +152,6 @@ def get_beat_quality_scores(ecg_cleaned, r_peaks, fs=250, threshold=0.80):
     
     mean_sqi = float(np.nanmean(scores))
     clean_peaks = valid_peaks[scores >= threshold]
-
-    retention_rate = len(clean_peaks) / len(r_peaks)
-    print(f"Beat retention: {retention_rate:.1%}")
 
     return mean_sqi, clean_peaks
 
