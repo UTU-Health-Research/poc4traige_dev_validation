@@ -11,6 +11,8 @@ from sklearn.preprocessing import MaxAbsScaler
 
 @dataclass
 class RespirationData:
+    # timestamp
+    timestamp: np.ndarray
     # raw
     raw_ip: np.ndarray
     raw_gyr: np.ndarray
@@ -20,6 +22,9 @@ class RespirationData:
     ref_respiration: np.ndarray
     dev_ip: np.ndarray
     dev_gyr: np.ndarray
+
+    #body temperature
+    dev_temperature: np.ndarray
 
 @dataclass
 class ECGData:
@@ -40,6 +45,8 @@ class DeviceData:
 
 
 SIGNAL_MAP = {
+    # timestamp
+    "timestamp":              "timestamp",
     # ECG channels
     "impedance_pneumography": "ecg_ch1",
     "lead1":                  "ecg_ch2",
@@ -358,12 +365,14 @@ def read_and_clean(dev, ref_ecg, ref_resp, subject=None, activity=None, configur
 
     return DeviceData(
         respiration=RespirationData(
+            timestamp=np.array(raw_dev["timestamp"]),
             raw_ip=np.array(raw_dev["impedance_pneumography"]),
             raw_gyr=np.array(raw_dev["gyry_ribs_imu"]),
             raw_ref=np.array(raw_ref_respiration),
             dev_ip=np.array(prep_ip),
             dev_gyr=np.array(prep_gyr),
             ref_respiration=np.array(prep_ref_resp),
+            dev_temperature=np.array(raw_dev["body_temperature"]),
         ),
         ecg=ECGData(
             raw_dev_lead2=np.array(raw_dev["lead2"]),

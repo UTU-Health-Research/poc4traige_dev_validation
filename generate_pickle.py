@@ -7,8 +7,8 @@ from module_1 import read_and_clean
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Default location of the dataset relative to this script
-# DATASET_DIR = "../dataset"
-DATASET_DIR = "../long_term_data_p4t"
+DATASET_DIR = "../dataset"
+# DATASET_DIR = "../long_term_data_p4t"
 
 
 # ──────────────────────── discover available subjects ──────────────────────────
@@ -60,8 +60,8 @@ def _process_one_case(args):
     
 # ──────────────────────────── main batch runner ────────────────────────────────
 def run_all_parallel(
-    # output_pkl: str = "all_device_data_MnF.pkl",
-    output_pkl: str = "long_term_data.pkl",
+    output_pkl: str = "all_device_data_MnF.pkl",
+    # output_pkl: str = "long_term_data.pkl",
     configs: list[str] | None = None,
     activities: list[str] | None = None,
     subjects: list[int] | None = None,
